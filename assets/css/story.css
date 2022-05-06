@@ -1,0 +1,21 @@
+
+.story-card-text {
+    color: #333333;
+}
+
+.story-map-icon {
+    position: absolute;
+    height: 5%;
+}
+
+.story-clicky {
+    cursor: pointer;
+}
+
+.story-dark-bg {
+    background-color: #343a40
+}
+
+.completed-challenge {
+    text-decoration: line-through
+}

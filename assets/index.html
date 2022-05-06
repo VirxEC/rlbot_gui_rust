@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+	<meta charset="utf-8">
+	<meta content="width=device-width,initial-scale=1,minimal-ui" name="viewport">
+
+	<link rel="icon" type="image/png" sizes="192x192" href="imgs/rlbot_logo.png">
+
+	<!-- Load required Bootstrap and BootstrapVue CSS -->
+	<link type="text/css" rel="stylesheet" href="css/bootstrap.min.css" />
+	<link type="text/css" rel="stylesheet" href="css/bootstrap-vue.min.css" />
+
+
+
+	<link rel="stylesheet" href="css/style.css"/>
+	<link rel="stylesheet" href="css/appearance-editor.css"/>
+	<link rel="stylesheet" href="css/story.css"/>
+
+	<title>RLBot</title>
+
+</head>
+<body id="rlbotgui">
+	<div id="app" :style="bodyStyle" class="noscroll-flex">
+
+<!--		https://stackoverflow.com/a/55296309/280852-->
+		<keep-alive include="match-setup,sandbox,story">
+			<router-view @background-change="changeBackgroundImage"></router-view>
+		</keep-alive>
+
+		<div id="javascript-trouble" class="container pt-5">
+			<div class="card">
+				<div class="card-body">
+					<p>Loading RLBotGUI...</p>
+					<p>
+						If you get stuck on this message, you're probably having an issue with javascript or connecting to the backend.
+						If you've disabled javascript in your browser, you may need to re-enable it. If you're not sure,
+						you can collect some information and ask for help on <a href="https://discord.gg/5cNbXgG">Discord</a>.
+						We'll want to know:
+					</p>
+					<ul>
+						<li>What's in the console output? (black window with text)</li>
+						<li>Are there any errors in the javascript console? Press F12 and look in the 'console' area.</li>
+					</ul>
+				</div>
+			</div>
+		</div>
+
+	</div>
+
+	<!-- Load Vue followed by BootstrapVue -->
+	<script src="js/vue.min.js"></script>
+	<script src="js/bootstrap-vue.min.js"></script>
+	<script src="js/vuex.min.js"></script>
+
+	<!-- Load the following for BootstrapVueIcons support -->
+	<script src="js/bootstrap-vue-icons.min.js"></script>
+	<script type="text/javascript" src="js/vue-router.js"></script>
+    <script type="text/javascript" src="js/Sortable.min.js"></script>
+    <script type="text/javascript" src="js/vuedraggable.min.js"></script>
+	<script type="module" src="js/main.js"></script>
+	<script type="text/javascript" src='js/konva.min.js'></script>
+	<script type="text/javascript" src='js/vue-konva.min.js'></script>
+</body>
+</html>
