@@ -8,6 +8,8 @@ use imghdr::Type;
 use serde::{Deserialize, Serialize};
 use tini::{Error, Ini};
 
+use crate::rlbot::agents::{base_script::SCRIPT_FILE_KEY, runnable::Runnable};
+
 pub const BOT_CONFIG_MODULE_HEADER: &str = "Locations";
 pub const BOT_CONFIG_DETAILS_HEADER: &str = "Details";
 // pub const PYTHON_FILE_KEY: &str = "python_file";
@@ -20,7 +22,7 @@ pub const BOT_NAME_KEY: &str = "name";
 // pub const MAXIMUM_TICK_RATE_PREFERENCE_KEY: &str = "maximum_tick_rate_preference";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub struct BotInfo {
+pub struct DevInfo {
     pub developer: String,
     pub description: String,
     pub fun_fact: String,
@@ -29,7 +31,7 @@ pub struct BotInfo {
     pub tags: Vec<String>,
 }
 
-impl BotInfo {
+impl DevInfo {
     pub fn from_config(config: Ini) -> Self {
         let developer = config.get::<String>(BOT_CONFIG_DETAILS_HEADER, "developer").unwrap_or_default();
         let description = config.get::<String>(BOT_CONFIG_DETAILS_HEADER, "description").unwrap_or_default();
@@ -61,7 +63,7 @@ pub struct BotConfigBundle {
     pub looks_path: Option<String>,
     pub path: String,
     config_file_name: String,
-    pub info: BotInfo,
+    pub info: DevInfo,
     pub logo: Option<String>,
     pub type_: String,
     pub skill: u8,
@@ -135,7 +137,7 @@ impl BotConfigBundle {
 
         let logo = if Path::new(&ta_logo).exists() { to_base64(&ta_logo) } else { None };
 
-        let info = BotInfo::from_config(config);
+        let info = DevInfo::from_config(config);
 
         let type_ = String::from("rlbot");
         let skill = 1;
@@ -156,15 +158,80 @@ impl BotConfigBundle {
         })
     }
 
-    pub fn get_config_file_name(&self) -> &str {
-        &self.config_file_name
-    }
-
     pub fn is_valid_bot_config(&self) -> bool {
         if self.looks_path.is_none() || self.name.is_none() {
             return false;
         }
 
         true
+    }
+}
+
+impl Runnable for BotConfigBundle {
+    fn get_config_file_name(&self) -> &str {
+        &self.config_file_name
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct ScriptConfigBundle {
+    pub name: Option<String>,
+    pub type_: String,
+    pub image: String,
+    pub path: String,
+    pub info: DevInfo,
+    pub logo: Option<String>,
+    pub missing_python_packages: Vec<String>,
+    config_file_name: String,
+    script_file: Option<String>,
+}
+
+impl ScriptConfigBundle {
+    pub fn from_path(config_path: PathBuf) -> Result<Self, Error> {
+        let config = Ini::from_file(config_path.to_str().unwrap())?;
+
+        let name = config.get(BOT_CONFIG_MODULE_HEADER, BOT_NAME_KEY);
+        let type_ = String::from("script");
+        let image = String::from("imgs/rlbot.png");
+        let path = config_path.to_str().unwrap().to_string();
+        let config_directory = config_path.parent().unwrap().to_str().unwrap().to_string();
+        let config_file_name = config_path.file_name().unwrap().to_str().unwrap().to_string();
+
+        let t_logo = config.get::<String>(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY).unwrap_or_else(|| String::from("logo.png"));
+        let ta_logo = format!("{}/{}", config_directory, t_logo);
+        let logo = if Path::new(&ta_logo).exists() { to_base64(&ta_logo) } else { None };
+
+        let script_file = config
+            .get::<String>(BOT_CONFIG_MODULE_HEADER, SCRIPT_FILE_KEY)
+            .map(|path| format!("{}/{}", config_directory, path));
+
+        let info = DevInfo::from_config(config);
+
+        let missing_python_packages = Vec::new();
+
+        Ok(Self {
+            name,
+            type_,
+            image,
+            path,
+            info,
+            logo,
+            missing_python_packages,
+            config_file_name,
+            script_file,
+        })
+    }
+
+    pub fn is_valid_script_config(&self) -> bool {
+        match &self.script_file {
+            Some(s) => Path::new(&*s).exists(),
+            None => false,
+        }
+    }
+}
+
+impl Runnable for ScriptConfigBundle {
+    fn get_config_file_name(&self) -> &str {
+        &self.config_file_name
     }
 }

@@ -367,15 +367,15 @@ export default {
     },
     created: async function () {
         console.log(this.saveState)
-        let cities = await eel.get_cities_json(this.saveState.story_config)();
-        this.bots_config = await eel.get_bots_json(this.saveState.story_config)();
-        this.challenges = {}
-        for (let city of Object.keys(cities)) {
-            this.challenges[city] = cities[city].challenges
-            this.cityDisplayInfo[city] = cities[city].description
-            Object.assign(this.cityDisplayInfo[city], CITY_MAP_INFO[city])
-        }
-        this.switchSelectedCityToBest();
+        // let cities = await eel.get_cities_json(this.saveState.story_config)();
+        // this.bots_config = await eel.get_bots_json(this.saveState.story_config)();
+        // this.challenges = {}
+        // for (let city of Object.keys(cities)) {
+        //     this.challenges[city] = cities[city].challenges
+        //     this.cityDisplayInfo[city] = cities[city].description
+        //     Object.assign(this.cityDisplayInfo[city], CITY_MAP_INFO[city])
+        // }
+        // this.switchSelectedCityToBest();
     },
     watch: {
 

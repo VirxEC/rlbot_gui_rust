@@ -7,13 +7,18 @@ use std::{
     collections::{HashMap, HashSet},
     env,
     fs::create_dir_all,
-    path::Path,
+    path::{Path, PathBuf},
     process,
     str::FromStr,
 };
 
 use lazy_static::{initialize, lazy_static};
-use rlbot::parsing::{agent_config_parser::BotLooksConfig, bot_config_bundle::BotConfigBundle};
+use rlbot::agents::runnable::Runnable;
+use rlbot::parsing::{
+    agent_config_parser::BotLooksConfig,
+    bot_config_bundle::{BotConfigBundle, ScriptConfigBundle},
+    directory_scanner::scan_directory_for_script_configs,
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 
@@ -110,6 +115,14 @@ async fn get_folder_settings() -> BotFolderSettings {
     BOT_FOLDER_SETTINGS.lock().unwrap().clone()
 }
 
+fn filter_hidden_bundles<T: Runnable + Clone>(bundles: HashSet<T>) -> Vec<T> {
+    bundles.iter().filter(|b| !b.get_config_file_name().starts_with('_')).cloned().collect()
+}
+
+fn get_bots_from_directory(path: &str) -> Vec<BotConfigBundle> {
+    filter_hidden_bundles(scan_directory_for_bot_configs(path))
+}
+
 #[tauri::command]
 async fn scan_for_bots() -> Vec<BotConfigBundle> {
     let bfs = BOT_FOLDER_SETTINGS.lock().unwrap();
@@ -121,15 +134,37 @@ async fn scan_for_bots() -> Vec<BotConfigBundle> {
         }
     }
 
+    for (path, props) in bfs.files.iter() {
+        if props.visible {
+            bots.extend(BotConfigBundle::from_path(PathBuf::from(path)));
+        }
+    }
+
     bots
 }
 
-fn get_bots_from_directory(path: &str) -> Vec<BotConfigBundle> {
-    filter_hidden_bundles(scan_directory_for_bot_configs(path))
+fn get_scripts_from_directory(path: &str) -> Vec<ScriptConfigBundle> {
+    filter_hidden_bundles(scan_directory_for_script_configs(path))
 }
 
-fn filter_hidden_bundles(bundles: HashSet<BotConfigBundle>) -> Vec<BotConfigBundle> {
-    bundles.iter().filter(|b| !b.get_config_file_name().starts_with('_')).cloned().collect()
+#[tauri::command]
+async fn scan_for_scripts() -> Vec<ScriptConfigBundle> {
+    let bfs = BOT_FOLDER_SETTINGS.lock().unwrap();
+    let mut scripts = Vec::with_capacity(bfs.folders.len() + bfs.files.len());
+
+    for (path, props) in bfs.folders.iter() {
+        if props.visible {
+            scripts.extend(get_scripts_from_directory(&*path));
+        }
+    }
+
+    for (path, props) in bfs.files.iter() {
+        if props.visible {
+            scripts.extend(ScriptConfigBundle::from_path(PathBuf::from(path)));
+        }
+    }
+
+    scripts
 }
 
 use native_dialog::FileDialog;
@@ -184,6 +219,7 @@ fn main() {
             scan_for_bots,
             get_looks,
             save_looks,
+            scan_for_scripts,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

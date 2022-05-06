@@ -461,19 +461,19 @@ export default {
 			if (this.matchSettings.randomizeMap) await this.setRandomMap();
 
 			this.matchSettings.scripts = this.scriptPool.filter((val) => { return val.enabled });
-			eel.save_match_settings(this.matchSettings);
-			eel.save_team_settings(this.blueTeam, this.orangeTeam);
+			// eel.save_match_settings(this.matchSettings);
+			// eel.save_team_settings(this.blueTeam, this.orangeTeam);
 
 			const blueBots = this.blueTeam.map((bot) => { return  {'name': bot.name, 'team': 0, 'type': bot.type, 'skill': bot.skill, 'path': bot.path} });
 			const orangeBots = this.orangeTeam.map((bot) => { return  {'name': bot.name, 'team': 1, 'type': bot.type, 'skill': bot.skill, 'path': bot.path} });
 
 			// start match asynchronously, so it doesn't block things like updating the background image
-			setTimeout(() => {
-				eel.start_match(blueBots.concat(orangeBots), this.matchSettings);
-			}, 0);
+			// setTimeout(() => {
+			// 	eel.start_match(blueBots.concat(orangeBots), this.matchSettings);
+			// }, 0);
 		},
 		killBots: function(event) {
-			eel.kill_bots();
+			// eel.kill_bots();
 			this.matchStarting = false;
 		},
 		pickBotFolder: function (event) {
@@ -534,7 +534,7 @@ export default {
 			this.$bvModal.show('download-modal');
 			this.downloadStatus = "Starting";
 			this.downloadProgressPercent = 0;
-			eel.download_bot_pack()(this.botPackUpdated.bind(this, 'Downloaded Bot Pack!'));
+			// eel.download_bot_pack()(this.botPackUpdated.bind(this, 'Downloaded Bot Pack!'));
 		},
 		updateBotPack: function() {
 			this.showBotpackUpdateSnackbar = false;
@@ -542,7 +542,7 @@ export default {
 			this.$bvModal.show('download-modal');
 			this.downloadStatus = "Starting";
 			this.downloadProgressPercent = 0;
-			eel.update_bot_pack()(this.botPackUpdated.bind(this, 'Updated Bot Pack!'));
+			// eel.update_bot_pack()(this.botPackUpdated.bind(this, 'Updated Bot Pack!'));
 		},
 		updateMapPack: function() {
 			this.showBotpackUpdateSnackbar = false;
@@ -550,7 +550,7 @@ export default {
 			this.$bvModal.show('download-modal');
 			this.downloadStatus = "Starting";
 			this.downloadProgressPercent = 0;
-			eel.update_map_pack()(this.botPackUpdated.bind(this, 'Downloaded Maps!'));
+			// eel.update_map_pack()(this.botPackUpdated.bind(this, 'Downloaded Maps!'));
 		},
 		showAppearanceEditor: function(looksPath) {
 			this.appearancePath = looksPath;
@@ -558,32 +558,32 @@ export default {
 			this.$bvModal.show('appearance-editor-dialog');
 		},
 		pickAndEditAppearanceFile: async function() {
-			let path = await eel.pick_location(false)();
+			// let path = await eel.pick_location(false)();
 			this.activeBot = null;
-			if (path) this.showAppearanceEditor(path);
+			// if (path) this.showAppearanceEditor(path);
 		},
 		showPathInExplorer: function (path) {
 			invoke("show_path_in_explorer", { path: path });
 		},
-		hotReload: function() {
-			eel.hot_reload_python_bots();
-		},
+		// hotReload: function() {
+		// 	eel.hot_reload_python_bots();
+		// },
 		beginNewBot: function (language, bot_name) {
 			if (!bot_name) {
 				this.snackbarContent = "Please choose a proper name!";
 				this.showSnackbar = true;
 			} else if (language === 'python') {
 				this.showProgressSpinner = true;
-				eel.begin_python_bot(bot_name)(this.botLoadHandler);
+				// eel.begin_python_bot(bot_name)(this.botLoadHandler);
 			} else if (language === 'scratch') {
 				this.showProgressSpinner = true;
-				eel.begin_scratch_bot(bot_name)(this.botLoadHandler);
+				// eel.begin_scratch_bot(bot_name)(this.botLoadHandler);
 			} else if (language === 'python_hive') {
 				this.showProgressSpinner = true;
-				eel.begin_python_hivemind(bot_name)(this.botLoadHandler);
+				// eel.begin_python_hivemind(bot_name)(this.botLoadHandler);
 			} else if (language === 'rust') {
 				this.showProgressSpinner = true;
-				eel.begin_rust_bot(bot_name)(this.botLoadHandler);
+				// eel.begin_rust_bot(bot_name)(this.botLoadHandler);
 			}
 		},
 		prepareFolderSettingsDialog: function() {
@@ -594,7 +594,7 @@ export default {
 				this.botPool = STARTING_BOT_POOL;
 				this.scriptPool = [];
 				invoke("scan_for_bots").then(this.botsReceived);
-				// eel.scan_for_scripts()(this.scriptsReceived);
+				invoke("scan_for_scripts").then(this.scriptsReceived);
 			});
 		},
 		botLoadHandler: function (response) {
@@ -702,7 +702,7 @@ export default {
 		folderSettingsReceived: function (folderSettings) {
 			this.folderSettings = folderSettings;
 			invoke("scan_for_bots").then(this.botsReceived);
-			// eel.scan_for_scripts()(this.scriptsReceived);
+			invoke("scan_for_scripts").then(this.scriptsReceived);
 			// eel.get_match_options()(this.matchOptionsReceived)
 		},
 
@@ -716,8 +716,8 @@ export default {
 			this.showSnackbar = true;
 			this.$bvModal.hide('download-modal');
 			invoke("get_folder_settings").then(this.folderSettingsReceived);
-			eel.get_recommendations()(recommendations => this.recommendations = recommendations);
-			eel.get_match_options()(this.matchOptionsReceived)
+			// eel.get_recommendations()(recommendations => this.recommendations = recommendations);
+			// eel.get_match_options()(this.matchOptionsReceived)
 			this.$refs.botPool.setDefaultCategory();
 			this.isBotpackUpToDate = true;
 		},
@@ -731,11 +731,11 @@ export default {
 		},
 		installPackage: function () {
 			this.showProgressSpinner = true;
-			eel.install_package(this.packageString)(this.onInstallationComplete);
+			// eel.install_package(this.packageString)(this.onInstallationComplete);
 		},
 		installRequirements: function (configPath) {
 			this.showProgressSpinner = true;
-			eel.install_requirements(configPath)(this.onInstallationComplete);
+			// eel.install_requirements(configPath)(this.onInstallationComplete);
 		},
 		selectRecommendation: function(bots) {
 			this.blueTeam = [HUMAN];

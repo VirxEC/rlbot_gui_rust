@@ -150,7 +150,7 @@ export default {
 				this.config = {}; // prevents a memory leak from not un-loading configs when the dialog is closed
 			},
 			spawnCarForViewing: function(team) {
-				eel.spawn_car_for_viewing(this.config, team, this.selectedShowcaseType, this.map);
+				// eel.spawn_car_for_viewing(this.config, team, this.selectedShowcaseType, this.map);
 			},
 			loadLooks: async function (path) {
 				invoke('get_looks', { path: path }).then((config) => {

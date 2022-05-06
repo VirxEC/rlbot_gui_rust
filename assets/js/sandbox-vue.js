@@ -130,7 +130,7 @@ export default {
         },
     methods: {
             startWatching: function () {
-                eel.fetch_game_tick_packet_json()(this.gameTickPacketReceived);
+                // eel.fetch_game_tick_packet_json()(this.gameTickPacketReceived);
                 this.previousSecondsElapsed = 0;
             },
             gameTickPacketReceived: function (result) {
@@ -189,7 +189,7 @@ export default {
 
                 if (this.watching) {
                     setTimeout(function() {
-                        eel.fetch_game_tick_packet_json()(this.gameTickPacketReceived)
+                        // eel.fetch_game_tick_packet_json()(this.gameTickPacketReceived)
                     }.bind(this), 50);  // Delay 50 milliseconds to avoid hurting the CPU
                 }
             },
@@ -216,9 +216,9 @@ export default {
             handleBallDragEnd: function (evt) {
                 this.dragging = false;
                 const packetVec = this.toPacketVec({x: this.ball.x, y: this.ball.y, z: 10});
-                eel.set_state({
-                    ball:{physics:{location:packetVec, velocity: {x: this.ball.vx, y: this.ball.vy, z: 0}}}
-                });
+                // eel.set_state({
+                //     ball:{physics:{location:packetVec, velocity: {x: this.ball.vx, y: this.ball.vy, z: 0}}}
+                // });
             },
             handleCarDragEnd: function (evt) {
                 const index = evt.target.attrs.playerIndex;
@@ -226,9 +226,9 @@ export default {
                 const packetVec = this.toPacketVec({x: evt.target.x(), y: evt.target.y(), z: 1});
                 let cars = {};
                 cars[index] = {physics: {location: packetVec}};
-                eel.set_state({
-                    cars: cars
-                });
+                // eel.set_state({
+                //     cars: cars
+                // });
             },
             handleCarVelocityDragEnd: function(car) {
                 this.dragging = false;
@@ -238,13 +238,13 @@ export default {
                     velocity: {x: car.vx, y: car.vy, z: 0},
                     rotation: {pitch: 0, yaw: car.rotation / 180 * Math.PI, roll: 0}
                 }};
-                eel.set_state({cars: cars});
+                // eel.set_state({cars: cars});
             },
             executeCommand: function() {
-                eel.set_state({console_commands: [this.command]});
+                // eel.set_state({console_commands: [this.command]});
             },
             setGamespeed: function() {
-                eel.set_state({game_info: {game_speed: parseFloat(this.gamespeed)}});
+                // eel.set_state({game_info: {game_speed: parseFloat(this.gamespeed)}});
             },
             rewind: function () {
                 // Rewinds to the earliest point in recorded history. In many cases this will be 5 seconds ago,
@@ -271,10 +271,10 @@ export default {
                     firstPacket.game_cars.forEach(function (car, index) {
                         cars[index] = {physics: car.physics, boost_amount: car.boost}
                     });
-                    eel.set_state({
-                        cars: cars,
-                        ball: {physics: firstPacket.game_ball.physics}
-                    });
+                    // eel.set_state({
+                    //     cars: cars,
+                    //     ball: {physics: firstPacket.game_ball.physics}
+                    // });
                 }
                 this.hasPacketHistory = false;
             }
@@ -289,15 +289,15 @@ export default {
             },
             frozen: {
                 handler: function (newVal) {
-                    eel.set_state({game_info: {paused: newVal}});
+                    // eel.set_state({game_info: {paused: newVal}});
                 }
             },
             gravity: {
                 handler: function (newVal) {
                     if (newVal === 'zero') {
-                        eel.set_state({game_info: {world_gravity_z: -0.000001}});
+                        // eel.set_state({game_info: {world_gravity_z: -0.000001}});
                     } else {
-                        eel.set_state({game_info: {world_gravity_z: -650}});
+                        // eel.set_state({game_info: {world_gravity_z: -650}});
                     }
                 }
             }

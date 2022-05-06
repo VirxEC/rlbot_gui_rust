@@ -25,11 +25,11 @@ export default {
 			}
 		},
 		saveLauncherSettings: function () {
-			eel.save_launcher_settings(this.launcherSettings);
+			// eel.save_launcher_settings(this.launcherSettings);
 			this.$bvModal.hide(this.modalId);
 		},
 	},
 	created: function () {
-		eel.get_launcher_settings()(this.launcherSettingsReceived);
+		// eel.get_launcher_settings()(this.launcherSettingsReceived);
 	},
 }

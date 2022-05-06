@@ -83,10 +83,10 @@ export default {
         pickFile: async function(event) {
             let field = event.target.value;
 
-            let path = await eel.pick_location(false, 'JSON files (*.json)')(); // is_folder=False
-            if (path) {
-                this.form.custom_story[field] = path
-            }
+            // let path = await eel.pick_location(false, 'JSON files (*.json)')(); // is_folder=False
+            // if (path) {
+            //     this.form.custom_story[field] = path
+            // }
         },
         submit: function (event) {
             console.log("Submitting story-start");

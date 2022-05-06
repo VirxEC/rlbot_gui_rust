@@ -27,7 +27,7 @@ export default {
             let state = JSON.parse(this.text)
             console.log(state);
             this.$emit('input', JSON.parse(this.text));
-            eel.story_save_fake_state(state)
+            // eel.story_save_fake_state(state)
         }
     }
 };
