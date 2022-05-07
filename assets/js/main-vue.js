@@ -461,7 +461,7 @@ export default {
 			if (this.matchSettings.randomizeMap) await this.setRandomMap();
 
 			this.matchSettings.scripts = this.scriptPool.filter((val) => { return val.enabled });
-			// eel.save_match_settings(this.matchSettings);
+			invoke("save_match_settings", { settings: this.matchSettings });
 			// eel.save_team_settings(this.blueTeam, this.orangeTeam);
 
 			const blueBots = this.blueTeam.map((bot) => { return  {'name': bot.name, 'team': 0, 'type': bot.type, 'skill': bot.skill, 'path': bot.path} });

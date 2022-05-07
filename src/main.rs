@@ -61,7 +61,7 @@ impl BotFolderSettings {
         Self { files, folders }
     }
 
-    fn update_config(&mut self, bfs: BotFolderSettings) {
+    fn update_config(&mut self, bfs: Self) {
         self.files = bfs.files;
         self.folders = bfs.folders;
 
@@ -140,6 +140,47 @@ impl MutatorSettings {
             respawn_time,
         }
     }
+
+    fn update_config(&mut self, ms: Self) {
+        self.match_length = ms.match_length;
+        self.max_score = ms.max_score;
+        self.overtime = ms.overtime;
+        self.series_length = ms.series_length;
+        self.game_speed = ms.game_speed;
+        self.ball_max_speed = ms.ball_max_speed;
+        self.ball_type = ms.ball_type;
+        self.ball_weight = ms.ball_weight;
+        self.ball_size = ms.ball_size;
+        self.ball_bounciness = ms.ball_bounciness;
+        self.boost_amount = ms.boost_amount;
+        self.rumble = ms.rumble;
+        self.boost_strength = ms.boost_strength;
+        self.gravity = ms.gravity;
+        self.demolish = ms.demolish;
+        self.respawn_time = ms.respawn_time;
+
+        let path = CONFIG_PATH.lock().unwrap();
+        let conf = Ini::from_file(&*path)
+            .unwrap()
+            .section("mutator_settings")
+            .item("match_length", &self.match_length)
+            .item("max_score", &self.max_score)
+            .item("overtime", &self.overtime)
+            .item("series_length", &self.series_length)
+            .item("game_speed", &self.game_speed)
+            .item("ball_max_speed", &self.ball_max_speed)
+            .item("ball_type", &self.ball_type)
+            .item("ball_weight", &self.ball_weight)
+            .item("ball_size", &self.ball_size)
+            .item("ball_bounciness", &self.ball_bounciness)
+            .item("boost_amount", &self.boost_amount)
+            .item("rumble", &self.rumble)
+            .item("boost_strength", &self.boost_strength)
+            .item("gravity", &self.gravity)
+            .item("demolish", &self.demolish)
+            .item("respawn_time", &self.respawn_time);
+        conf.to_file(&*path).unwrap();
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -191,6 +232,39 @@ impl MatchSettings {
             mutators: MutatorSettings::from_path(path),
         }
     }
+
+    fn update_config(&mut self, ms: Self) {
+        self.map = ms.map;
+        self.game_mode = ms.game_mode;
+        self.match_behavior = ms.match_behavior;
+        self.skip_replays = ms.skip_replays;
+        self.instant_start = ms.instant_start;
+        self.enable_lockstep = ms.enable_lockstep;
+        self.randomize_map = ms.randomize_map;
+        self.enable_rendering = ms.enable_rendering;
+        self.enable_state_setting = ms.enable_state_setting;
+        self.auto_save_replay = ms.auto_save_replay;
+        self.scripts = ms.scripts;
+
+        self.mutators.update_config(ms.mutators);
+
+        let path = CONFIG_PATH.lock().unwrap();
+        let conf = Ini::from_file(&*path)
+            .unwrap()
+            .section("match_settings")
+            .item("map", &self.map)
+            .item("game_mode", &self.game_mode)
+            .item("match_behavior", &self.match_behavior)
+            .item("skip_replays", self.skip_replays)
+            .item("instant_start", self.instant_start)
+            .item("enable_lockstep", self.enable_lockstep)
+            .item("randomize_map", self.randomize_map)
+            .item("enable_rendering", self.enable_rendering)
+            .item("enable_state_setting", self.enable_state_setting)
+            .item("auto_save_replay", self.auto_save_replay)
+            .item("scripts", serde_json::to_string(&self.scripts).unwrap_or_default());
+        conf.to_file(&*path).unwrap();
+    }
 }
 
 lazy_static! {
@@ -220,7 +294,24 @@ lazy_static! {
                 .item("enable_rendering", false)
                 .item("enable_state_setting", true)
                 .item("auto_save_replay", false)
-                .item("scripts", "[]");
+                .item("scripts", "[]")
+                .section("mutator_settings")
+                .item("match_length", MATCH_LENGTH_TYPES[0].to_string())
+                .item("max_score", MAX_SCORE_TYPES[0].to_string())
+                .item("overtime", OVERTIME_MUTATOR_TYPES[0].to_string())
+                .item("series_length", SERIES_LENGTH_MUTATOR_TYPES[0].to_string())
+                .item("game_speed", GAME_SPEED_MUTATOR_TYPES[0].to_string())
+                .item("ball_max_speed", BALL_MAX_SPEED_MUTATOR_TYPES[0].to_string())
+                .item("ball_type", BALL_TYPE_MUTATOR_TYPES[0].to_string())
+                .item("ball_weight", BALL_WEIGHT_MUTATOR_TYPES[0].to_string())
+                .item("ball_size", BALL_SIZE_MUTATOR_TYPES[0].to_string())
+                .item("ball_bounciness", BALL_BOUNCINESS_MUTATOR_TYPES[0].to_string())
+                .item("boost_amount", BOOST_AMOUNT_MUTATOR_TYPES[0].to_string())
+                .item("rumble", RUMBLE_MUTATOR_TYPES[0].to_string())
+                .item("boost_strength", BOOST_STRENGTH_MUTATOR_TYPES[0].to_string())
+                .item("gravity", GRAVITY_MUTATOR_TYPES[0].to_string())
+                .item("demolish", DEMOLISH_MUTATOR_TYPES[0].to_string())
+                .item("respawn_time", RESPAWN_TIME_MUTATOR_TYPES[0].to_string());
 
             conf.to_file(&path).unwrap();
         }
@@ -348,6 +439,11 @@ async fn get_match_settings() -> MatchSettings {
     MATCH_SETTINGS.lock().unwrap().clone()
 }
 
+#[tauri::command]
+async fn save_match_settings(settings: MatchSettings) {
+    MATCH_SETTINGS.lock().unwrap().update_config(settings);
+}
+
 fn main() {
     initialize(&CONFIG_PATH);
     initialize(&BOT_FOLDER_SETTINGS);
@@ -365,6 +461,7 @@ fn main() {
             scan_for_scripts,
             get_match_options,
             get_match_settings,
+            save_match_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
