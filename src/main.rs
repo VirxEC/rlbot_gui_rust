@@ -444,6 +444,28 @@ async fn save_match_settings(settings: MatchSettings) {
     MATCH_SETTINGS.lock().unwrap().update_config(settings);
 }
 
+#[tauri::command]
+async fn get_team_settings() -> HashMap<String, Vec<HashMap<String, String>>> {
+    let config = Ini::from_file(&*CONFIG_PATH.lock().unwrap()).unwrap();
+    let blue_team = serde_json::from_str(&*config.get::<String>("team_settings", "blue_team").unwrap_or_else(|| "[{\"name\": \"Human\", \"type_\": \"human\", \"image\": \"imgs/human.png\"}]".to_string())).unwrap();
+    let orange_team = serde_json::from_str(&*config.get::<String>("team_settings", "orange_team").unwrap_or_else(|| "[]".to_string())).unwrap();
+
+    let mut bots = HashMap::new();
+    bots.insert("blue_team".to_string(), blue_team);
+    bots.insert("orange_team".to_string(), orange_team);
+
+    bots
+}
+
+#[tauri::command]
+async fn save_team_settings(blue_team: Vec<HashMap<String, String>>, orange_team: Vec<HashMap<String, String>>) {
+    let config = Ini::from_file(&*CONFIG_PATH.lock().unwrap()).unwrap()
+        .section("team_settings")
+        .item("blue_team", serde_json::to_string(&blue_team).unwrap())
+        .item("orange_team", serde_json::to_string(&orange_team).unwrap());
+    config.to_file(&*CONFIG_PATH.lock().unwrap()).unwrap();
+}
+
 fn main() {
     initialize(&CONFIG_PATH);
     initialize(&BOT_FOLDER_SETTINGS);
@@ -462,6 +484,8 @@ fn main() {
             get_match_options,
             get_match_settings,
             save_match_settings,
+            get_team_settings,
+            save_team_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

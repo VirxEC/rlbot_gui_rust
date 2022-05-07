@@ -8,12 +8,12 @@ import LauncherPreferenceModal from './launcher-preference-vue.js'
 
 const invoke = window.__TAURI__.invoke;
 
-const HUMAN = {'name': 'Human', 'type': 'human', 'image': 'imgs/human.png'};
+const HUMAN = {'name': 'Human', 'type_': 'human', 'image': 'imgs/human.png'};
 const STARTING_BOT_POOL = [
 	HUMAN,
-	{'name': 'Psyonix Allstar', 'type': 'psyonix', 'skill': 1, 'image': 'imgs/psyonix.png'},
-	{'name': 'Psyonix Pro', 'type': 'psyonix', 'skill': 0.5, 'image': 'imgs/psyonix.png'},
-	{'name': 'Psyonix Rookie', 'type': 'psyonix', 'skill': 0, 'image': 'imgs/psyonix.png'}
+	{'name': 'Psyonix Allstar', 'type_': 'psyonix', 'skill': 1, 'image': 'imgs/psyonix.png'},
+	{'name': 'Psyonix Pro', 'type_': 'psyonix', 'skill': 0.5, 'image': 'imgs/psyonix.png'},
+	{'name': 'Psyonix Rookie', 'type_': 'psyonix', 'skill': 0, 'image': 'imgs/psyonix.png'}
 ];
 
 export default {
@@ -462,7 +462,7 @@ export default {
 
 			this.matchSettings.scripts = this.scriptPool.filter((val) => { return val.enabled });
 			invoke("save_match_settings", { settings: this.matchSettings });
-			// eel.save_team_settings(this.blueTeam, this.orangeTeam);
+			invoke("save_team_settings", { blueTeam: this.blueTeam, orangeTeam: this.orangeTeam });
 
 			const blueBots = this.blueTeam.map((bot) => { return  {'name': bot.name, 'team': 0, 'type': bot.type, 'skill': bot.skill, 'path': bot.path} });
 			const orangeBots = this.orangeTeam.map((bot) => { return  {'name': bot.name, 'team': 1, 'type': bot.type, 'skill': bot.skill, 'path': bot.path} });
@@ -693,6 +693,13 @@ export default {
 			}
 		},
 		teamSettingsReceived: function (teamSettings) {
+			console.log(this.blueTeam)
+			console.log(this.orangeTeam)
+			console.log(teamSettings)
+			console.log(teamSettings.blue_team)
+			console.log(teamSettings['blue_team'])
+			console.log(teamSettings.orange_team)
+			console.log(teamSettings['orange_team'])
 			if (teamSettings) {
 				this.blueTeam = teamSettings.blue_team;
 				this.orangeTeam = teamSettings.orange_team;
@@ -749,7 +756,7 @@ export default {
 			invoke('get_folder_settings').then(this.folderSettingsReceived);
 			invoke("get_match_options").then(this.matchOptionsReceived);
 			invoke("get_match_settings").then(this.matchSettingsReceived);
-			// eel.get_team_settings()(this.teamSettingsReceived);
+			invoke("get_team_settings").then(this.teamSettingsReceived);
 
 			// eel.get_language_support()((support) => {
 			// 	this.languageSupport = support;
