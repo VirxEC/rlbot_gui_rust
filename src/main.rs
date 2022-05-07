@@ -13,18 +13,18 @@ use std::{
 };
 
 use lazy_static::{initialize, lazy_static};
-use rlbot::agents::runnable::Runnable;
 use rlbot::parsing::{
     agent_config_parser::BotLooksConfig,
     bot_config_bundle::{BotConfigBundle, ScriptConfigBundle},
     directory_scanner::scan_directory_for_script_configs,
 };
+use rlbot::{agents::runnable::Runnable, parsing::match_settings_config_parser::*};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 
 use tini::Ini;
 
-use crate::rlbot::parsing::directory_scanner::scan_directory_for_bot_configs;
+use rlbot::parsing::directory_scanner::scan_directory_for_bot_configs;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct BotFolder {
@@ -52,8 +52,8 @@ struct BotFolderSettings {
 }
 
 impl BotFolderSettings {
-    fn new() -> Self {
-        let conf = Ini::from_file(&*CONFIG_PATH.lock().unwrap()).unwrap();
+    fn from_path(path: &String) -> Self {
+        let conf = Ini::from_file(path).unwrap();
         let files = serde_json::from_str(&*conf.get::<String>("bot_folder_settings", "files").unwrap_or_else(|| "[]".to_string())).unwrap_or_default();
 
         let folders = serde_json::from_str(&*conf.get::<String>("bot_folder_settings", "folders").unwrap_or_else(|| "[]".to_string())).unwrap_or_default();
@@ -80,6 +80,119 @@ impl BotFolderSettings {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct MutatorSettings {
+    pub match_length: String,
+    pub max_score: String,
+    pub overtime: String,
+    pub series_length: String,
+    pub game_speed: String,
+    pub ball_max_speed: String,
+    pub ball_type: String,
+    pub ball_weight: String,
+    pub ball_size: String,
+    pub ball_bounciness: String,
+    pub boost_amount: String,
+    pub rumble: String,
+    pub boost_strength: String,
+    pub gravity: String,
+    pub demolish: String,
+    pub respawn_time: String,
+}
+
+impl MutatorSettings {
+    fn from_path(path: &String) -> Self {
+        let conf = Ini::from_file(path).unwrap();
+
+        let match_length = conf.get::<String>("mutator_settings", "match_length").unwrap_or_else(|| MATCH_LENGTH_TYPES[0].to_string());
+        let max_score = conf.get::<String>("mutator_settings", "max_score").unwrap_or_else(|| MAX_SCORE_TYPES[0].to_string());
+        let overtime = conf.get::<String>("mutator_settings", "overtime").unwrap_or_else(|| OVERTIME_MUTATOR_TYPES[0].to_string());
+        let series_length = conf.get::<String>("mutator_settings", "series_length").unwrap_or_else(|| SERIES_LENGTH_MUTATOR_TYPES[0].to_string());
+        let game_speed = conf.get::<String>("mutator_settings", "game_speed").unwrap_or_else(|| GAME_SPEED_MUTATOR_TYPES[0].to_string());
+        let ball_max_speed = conf.get::<String>("mutator_settings", "ball_max_speed").unwrap_or_else(|| BALL_MAX_SPEED_MUTATOR_TYPES[0].to_string());
+        let ball_type = conf.get::<String>("mutator_settings", "ball_type").unwrap_or_else(|| BALL_TYPE_MUTATOR_TYPES[0].to_string());
+        let ball_weight = conf.get::<String>("mutator_settings", "ball_weight").unwrap_or_else(|| BALL_WEIGHT_MUTATOR_TYPES[0].to_string());
+        let ball_size = conf.get::<String>("mutator_settings", "ball_size").unwrap_or_else(|| BALL_SIZE_MUTATOR_TYPES[0].to_string());
+        let ball_bounciness = conf.get::<String>("mutator_settings", "ball_bounciness").unwrap_or_else(|| BALL_BOUNCINESS_MUTATOR_TYPES[0].to_string());
+        let boost_amount = conf.get::<String>("mutator_settings", "boost_amount").unwrap_or_else(|| BOOST_AMOUNT_MUTATOR_TYPES[0].to_string());
+        let rumble = conf.get::<String>("mutator_settings", "rumble").unwrap_or_else(|| RUMBLE_MUTATOR_TYPES[0].to_string());
+        let boost_strength = conf.get::<String>("mutator_settings", "boost_strength").unwrap_or_else(|| BOOST_STRENGTH_MUTATOR_TYPES[0].to_string());
+        let gravity = conf.get::<String>("mutator_settings", "gravity").unwrap_or_else(|| GRAVITY_MUTATOR_TYPES[0].to_string());
+        let demolish = conf.get::<String>("mutator_settings", "demolish").unwrap_or_else(|| DEMOLISH_MUTATOR_TYPES[0].to_string());
+        let respawn_time = conf.get::<String>("mutator_settings", "respawn_time").unwrap_or_else(|| RESPAWN_TIME_MUTATOR_TYPES[0].to_string());
+
+        Self {
+            match_length,
+            max_score,
+            overtime,
+            series_length,
+            game_speed,
+            ball_max_speed,
+            ball_type,
+            ball_weight,
+            ball_size,
+            ball_bounciness,
+            boost_amount,
+            rumble,
+            boost_strength,
+            gravity,
+            demolish,
+            respawn_time,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct MatchSettings {
+    pub map: String,
+    pub game_mode: String,
+    pub match_behavior: String,
+    pub skip_replays: bool,
+    pub instant_start: bool,
+    pub enable_lockstep: bool,
+    pub randomize_map: bool,
+    pub enable_rendering: bool,
+    pub enable_state_setting: bool,
+    pub auto_save_replay: bool,
+    pub scripts: Vec<String>,
+    pub mutators: MutatorSettings,
+}
+
+impl MatchSettings {
+    fn from_path(path: &String) -> Self {
+        let conf = Ini::from_file(path).unwrap();
+
+        let map = conf.get::<String>("match_settings", "map").unwrap_or_else(|| MAP_TYPES[0].to_string());
+        let game_mode = conf.get::<String>("match_settings", "game_mode").unwrap_or_else(|| GAME_MODES[0].to_string());
+        let match_behavior = conf
+            .get::<String>("match_settings", "match_behavior")
+            .unwrap_or_else(|| EXISTING_MATCH_BEHAVIOR_TYPES[0].to_string());
+        let skip_replays = conf.get::<bool>("match_settings", "skip_replays").unwrap_or(false);
+        let instant_start = conf.get::<bool>("match_settings", "instant_start").unwrap_or(false);
+        let enable_lockstep = conf.get::<bool>("match_settings", "enable_lockstep").unwrap_or(false);
+        let randomize_map = conf.get::<bool>("match_settings", "randomize_map").unwrap_or(false);
+        let enable_rendering = conf.get::<bool>("match_settings", "enable_rendering").unwrap_or(false);
+        let enable_state_setting = conf.get::<bool>("match_settings", "enable_state_setting").unwrap_or(true);
+        let auto_save_replay = conf.get::<bool>("match_settings", "auto_save_replay").unwrap_or(false);
+        let scripts = conf.get::<String>("match_settings", "scripts").unwrap_or_else(|| "[]".to_string());
+
+        Self {
+            map,
+            game_mode,
+            match_behavior,
+            skip_replays,
+            instant_start,
+            enable_lockstep,
+            randomize_map,
+            enable_rendering,
+            enable_state_setting,
+            auto_save_replay,
+            scripts: serde_json::from_str(&scripts).unwrap_or_default(),
+            mutators: MutatorSettings::from_path(path),
+        }
+    }
+}
+
 lazy_static! {
     static ref CONFIG_PATH: Mutex<String> = {
         let path = match env::consts::FAMILY {
@@ -92,7 +205,22 @@ lazy_static! {
 
         if !path.exists() {
             create_dir_all(path.parent().unwrap()).unwrap();
-            let conf = Ini::new().section("bot_folder_settings").item("files", "[]").item("folders", "[]");
+            let conf = Ini::new()
+                .section("bot_folder_settings")
+                .item("files", "[]")
+                .item("folders", "[]")
+                .section("match_settings")
+                .item("map", MAP_TYPES[0].to_string())
+                .item("game_mode", GAME_MODES[0].to_string())
+                .item("match_behavior", EXISTING_MATCH_BEHAVIOR_TYPES[0].to_string())
+                .item("skip_replays", false)
+                .item("instant_start", false)
+                .item("enable_lockstep", false)
+                .item("randomize_map", false)
+                .item("enable_rendering", false)
+                .item("enable_state_setting", true)
+                .item("auto_save_replay", false)
+                .item("scripts", "[]");
 
             conf.to_file(&path).unwrap();
         }
@@ -102,7 +230,8 @@ lazy_static! {
 }
 
 lazy_static! {
-    static ref BOT_FOLDER_SETTINGS: Mutex<BotFolderSettings> = Mutex::new(BotFolderSettings::new());
+    static ref BOT_FOLDER_SETTINGS: Mutex<BotFolderSettings> = Mutex::new(BotFolderSettings::from_path(&*CONFIG_PATH.lock().unwrap()));
+    static ref MATCH_SETTINGS: Mutex<MatchSettings> = Mutex::new(MatchSettings::from_path(&*CONFIG_PATH.lock().unwrap()));
 }
 
 #[tauri::command]
@@ -183,7 +312,10 @@ async fn pick_bot_folder() {
 async fn show_path_in_explorer(path: String) {
     let command = match env::consts::FAMILY {
         "windows" => "explorer.exe",
-        "unix" => "xdg-open",
+        "unix" => match env::consts::OS {
+            "macos" => "open",
+            _ => "xdg-open",
+        },
         _ => unreachable!("Unsupported OS"),
     };
 
@@ -206,9 +338,20 @@ async fn save_looks(path: String, config: BotLooksConfig) {
     config.save_to_path(&*path);
 }
 
+#[tauri::command]
+async fn get_match_options() -> MatchOptions {
+    MatchOptions::new()
+}
+
+#[tauri::command]
+async fn get_match_settings() -> MatchSettings {
+    MATCH_SETTINGS.lock().unwrap().clone()
+}
+
 fn main() {
     initialize(&CONFIG_PATH);
     initialize(&BOT_FOLDER_SETTINGS);
+    initialize(&MATCH_SETTINGS);
 
     tauri::Builder::default()
         .invoke_handler(tauri::generate_handler![
@@ -220,6 +363,8 @@ fn main() {
             get_looks,
             save_looks,
             scan_for_scripts,
+            get_match_options,
+            get_match_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

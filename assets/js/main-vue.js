@@ -703,7 +703,7 @@ export default {
 			this.folderSettings = folderSettings;
 			invoke("scan_for_bots").then(this.botsReceived);
 			invoke("scan_for_scripts").then(this.scriptsReceived);
-			// eel.get_match_options()(this.matchOptionsReceived)
+			invoke("get_match_options").then(this.matchOptionsReceived);
 		},
 
 		botpackUpdateChecked: function (isBotpackUpToDate) {
@@ -717,7 +717,7 @@ export default {
 			this.$bvModal.hide('download-modal');
 			invoke("get_folder_settings").then(this.folderSettingsReceived);
 			// eel.get_recommendations()(recommendations => this.recommendations = recommendations);
-			// eel.get_match_options()(this.matchOptionsReceived)
+			invoke("get_match_options").then(this.matchOptionsReceived);
 			this.$refs.botPool.setDefaultCategory();
 			this.isBotpackUpToDate = true;
 		},
@@ -747,8 +747,8 @@ export default {
 				return
 			}
 			invoke('get_folder_settings').then(this.folderSettingsReceived);
-			// eel.get_match_options()(this.matchOptionsReceived);
-			// eel.get_match_settings()(this.matchSettingsReceived);
+			invoke("get_match_options").then(this.matchOptionsReceived);
+			invoke("get_match_settings").then(this.matchSettingsReceived);
 			// eel.get_team_settings()(this.teamSettingsReceived);
 
 			// eel.get_language_support()((support) => {
@@ -759,24 +759,22 @@ export default {
 			// eel.is_botpack_up_to_date()(this.botpackUpdateChecked);
 			// eel.get_recommendations()(recommendations => this.recommendations = recommendations);
 
-			// const self = this;
-
 			// eel.expose(noRLBotFlagPopup)
 			// function noRLBotFlagPopup(title, text){
-			// 	self.$bvModal.show("no-rlbot-flag-modal")
-			// 	self.matchStarting = false;
+			// 	this.$bvModal.show("no-rlbot-flag-modal")
+			// 	this.matchStarting = false;
 			// }
 
 			// eel.expose(matchStarted)
 			// function matchStarted(){
-			// 	self.matchStarting = false;
-			// 	self.gameAlreadyLaunched = true;
+			// 	this.matchStarting = false;
+			// 	this.gameAlreadyLaunched = true;
 			// }
 
 			// eel.expose(updateDownloadProgress);
 			// function updateDownloadProgress(progress, status) {
-			// 	self.downloadStatus = status;
-			// 	self.downloadProgressPercent = progress;
+			// 	this.downloadStatus = status;
+			// 	this.downloadProgressPercent = progress;
 			// }
 		}
 	},
