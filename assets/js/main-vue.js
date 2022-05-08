@@ -462,6 +462,9 @@ export default {
 
 			this.matchSettings.scripts = this.scriptPool.filter((val) => { return val.enabled });
 			invoke("save_match_settings", { settings: this.matchSettings });
+
+			console.log(this.blueTeam)
+			console.log(this.orangeTeam)
 			invoke("save_team_settings", { blueTeam: this.blueTeam, orangeTeam: this.orangeTeam });
 
 			const blueBots = this.blueTeam.map((bot) => { return  {'name': bot.name, 'team': 0, 'type': bot.type, 'skill': bot.skill, 'path': bot.path} });
@@ -693,16 +696,11 @@ export default {
 			}
 		},
 		teamSettingsReceived: function (teamSettings) {
-			console.log(this.blueTeam)
-			console.log(this.orangeTeam)
-			console.log(teamSettings)
-			console.log(teamSettings.blue_team)
-			console.log(teamSettings['blue_team'])
-			console.log(teamSettings.orange_team)
-			console.log(teamSettings['orange_team'])
 			if (teamSettings) {
 				this.blueTeam = teamSettings.blue_team;
 				this.orangeTeam = teamSettings.orange_team;
+				console.log(this.blueTeam)
+				console.log(this.orangeTeam)
 			}
 		},
 

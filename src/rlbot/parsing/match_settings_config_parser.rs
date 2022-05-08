@@ -133,25 +133,29 @@ pub struct Mutators {
     pub respawn_time_types: Vec<String>,
 }
 
+fn vec_to_string(vec: &[&str]) -> Vec<String> {
+    vec.iter().map(|s| s.to_string()).collect()
+}
+
 impl Mutators {
     pub fn new() -> Self {
         Self {
-            match_length_types: MATCH_LENGTH_TYPES.iter().map(|s| s.to_string()).collect(),
-            max_score_types: MAX_SCORE_TYPES.iter().map(|s| s.to_string()).collect(),
-            overtime_types: OVERTIME_MUTATOR_TYPES.iter().map(|s| s.to_string()).collect(),
-            series_length_types: SERIES_LENGTH_MUTATOR_TYPES.iter().map(|s| s.to_string()).collect(),
-            game_speed_types: GAME_SPEED_MUTATOR_TYPES.iter().map(|s| s.to_string()).collect(),
-            ball_max_speed_types: BALL_MAX_SPEED_MUTATOR_TYPES.iter().map(|s| s.to_string()).collect(),
-            ball_type_types: BALL_TYPE_MUTATOR_TYPES.iter().map(|s| s.to_string()).collect(),
-            ball_weight_types: BALL_WEIGHT_MUTATOR_TYPES.iter().map(|s| s.to_string()).collect(),
-            ball_size_types: BALL_SIZE_MUTATOR_TYPES.iter().map(|s| s.to_string()).collect(),
-            ball_bounciness_types: BALL_BOUNCINESS_MUTATOR_TYPES.iter().map(|s| s.to_string()).collect(),
-            boost_amount_types: BOOST_AMOUNT_MUTATOR_TYPES.iter().map(|s| s.to_string()).collect(),
-            rumble_types: RUMBLE_MUTATOR_TYPES.iter().map(|s| s.to_string()).collect(),
-            boost_strength_types: BOOST_STRENGTH_MUTATOR_TYPES.iter().map(|s| s.to_string()).collect(),
-            gravity_types: GRAVITY_MUTATOR_TYPES.iter().map(|s| s.to_string()).collect(),
-            demolish_types: DEMOLISH_MUTATOR_TYPES.iter().map(|s| s.to_string()).collect(),
-            respawn_time_types: RESPAWN_TIME_MUTATOR_TYPES.iter().map(|s| s.to_string()).collect(),
+            match_length_types: vec_to_string(&MATCH_LENGTH_TYPES),
+            max_score_types: vec_to_string(&MAX_SCORE_TYPES),
+            overtime_types: vec_to_string(&OVERTIME_MUTATOR_TYPES),
+            series_length_types: vec_to_string(&SERIES_LENGTH_MUTATOR_TYPES),
+            game_speed_types: vec_to_string(&GAME_SPEED_MUTATOR_TYPES),
+            ball_max_speed_types: vec_to_string(&BALL_MAX_SPEED_MUTATOR_TYPES),
+            ball_type_types: vec_to_string(&BALL_TYPE_MUTATOR_TYPES),
+            ball_weight_types: vec_to_string(&BALL_WEIGHT_MUTATOR_TYPES),
+            ball_size_types: vec_to_string(&BALL_SIZE_MUTATOR_TYPES),
+            ball_bounciness_types: vec_to_string(&BALL_BOUNCINESS_MUTATOR_TYPES),
+            boost_amount_types: vec_to_string(&BOOST_AMOUNT_MUTATOR_TYPES),
+            rumble_types: vec_to_string(&RUMBLE_MUTATOR_TYPES),
+            boost_strength_types: vec_to_string(&BOOST_STRENGTH_MUTATOR_TYPES),
+            gravity_types: vec_to_string(&GRAVITY_MUTATOR_TYPES),
+            demolish_types: vec_to_string(&DEMOLISH_MUTATOR_TYPES),
+            respawn_time_types: vec_to_string(&RESPAWN_TIME_MUTATOR_TYPES),
         }
     }
 }
@@ -167,9 +171,9 @@ pub struct MatchOptions {
 impl MatchOptions {
     pub fn new() -> Self {
         Self {
-            map_types: MAP_TYPES.iter().map(|x| x.to_string()).collect(),
-            game_modes: GAME_MODES.iter().map(|x| x.to_string()).collect(),
-            match_behaviours: EXISTING_MATCH_BEHAVIOR_TYPES.iter().map(|x| x.to_string()).collect(),
+            map_types: vec_to_string(&MAP_TYPES),
+            game_modes: vec_to_string(&GAME_MODES),
+            match_behaviours: vec_to_string(&EXISTING_MATCH_BEHAVIOR_TYPES),
             mutators: Mutators::new(),
         }
     }

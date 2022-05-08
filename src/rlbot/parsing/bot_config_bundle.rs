@@ -57,21 +57,6 @@ impl DevInfo {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
-pub struct BotConfigBundle {
-    pub name: Option<String>,
-    pub looks_path: Option<String>,
-    pub path: String,
-    config_file_name: String,
-    pub info: DevInfo,
-    pub logo: Option<String>,
-    pub type_: String,
-    pub skill: u8,
-    pub image: String,
-    pub missing_python_packages: Vec<String>,
-}
-
-/// Returns a file's extension based on the its hexidecimal representation.
 fn get_file_extension(vec: &[u8]) -> Option<&'static str> {
     match imghdr::from_bytes(vec) {
         // Gif 87a and 89a Files
@@ -120,12 +105,27 @@ pub fn to_base64(path: &str) -> Option<String> {
     get_file_extension(&vec).map(|extension| format!("data:image/{};base64,{}", extension, base64::encode(vec).replace("\r\n", "")))
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct BotConfigBundle {
+    pub name: Option<String>,
+    pub looks_path: Option<String>,
+    pub path: Option<String>,
+    config_file_name: Option<String>,
+    pub info: Option<DevInfo>,
+    pub logo_path: Option<String>,
+    pub logo: Option<String>,
+    pub type_: String,
+    pub skill: Option<u8>,
+    pub image: String,
+    pub missing_python_packages: Option<Vec<String>>,
+}
+
 impl BotConfigBundle {
     pub fn from_path(config_path: PathBuf) -> Result<Self, Error> {
         let config = Ini::from_file(config_path.to_str().unwrap())?;
         let path = config_path.to_str().unwrap().to_string();
         let config_directory = config_path.parent().unwrap().to_str().unwrap().to_string();
-        let config_file_name = config_path.file_name().unwrap().to_str().unwrap().to_string();
+        let config_file_name = Some(config_path.file_name().unwrap().to_str().unwrap().to_string());
 
         let name = config.get(BOT_CONFIG_MODULE_HEADER, BOT_NAME_KEY);
         let looks_path = config
@@ -137,12 +137,15 @@ impl BotConfigBundle {
 
         let logo = if Path::new(&ta_logo).exists() { to_base64(&ta_logo) } else { None };
 
-        let info = DevInfo::from_config(config);
+        let info = Some(DevInfo::from_config(config));
 
         let type_ = String::from("rlbot");
-        let skill = 1;
+        let skill = Some(1);
         let image = String::from("imgs/rlbot.png");
-        let missing_python_packages = Vec::new();
+        let missing_python_packages = Some(Vec::new());
+
+        let path = Some(path);
+        let logo_path = Some(ta_logo);
 
         Ok(Self {
             name,
@@ -150,6 +153,7 @@ impl BotConfigBundle {
             path,
             config_file_name,
             info,
+            logo_path,
             logo,
             type_,
             skill,
@@ -159,17 +163,33 @@ impl BotConfigBundle {
     }
 
     pub fn is_valid_bot_config(&self) -> bool {
-        if self.looks_path.is_none() || self.name.is_none() {
+        if self.looks_path.is_none() || self.name.is_none() || self.config_file_name.is_none() {
             return false;
         }
 
         true
     }
+
+    pub fn cleaned(&self) -> Self {
+        let mut b = self.clone();
+        b.info = None;
+        b.logo = None;
+        b.missing_python_packages = None;
+        b
+    }
+
+    pub fn with_logo(&self) -> Self {
+        let mut b = self.clone();
+        if let Some(logo_path) = &b.logo_path {
+            b.logo = to_base64(&**logo_path);
+        }
+        b
+    }
 }
 
 impl Runnable for BotConfigBundle {
     fn get_config_file_name(&self) -> &str {
-        &self.config_file_name
+        self.config_file_name.as_ref().unwrap()
     }
 }
 

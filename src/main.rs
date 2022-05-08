@@ -1,5 +1,6 @@
 #![cfg_attr(all(not(debug_assertions), target_os = "windows"), windows_subsystem = "windows")]
 
+mod custom_maps;
 mod rlbot;
 
 use core::fmt;
@@ -12,6 +13,7 @@ use std::{
     str::FromStr,
 };
 
+use custom_maps::find_all_custom_maps;
 use lazy_static::{initialize, lazy_static};
 use rlbot::parsing::{
     agent_config_parser::BotLooksConfig,
@@ -27,7 +29,7 @@ use tini::Ini;
 use rlbot::parsing::directory_scanner::scan_directory_for_bot_configs;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct BotFolder {
+pub struct BotFolder {
     pub visible: bool,
 }
 
@@ -46,9 +48,9 @@ impl FromStr for BotFolder {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct BotFolderSettings {
-    files: HashMap<String, BotFolder>,
-    folders: HashMap<String, BotFolder>,
+pub struct BotFolderSettings {
+    pub files: HashMap<String, BotFolder>,
+    pub folders: HashMap<String, BotFolder>,
 }
 
 impl BotFolderSettings {
@@ -107,19 +109,39 @@ impl MutatorSettings {
         let match_length = conf.get::<String>("mutator_settings", "match_length").unwrap_or_else(|| MATCH_LENGTH_TYPES[0].to_string());
         let max_score = conf.get::<String>("mutator_settings", "max_score").unwrap_or_else(|| MAX_SCORE_TYPES[0].to_string());
         let overtime = conf.get::<String>("mutator_settings", "overtime").unwrap_or_else(|| OVERTIME_MUTATOR_TYPES[0].to_string());
-        let series_length = conf.get::<String>("mutator_settings", "series_length").unwrap_or_else(|| SERIES_LENGTH_MUTATOR_TYPES[0].to_string());
-        let game_speed = conf.get::<String>("mutator_settings", "game_speed").unwrap_or_else(|| GAME_SPEED_MUTATOR_TYPES[0].to_string());
-        let ball_max_speed = conf.get::<String>("mutator_settings", "ball_max_speed").unwrap_or_else(|| BALL_MAX_SPEED_MUTATOR_TYPES[0].to_string());
-        let ball_type = conf.get::<String>("mutator_settings", "ball_type").unwrap_or_else(|| BALL_TYPE_MUTATOR_TYPES[0].to_string());
-        let ball_weight = conf.get::<String>("mutator_settings", "ball_weight").unwrap_or_else(|| BALL_WEIGHT_MUTATOR_TYPES[0].to_string());
-        let ball_size = conf.get::<String>("mutator_settings", "ball_size").unwrap_or_else(|| BALL_SIZE_MUTATOR_TYPES[0].to_string());
-        let ball_bounciness = conf.get::<String>("mutator_settings", "ball_bounciness").unwrap_or_else(|| BALL_BOUNCINESS_MUTATOR_TYPES[0].to_string());
-        let boost_amount = conf.get::<String>("mutator_settings", "boost_amount").unwrap_or_else(|| BOOST_AMOUNT_MUTATOR_TYPES[0].to_string());
+        let series_length = conf
+            .get::<String>("mutator_settings", "series_length")
+            .unwrap_or_else(|| SERIES_LENGTH_MUTATOR_TYPES[0].to_string());
+        let game_speed = conf
+            .get::<String>("mutator_settings", "game_speed")
+            .unwrap_or_else(|| GAME_SPEED_MUTATOR_TYPES[0].to_string());
+        let ball_max_speed = conf
+            .get::<String>("mutator_settings", "ball_max_speed")
+            .unwrap_or_else(|| BALL_MAX_SPEED_MUTATOR_TYPES[0].to_string());
+        let ball_type = conf
+            .get::<String>("mutator_settings", "ball_type")
+            .unwrap_or_else(|| BALL_TYPE_MUTATOR_TYPES[0].to_string());
+        let ball_weight = conf
+            .get::<String>("mutator_settings", "ball_weight")
+            .unwrap_or_else(|| BALL_WEIGHT_MUTATOR_TYPES[0].to_string());
+        let ball_size = conf
+            .get::<String>("mutator_settings", "ball_size")
+            .unwrap_or_else(|| BALL_SIZE_MUTATOR_TYPES[0].to_string());
+        let ball_bounciness = conf
+            .get::<String>("mutator_settings", "ball_bounciness")
+            .unwrap_or_else(|| BALL_BOUNCINESS_MUTATOR_TYPES[0].to_string());
+        let boost_amount = conf
+            .get::<String>("mutator_settings", "boost_amount")
+            .unwrap_or_else(|| BOOST_AMOUNT_MUTATOR_TYPES[0].to_string());
         let rumble = conf.get::<String>("mutator_settings", "rumble").unwrap_or_else(|| RUMBLE_MUTATOR_TYPES[0].to_string());
-        let boost_strength = conf.get::<String>("mutator_settings", "boost_strength").unwrap_or_else(|| BOOST_STRENGTH_MUTATOR_TYPES[0].to_string());
+        let boost_strength = conf
+            .get::<String>("mutator_settings", "boost_strength")
+            .unwrap_or_else(|| BOOST_STRENGTH_MUTATOR_TYPES[0].to_string());
         let gravity = conf.get::<String>("mutator_settings", "gravity").unwrap_or_else(|| GRAVITY_MUTATOR_TYPES[0].to_string());
         let demolish = conf.get::<String>("mutator_settings", "demolish").unwrap_or_else(|| DEMOLISH_MUTATOR_TYPES[0].to_string());
-        let respawn_time = conf.get::<String>("mutator_settings", "respawn_time").unwrap_or_else(|| RESPAWN_TIME_MUTATOR_TYPES[0].to_string());
+        let respawn_time = conf
+            .get::<String>("mutator_settings", "respawn_time")
+            .unwrap_or_else(|| RESPAWN_TIME_MUTATOR_TYPES[0].to_string());
 
         Self {
             match_length,
@@ -431,7 +453,9 @@ async fn save_looks(path: String, config: BotLooksConfig) {
 
 #[tauri::command]
 async fn get_match_options() -> MatchOptions {
-    MatchOptions::new()
+    let mut mo = MatchOptions::new();
+    mo.map_types.extend(find_all_custom_maps(&BOT_FOLDER_SETTINGS.lock().unwrap().folders));
+    mo
 }
 
 #[tauri::command]
@@ -444,25 +468,39 @@ async fn save_match_settings(settings: MatchSettings) {
     MATCH_SETTINGS.lock().unwrap().update_config(settings);
 }
 
+fn fetch_logos(bfb: Vec<BotConfigBundle>) -> Vec<BotConfigBundle> {
+    bfb.iter().map(|b| b.with_logo()).collect()
+}
+
 #[tauri::command]
-async fn get_team_settings() -> HashMap<String, Vec<HashMap<String, String>>> {
+async fn get_team_settings() -> HashMap<String, Vec<BotConfigBundle>> {
     let config = Ini::from_file(&*CONFIG_PATH.lock().unwrap()).unwrap();
-    let blue_team = serde_json::from_str(&*config.get::<String>("team_settings", "blue_team").unwrap_or_else(|| "[{\"name\": \"Human\", \"type_\": \"human\", \"image\": \"imgs/human.png\"}]".to_string())).unwrap();
+    let blue_team = serde_json::from_str(
+        &*config
+            .get::<String>("team_settings", "blue_team")
+            .unwrap_or_else(|| "[{\"name\": \"Human\", \"type_\": \"human\", \"image\": \"imgs/human.png\"}]".to_string()),
+    )
+    .unwrap();
     let orange_team = serde_json::from_str(&*config.get::<String>("team_settings", "orange_team").unwrap_or_else(|| "[]".to_string())).unwrap();
 
     let mut bots = HashMap::new();
-    bots.insert("blue_team".to_string(), blue_team);
-    bots.insert("orange_team".to_string(), orange_team);
+    bots.insert("blue_team".to_string(), fetch_logos(blue_team));
+    bots.insert("orange_team".to_string(), fetch_logos(orange_team));
 
     bots
 }
 
+fn clean(bcb: Vec<BotConfigBundle>) -> Vec<BotConfigBundle> {
+    bcb.iter().map(|b| b.cleaned()).collect()
+}
+
 #[tauri::command]
-async fn save_team_settings(blue_team: Vec<HashMap<String, String>>, orange_team: Vec<HashMap<String, String>>) {
-    let config = Ini::from_file(&*CONFIG_PATH.lock().unwrap()).unwrap()
+async fn save_team_settings(blue_team: Vec<BotConfigBundle>, orange_team: Vec<BotConfigBundle>) {
+    let config = Ini::from_file(&*CONFIG_PATH.lock().unwrap())
+        .unwrap()
         .section("team_settings")
-        .item("blue_team", serde_json::to_string(&blue_team).unwrap())
-        .item("orange_team", serde_json::to_string(&orange_team).unwrap());
+        .item("blue_team", serde_json::to_string(&clean(blue_team)).unwrap())
+        .item("orange_team", serde_json::to_string(&clean(orange_team)).unwrap());
     config.to_file(&*CONFIG_PATH.lock().unwrap()).unwrap();
 }
 
