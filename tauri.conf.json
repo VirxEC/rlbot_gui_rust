@@ -16,7 +16,8 @@
       "targets": "all",
       "identifier": "com.tauri.dev",
       "icon": [
-        "assets/imgs/rlbot_logo.png"
+        "icons/icon.png",
+        "icons/icon.ico"
       ],
       "resources": [],
       "externalBin": [],
