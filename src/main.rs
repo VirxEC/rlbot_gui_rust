@@ -292,7 +292,7 @@ impl MatchSettings {
 lazy_static! {
     static ref CONFIG_PATH: Mutex<String> = {
         let path = match env::consts::FAMILY {
-            "windows" => Path::new("%LOCALAPPDATA%\\RLBotGUIX\\config.ini").to_path_buf(),
+            "windows" => Path::new(&env::var_os("LOCALAPPDATA").unwrap()).join("RLBotGUIX\\config.ini"),
             "unix" => Path::new(&env::var_os("HOME").unwrap()).join(".config/rlbotgui/config.ini"),
             _ => unreachable!("Unsupported OS"),
         };
@@ -303,8 +303,8 @@ lazy_static! {
             create_dir_all(path.parent().unwrap()).unwrap();
             let conf = Ini::new()
                 .section("bot_folder_settings")
-                .item("files", "[]")
-                .item("folders", "[]")
+                .item("files", "{}")
+                .item("folders", "{}")
                 .section("match_settings")
                 .item("map", MAP_TYPES[0].to_string())
                 .item("game_mode", GAME_MODES[0].to_string())
