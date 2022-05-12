@@ -9,7 +9,7 @@ use std::{
     env,
     fs::create_dir_all,
     path::{Path, PathBuf},
-    process,
+    process::{self, Stdio},
     str::FromStr,
 };
 
@@ -27,6 +27,8 @@ use std::sync::Mutex;
 use tini::Ini;
 
 use rlbot::parsing::directory_scanner::scan_directory_for_bot_configs;
+
+use cfg_if::cfg_if;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BotFolder {
@@ -291,10 +293,12 @@ impl MatchSettings {
 
 lazy_static! {
     static ref CONFIG_PATH: Mutex<String> = {
-        let path = match env::consts::FAMILY {
-            "windows" => Path::new(&env::var_os("LOCALAPPDATA").unwrap()).join("RLBotGUIX\\config.ini"),
-            "unix" => Path::new(&env::var_os("HOME").unwrap()).join(".config/rlbotgui/config.ini"),
-            _ => unreachable!("Unsupported OS"),
+        let path = if cfg!(target_os = "windows") {
+            Path::new(&env::var_os("LOCALAPPDATA").unwrap()).join("RLBotGUIX\\config.ini")
+        } else if cfg!(target_os = "macos") {
+            Path::new(&env::var_os("HOME").unwrap()).join("Library/Application Support/rlbotgui/config.ini")
+        } else {
+            Path::new(&env::var_os("HOME").unwrap()).join(".config/rlbotgui/config.ini")
         };
 
         println!("Config path: {}", path.to_str().unwrap());
@@ -333,7 +337,9 @@ lazy_static! {
                 .item("boost_strength", BOOST_STRENGTH_MUTATOR_TYPES[0].to_string())
                 .item("gravity", GRAVITY_MUTATOR_TYPES[0].to_string())
                 .item("demolish", DEMOLISH_MUTATOR_TYPES[0].to_string())
-                .item("respawn_time", RESPAWN_TIME_MUTATOR_TYPES[0].to_string());
+                .item("respawn_time", RESPAWN_TIME_MUTATOR_TYPES[0].to_string())
+                .section("python_config")
+                .item("path", "python3.7");
 
             conf.to_file(&path).unwrap();
         }
@@ -423,13 +429,12 @@ async fn pick_bot_folder() {
 
 #[tauri::command]
 async fn show_path_in_explorer(path: String) {
-    let command = match env::consts::FAMILY {
-        "windows" => "explorer.exe",
-        "unix" => match env::consts::OS {
-            "macos" => "open",
-            _ => "xdg-open",
-        },
-        _ => unreachable!("Unsupported OS"),
+    let command = if cfg!(target_os = "windows") {
+        "explorer.exe"
+    } else if cfg!(target_os = "macos") {
+        "open"
+    } else {
+        "xdg-open"
     };
 
     let ppath = Path::new(&*path);
@@ -504,6 +509,67 @@ async fn save_team_settings(blue_team: Vec<BotConfigBundle>, orange_team: Vec<Bo
     config.to_file(&*CONFIG_PATH.lock().unwrap()).unwrap();
 }
 
+fn get_command_status(program: &str, version: Vec<&str>) -> bool {
+    match process::Command::new(program).args(version).stdout(Stdio::null()).stderr(Stdio::null()).status() {
+        Ok(status) => status.success(),
+        Err(_) => false,
+    }
+}
+
+fn has_chrome() -> bool {
+    cfg_if! {
+        if #[cfg(target_os = "windows")] {
+            use registry::{Hive, Security};
+            let reg_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe";
+
+            for install_type in [Hive::CurrentUser, Hive::LocalMachine].iter() {
+                let reg_key = install_type.open(reg_path, Security::Read).unwrap();
+                if let Ok(chrome_path) = reg_key.value(reg_key) {
+                    if Path(chrome_path).exists() {
+                        return true;
+                    }
+                }
+            }
+        } else {
+            // google chrome works, but many Linux users especally may prefer to use Chromium instead
+            get_command_status("google-chrome", vec!["--product-version"]) || get_command_status("chromium", vec!["--product-version"])
+        }
+    }
+}
+
+fn get_python_path_r() -> String {
+    let config = Ini::from_file(&*CONFIG_PATH.lock().unwrap()).unwrap();
+    config.get("python_config", "path").unwrap_or_default()
+}
+
+#[tauri::command]
+async fn get_language_support() -> HashMap<String, bool> {
+    let mut lang_support = HashMap::new();
+
+    lang_support.insert("java".to_string(), get_command_status("java", vec!["-version"]));
+    lang_support.insert("node".to_string(), get_command_status("node", vec!["--version"]));
+    lang_support.insert("chrome".to_string(), has_chrome());
+
+    let python_path = get_python_path_r();
+    let python_check = get_command_status(&*python_path, vec!["--version"]);
+    lang_support.insert("python".to_string(), python_check);
+    lang_support.insert("fullpython".to_string(), python_check && get_command_status(&*python_path, vec!["-c", "import tkinter"]));
+
+    dbg!(lang_support)
+}
+
+#[tauri::command]
+async fn get_python_path() -> String {
+    get_python_path_r()
+}
+
+#[tauri::command]
+async fn set_python_path(path: String) {
+    let config_path = CONFIG_PATH.lock().unwrap();
+    let config = Ini::from_file(&*config_path).unwrap().section("python_config").item("path", path);
+    config.to_file(&*config_path).unwrap();
+}
+
 fn main() {
     initialize(&CONFIG_PATH);
     initialize(&BOT_FOLDER_SETTINGS);
@@ -524,6 +590,9 @@ fn main() {
             save_match_settings,
             get_team_settings,
             save_team_settings,
+            get_language_support,
+            get_python_path,
+            set_python_path,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

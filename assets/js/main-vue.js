@@ -171,13 +171,23 @@ export default {
 
 				<span style="flex-grow: 1"></span>
 
-				<b-button @click="startMatch()" variant="success" size="lg" :disabled="matchStarting" class="start-match-btn" style="margin-top: -10px;">
-					<span v-if="matchStarting">Starting match</span>
+				<b-button @click="noPython ? pythonSetup() : startMatch()" :variant="noPython ? 'warning' : 'success'" size="lg" :disabled="matchStarting" class="start-match-btn" style="margin-top: -10px;">
+					<span v-if="noPython">No Python install detected</span>
+					<span v-else-if="matchStarting">Starting match</span>
 					<span v-else-if="gameAlreadyLaunched">Start another match</span>
 					<span v-else>Launch Rocket League<br>and start match</span>
 				</b-button>
 				<b-button @click="killBots()" variant="secondary" size="lg" class="ml-2">Stop</b-button>
 			</div>
+
+			<b-modal title="No Python installion detected!" id="python-setup" hide-footer centered>
+				<b-form inline>
+					<label class="mr-3">Path to Python executable or command: </label>
+					<b-form-input id="python-exe-path" v-model="python_path" size="lg"></b-form-input>
+				</b-form>
+				<br>
+				<b-button variant="primary" class="mt-3" @click="applyPythonSetup()">Apply</b-button>
+			</b-modal>
 
 			<div>
 				<b-form-checkbox v-model="matchSettings.randomizeMap" class="mt-1 mb-1">
@@ -451,10 +461,26 @@ export default {
 			appearancePath: '',
 			recommendations: null,
 			downloadModalTitle: "Downloading Bot Pack",
+			noPython: false,
+			python_path: "",
 		}
 	},
 
 	methods: {
+		pythonSetup: function(event)  {
+			this.$bvModal.show("python-setup")
+		},
+		applyPythonSetup: function() {
+			invoke("set_python_path", { path: this.python_path });
+			invoke('get_folder_settings').then(this.folderSettingsReceived);
+
+			invoke("get_language_support").then((support) => {
+				this.languageSupport = support;
+				this.applyLanguageWarnings();
+			});
+
+			this.$bvModal.hide("python-setup")
+		},
 		startMatch: async function (event) {
 			this.matchStarting = true;
 
@@ -634,6 +660,8 @@ export default {
 
 		applyLanguageWarnings: function () {
 			if (this.languageSupport) {
+				this.noPython = !this.languageSupport.python;
+
 				this.botPool.concat(this.scriptPool).forEach((bot) => {
 					if (bot.info && bot.info.language) {
 						const language = bot.info.language.toLowerCase();
@@ -750,11 +778,12 @@ export default {
 			invoke("get_match_options").then(this.matchOptionsReceived);
 			invoke("get_match_settings").then(this.matchSettingsReceived);
 			invoke("get_team_settings").then(this.teamSettingsReceived);
+			invoke("get_python_path").then((path) => this.python_path = path);
 
-			// eel.get_language_support()((support) => {
-			// 	this.languageSupport = support;
-			// 	this.applyLanguageWarnings();
-			// });
+			invoke("get_language_support").then((support) => {
+				this.languageSupport = support;
+				this.applyLanguageWarnings();
+			});
 
 			// eel.is_botpack_up_to_date()(this.botpackUpdateChecked);
 			// eel.get_recommendations()(recommendations => this.recommendations = recommendations);

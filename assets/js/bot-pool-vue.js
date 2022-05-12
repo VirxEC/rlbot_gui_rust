@@ -86,9 +86,10 @@ export default {
 
 			let allowedTags = runnable.type === 'script' ? category.scripts : category.bots;
 			if (allowedTags) {
-				if (allowedTags === '*') {
+				if (allowedTags === '*' || runnable.info == null) {
 					return true;
 				}
+
 				return runnable.info.tags.some(tag => allowedTags.includes(tag));
 			}
 			return false;
