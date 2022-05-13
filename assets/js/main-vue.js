@@ -487,6 +487,7 @@ export default {
 			if (this.matchSettings.randomizeMap) await this.setRandomMap();
 
 			this.matchSettings.scripts = this.scriptPool.filter((val) => { return val.enabled });
+			console.log(this.matchSettings);
 			invoke("save_match_settings", { settings: this.matchSettings });
 			invoke("save_team_settings", { blueTeam: this.blueTeam, orangeTeam: this.orangeTeam });
 

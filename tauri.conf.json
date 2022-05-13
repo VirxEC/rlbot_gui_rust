@@ -44,9 +44,6 @@
     "updater": {
       "active": false
     },
-    "allowlist": {
-      "all": true
-    },
     "windows": [
       {
         "title": "RLBotGUI",

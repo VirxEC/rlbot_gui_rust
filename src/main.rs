@@ -17,7 +17,7 @@ use custom_maps::find_all_custom_maps;
 use lazy_static::{initialize, lazy_static};
 use rlbot::parsing::{
     agent_config_parser::BotLooksConfig,
-    bot_config_bundle::{BotConfigBundle, ScriptConfigBundle},
+    bot_config_bundle::{BotConfigBundle, ScriptConfigBundle, Clean},
     directory_scanner::scan_directory_for_script_configs,
 };
 use rlbot::{agents::runnable::Runnable, parsing::match_settings_config_parser::*};
@@ -219,7 +219,7 @@ struct MatchSettings {
     pub enable_rendering: bool,
     pub enable_state_setting: bool,
     pub auto_save_replay: bool,
-    pub scripts: Vec<String>,
+    pub scripts: Vec<ScriptConfigBundle>,
     pub mutators: MutatorSettings,
 }
 
@@ -288,6 +288,18 @@ impl MatchSettings {
             .item("auto_save_replay", self.auto_save_replay)
             .item("scripts", serde_json::to_string(&self.scripts).unwrap_or_default());
         conf.to_file(&*path).unwrap();
+    }
+
+    fn cleaned_scripts(&self) -> Self {
+        let mut new = self.clone();
+        new.scripts = clean(new.scripts);
+        new
+    }
+
+    fn with_logos(&self) -> Self {
+        let mut new = self.clone();
+        new.scripts = fetch_logos(new.scripts);
+        new
     }
 }
 
@@ -465,16 +477,16 @@ async fn get_match_options() -> MatchOptions {
 
 #[tauri::command]
 async fn get_match_settings() -> MatchSettings {
-    MATCH_SETTINGS.lock().unwrap().clone()
+    MATCH_SETTINGS.lock().unwrap().clone().with_logos()
 }
 
 #[tauri::command]
 async fn save_match_settings(settings: MatchSettings) {
-    MATCH_SETTINGS.lock().unwrap().update_config(settings);
+    MATCH_SETTINGS.lock().unwrap().update_config(settings.cleaned_scripts());
 }
 
-fn fetch_logos(bfb: Vec<BotConfigBundle>) -> Vec<BotConfigBundle> {
-    bfb.iter().map(|b| b.with_logo()).collect()
+fn fetch_logos<T: Clean>(items: Vec<T>) -> Vec<T> {
+    items.iter().map(|b| b.with_logo()).collect()
 }
 
 #[tauri::command]
@@ -495,8 +507,8 @@ async fn get_team_settings() -> HashMap<String, Vec<BotConfigBundle>> {
     bots
 }
 
-fn clean(bcb: Vec<BotConfigBundle>) -> Vec<BotConfigBundle> {
-    bcb.iter().map(|b| b.cleaned()).collect()
+fn clean<T: Clean>(items: Vec<T>) -> Vec<T> {
+    items.iter().map(|i| i.cleaned()).collect()
 }
 
 #[tauri::command]

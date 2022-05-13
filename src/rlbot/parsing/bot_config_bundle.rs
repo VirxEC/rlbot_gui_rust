@@ -105,6 +105,11 @@ pub fn to_base64(path: &str) -> Option<String> {
     get_file_extension(&vec).map(|extension| format!("data:image/{};base64,{}", extension, base64::encode(vec).replace("\r\n", "")))
 }
 
+pub trait Clean {
+    fn cleaned(&self) -> Self;
+    fn with_logo(&self) -> Self;
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct BotConfigBundle {
     pub name: Option<String>,
@@ -169,8 +174,10 @@ impl BotConfigBundle {
 
         true
     }
+}
 
-    pub fn cleaned(&self) -> Self {
+impl Clean for BotConfigBundle {
+    fn cleaned(&self) -> Self {
         let mut b = self.clone();
         b.info = None;
         b.logo = None;
@@ -178,7 +185,7 @@ impl BotConfigBundle {
         b
     }
 
-    pub fn with_logo(&self) -> Self {
+    fn with_logo(&self) -> Self {
         let mut b = self.clone();
         if let Some(logo_path) = &b.logo_path {
             b.logo = to_base64(&**logo_path);
@@ -201,6 +208,7 @@ pub struct ScriptConfigBundle {
     pub path: String,
     pub info: DevInfo,
     pub logo: Option<String>,
+    pub logo_path: Option<String>,
     pub missing_python_packages: Vec<String>,
     config_file_name: String,
     script_file: Option<String>,
@@ -228,6 +236,7 @@ impl ScriptConfigBundle {
         let info = DevInfo::from_config(config);
 
         let missing_python_packages = Vec::new();
+        let logo_path = Some(ta_logo);
 
         Ok(Self {
             name,
@@ -236,6 +245,7 @@ impl ScriptConfigBundle {
             path,
             info,
             logo,
+            logo_path,
             missing_python_packages,
             config_file_name,
             script_file,
@@ -247,6 +257,23 @@ impl ScriptConfigBundle {
             Some(s) => Path::new(&*s).exists(),
             None => false,
         }
+    }
+}
+
+impl Clean for ScriptConfigBundle {
+    fn cleaned(&self) -> Self {
+        let mut b = self.clone();
+        b.logo = None;
+        b.missing_python_packages = Vec::new();
+        b
+    }
+
+    fn with_logo(&self) -> Self {
+        let mut b = self.clone();
+        if let Some(logo_path) = &b.logo_path {
+            b.logo = to_base64(&**logo_path);
+        }
+        b
     }
 }
 
