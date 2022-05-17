@@ -1,8 +1,4 @@
-use std::{
-    fs,
-    io::Read,
-    path::{Path, PathBuf},
-};
+use std::{fs, io::Read, path::Path};
 
 use imghdr::Type;
 use serde::{Deserialize, Serialize};
@@ -126,7 +122,7 @@ pub struct BotConfigBundle {
 }
 
 impl BotConfigBundle {
-    pub fn from_path(config_path: PathBuf) -> Result<Self, Error> {
+    pub fn from_path(config_path: &Path) -> Result<Self, Error> {
         let config = Ini::from_file(config_path.to_str().unwrap())?;
         let path = config_path.to_str().unwrap().to_string();
         let config_directory = config_path.parent().unwrap().to_str().unwrap().to_string();
@@ -215,7 +211,7 @@ pub struct ScriptConfigBundle {
 }
 
 impl ScriptConfigBundle {
-    pub fn from_path(config_path: PathBuf) -> Result<Self, Error> {
+    pub fn from_path(config_path: &Path) -> Result<Self, Error> {
         let config = Ini::from_file(config_path.to_str().unwrap())?;
 
         let name = config.get(BOT_CONFIG_MODULE_HEADER, BOT_NAME_KEY);

@@ -8,7 +8,7 @@ use std::{
     collections::{HashMap, HashSet},
     env,
     fs::{create_dir_all, read_to_string},
-    path::{Path, PathBuf},
+    path::Path,
     process::{self, Stdio},
     str::FromStr,
 };
@@ -17,6 +17,7 @@ use glob::glob;
 
 use custom_maps::find_all_custom_maps;
 use lazy_static::{initialize, lazy_static};
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rlbot::parsing::{
     agent_config_parser::BotLooksConfig,
     bot_config_bundle::{BotConfigBundle, Clean, ScriptConfigBundle},
@@ -306,21 +307,19 @@ impl MatchSettings {
     }
 }
 
-fn auto_detect_python() -> String{
+fn auto_detect_python() -> String {
     if cfg!(target_os = "windows") {
         match Path::new(&env::var_os("LOCALAPPDATA").unwrap()).join("RLBotGUIX\\Python37\\python.exe") {
             path if path.exists() => path.to_str().unwrap().to_string(),
-            _ => {
-                match Path::new(&env::var_os("LOCALAPPDATA").unwrap()).join("RLBotGUIX\\venv\\python.exe") {
-                    path if path.exists() => path.to_str().unwrap().to_string(),
-                    _ => "python3.7".to_string(),
-                }
+            _ => match Path::new(&env::var_os("LOCALAPPDATA").unwrap()).join("RLBotGUIX\\venv\\python.exe") {
+                path if path.exists() => path.to_str().unwrap().to_string(),
+                _ => "python3.7".to_string(),
             },
         }
     } else if cfg!(target_os = "macos") {
         "python3.7".to_string()
     } else {
-        match Path::new(&env::var_os("HOME").unwrap()).join(".RLBotGUI/Python37/bin/python") {
+        match Path::new(&env::var_os("HOME").unwrap()).join(".RLBotGUI/env/bin/python") {
             path if path.exists() => path.to_str().unwrap().to_string(),
             _ => "python3.7".to_string(),
         }
@@ -423,7 +422,7 @@ fn scan_for_bots_r() -> Vec<BotConfigBundle> {
 
     for (path, props) in bfs.files.iter() {
         if props.visible {
-            bots.extend(BotConfigBundle::from_path(PathBuf::from(path)));
+            bots.extend(BotConfigBundle::from_path(Path::new(path)));
         }
     }
 
@@ -452,7 +451,7 @@ async fn scan_for_scripts() -> Vec<ScriptConfigBundle> {
 
     for (path, props) in bfs.files.iter() {
         if props.visible {
-            scripts.extend(ScriptConfigBundle::from_path(PathBuf::from(path)));
+            scripts.extend(ScriptConfigBundle::from_path(Path::new(path)));
         }
     }
 
@@ -561,9 +560,9 @@ fn get_command_status(program: &str, version: Vec<&str>) -> bool {
 }
 
 fn has_chrome() -> bool {
-    use registry::{Hive, Security};
     cfg_if! {
         if #[cfg(target_os = "windows")] {
+            use registry::{Hive, Security};
             let reg_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe";
 
             for install_type in [Hive::CurrentUser, Hive::LocalMachine].iter() {
@@ -622,7 +621,7 @@ async fn get_recommendations() -> Option<HashMap<String, Vec<HashMap<String, Vec
     type Recommendation = HashMap<String, BotNames>;
     type AllRecommendations = HashMap<String, Vec<Recommendation>>;
     let mut json: Option<AllRecommendations> = None;
-    
+
     {
         let bfs = BOT_FOLDER_SETTINGS.lock().unwrap();
 
@@ -634,16 +633,16 @@ async fn get_recommendations() -> Option<HashMap<String, Vec<HashMap<String, Vec
                     Ok(s) => s,
                     Err(_) => {
                         println!("Failed to read {}", path2.to_str().unwrap());
-                        continue
-                    },
+                        continue;
+                    }
                 };
 
                 match serde_json::from_str(&raw_json) {
                     Ok(j) => json = Some(j),
                     Err(e) => {
                         println!("Failed to parse file {}: {}", path2.to_str().unwrap(), e);
-                        continue
-                    },
+                        continue;
+                    }
                 }
             }
         }
@@ -662,7 +661,7 @@ async fn get_recommendations() -> Option<HashMap<String, Vec<HashMap<String, Vec
                 "bots".to_string(),
                 bots.get("bots")
                     .unwrap()
-                    .iter()
+                    .par_iter()
                     .filter_map(|bot_name| {
                         for bundle in &bot_config_bundles {
                             if let Some(name) = &bundle.name {
@@ -678,9 +677,7 @@ async fn get_recommendations() -> Option<HashMap<String, Vec<HashMap<String, Vec
             )]));
         }
 
-        HashMap::from([
-            ("recommendations".to_string(), recommendations),
-        ])
+        HashMap::from([("recommendations".to_string(), recommendations)])
     })
 }
 
