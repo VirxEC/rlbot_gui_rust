@@ -133,13 +133,13 @@ export default {
 
 		<b-row>
 			<b-col>
-				<team-card v-model="blueTeam" team-class="blu">
+				<team-card v-model="blueTeam" team-class="blu" @botadded="handleBotAddedToTeam">
 					<b-form-radio v-model="teamSelection" name="team-radios" value="blue">Add to Blue Team</b-form-radio>
 				</team-card>
 			</b-col>
 
 			<b-col>
-				<team-card v-model="orangeTeam" team-class="org">
+				<team-card v-model="orangeTeam" team-class="org" @botadded="handleBotAddedToTeam">
 					<b-form-radio v-model="teamSelection" name="team-radios" value="orange">Add to Orange Team</b-form-radio>
 				</team-card>
 			</b-col>
@@ -149,10 +149,13 @@ export default {
 			<span class="rlbot-card-header">Match Settings</span>
 			<div style="display:flex; align-items: flex-end">
 
-				<div>
+				<div style="max-width: 250px">
 					<label for="map_selection">Map</label>
 					<b-form-select v-model="matchSettings.map" id="map_selection" @change="updateBGImage(matchSettings.map)">
-						<b-form-select-option v-for="map in matchOptions.map_types" :key="map" v-bind:value="map">{{map}}</b-form-select-option>
+						<b-form-select-option v-for="map in matchOptions.map_types" :key="map" v-bind:value="map">
+							{{map}}
+							<span v-if="map == 'BeckwithPark_Midnight'">(DO NOT SELECT)</span> <!-- temporary until https://github.com/RLBot/RLBot/issues/523 is fixed -->
+						</b-form-select-option>
 					</b-form-select>
 				</div>
 				<div class="ml-2">
@@ -275,44 +278,46 @@ export default {
 			</div>
 		</b-modal>
 
-		<b-modal id="language-warning-modal" v-if="activeBot && activeBot.warn" title="Compatibility Warning" hide-footer centered>
-			<div v-if="activeBot.warn === 'java'">
-				<p><b>{{activeBot.name}}</b> requires Java and it looks like you don't have it installed!</p>
-				To play with it, you'll need to:
-				<ol>
-					<li>Download Java from <a href="https://java.com" target="_blank">java.com</a></li>
-					<li>Install it</li>
-					<li>Make sure you've <a href="https://javatutorial.net/set-java-home-windows-10">set the JAVA_HOME environment variable</a></li>
-					<li>Reboot your computer</li>
-				</ol>
-			</div>
-			<div v-if="activeBot.warn === 'chrome'">
-				<p>
-					This bot requires Google Chrome for its auto-run feature, and it looks like
-					you don't have it installed! You can
-					<a href="https://www.google.com/chrome/" target="_blank">download it here</a>.
-				</p>
-			</div>
-			<div v-if="activeBot.warn === 'pythonpkg'">
-				<p>
-					This bot needs some python package versions you haven't installed yet:
-					<code><span v-for="missing in activeBot.missing_python_packages">{{missing}} </span></code>
-				</p>
-				<b-button @click="installRequirements(activeBot.path)"
-						   variant="primary">Install Now</b-button>
-				<p v-if="!languageSupport.fullpython">
-					If the installation fails, try downloading our <a href="https://github.com/RLBot/RLBotGUI/releases/download/v1.0/RLBotGUI.msi">new launcher script</a>
-					which makes RLBotGUI better with package management.
-				</p>
-			</div>
-			<div v-if="activeBot.warn === 'node'">
-				<p><b>{{activeBot.name}}</b> requires Node.js to run javascript and it looks like you don't have it installed!</p>
-				To play with it, you'll need to:
-				<ol>
-					<li>Download Node.js from <a href="https://nodejs.org/" target="_blank">nodejs.org</a></li>
-					<li>Install it</li>
-					<li>Restart RLBotGUI</li>
-				</ol>
+		<b-modal id="language-warning-modal" title="Compatibility Warning" hide-footer centered>
+			<div v-if="activeBot && activeBot.warn">
+				<div v-if="activeBot.warn === 'java'">
+					<p><b>{{activeBot.name}}</b> requires Java and it looks like you don't have it installed!</p>
+					To play with it, you'll need to:
+					<ol>
+						<li>Download Java from <a href="https://java.com" target="_blank">java.com</a></li>
+						<li>Install it</li>
+						<li>Make sure you've <a href="https://javatutorial.net/set-java-home-windows-10">set the JAVA_HOME environment variable</a></li>
+						<li>Reboot your computer</li>
+					</ol>
+				</div>
+				<div v-if="activeBot.warn === 'chrome'">
+					<p>
+						This bot requires Google Chrome for its auto-run feature, and it looks like
+						you don't have it installed! You can
+						<a href="https://www.google.com/chrome/" target="_blank">download it here</a>.
+					</p>
+				</div>
+				<div v-if="activeBot.warn === 'pythonpkg'">
+					<p>
+						This bot needs some python package versions you haven't installed yet:
+						<code><span v-for="missing in activeBot.missing_python_packages">{{missing}} </span></code>
+					</p>
+					<b-button @click="installRequirements(activeBot.path)"
+							variant="primary">Install Now</b-button>
+					<p v-if="!languageSupport.fullpython">
+						If the installation fails, try downloading our <a href="https://github.com/RLBot/RLBotGUI/releases/download/v1.0/RLBotGUI.msi">new launcher script</a>
+						which makes RLBotGUI better with package management.
+					</p>
+				</div>
+				<div v-if="activeBot.warn === 'node'">
+					<p><b>{{activeBot.name}}</b> requires Node.js to run javascript and it looks like you don't have it installed!</p>
+					To play with it, you'll need to:
+					<ol>
+						<li>Download Node.js from <a href="https://nodejs.org/" target="_blank">nodejs.org</a></li>
+						<li>Install it</li>
+						<li>Restart RLBotGUI</li>
+					</ol>
+				</div>
 			</div>
 		</b-modal>
 
@@ -366,7 +371,7 @@ export default {
 			<p>Not sure which bots to play against? Try our recommended picks:</p>
 			<b-list-group>
 				<b-list-group-item v-for="recommendation in recommendations.recommendations">
-					<bot-card v-for="bot in recommendation.bots" :bot="bot" :draggable="false"/>
+					<bot-card v-for="bot in recommendation.bots" :bot="bot" :draggable="false" hidewarning />
 					<b-button variant="primary" class="float-right" @click="selectRecommendation(recommendation.bots)">Select</b-button>
 				</b-list-group-item>
 			</b-list-group>
@@ -519,7 +524,14 @@ export default {
 			} else {
 				this.blueTeam.push(bot);
 			}
+			this.handleBotAddedToTeam(bot);
 		},
+		handleBotAddedToTeam: function(bot) {
+            if (bot.warn) {
+                this.$store.commit('setActiveBot', bot);
+                this.$bvModal.show('language-warning-modal');
+            }
+        },
 		setRandomMap: async function() {
 			if (this.randomMapPool.length == 0) {
 				let response = await fetch("json/standard-maps.json");
@@ -588,15 +600,12 @@ export default {
 		},
 		pickAndEditAppearanceFile: async function() {
 			// let path = await eel.pick_location(false)();
-			this.activeBot = null;
+			this.$store.commit('setActiveBot', null);
 			// if (path) this.showAppearanceEditor(path);
 		},
 		showPathInExplorer: function (path) {
 			invoke("show_path_in_explorer", { path: path });
 		},
-		// hotReload: function() {
-		// 	eel.hot_reload_python_bots();
-		// },
 		beginNewBot: function (language, bot_name) {
 			if (!bot_name) {
 				this.snackbarContent = "Please choose a proper name!";
@@ -644,9 +653,9 @@ export default {
 			freshBots.forEach((bot) => bot.warn = false);
 			freshBots.sort((a, b) => a.name.localeCompare(b.name));
 
+			this.applyLanguageWarnings(freshBots);
 			this.botPool = this.botPool.concat(freshBots);
-			this.applyLanguageWarnings();
-			this.distinguishDuplicateBots();
+			this.distinguishDuplicateBots(this.botPool);
 			this.showProgressSpinner = false;
 		},
 
@@ -656,16 +665,15 @@ export default {
 			freshScripts.forEach((script) => {script.enabled = !!this.matchSettings.scripts.find( (element) => element.path === script.path )});
 			freshScripts.sort((a, b) => a.name.localeCompare(b.name));
 
+			this.applyLanguageWarnings(freshScripts);
 			this.scriptPool = this.scriptPool.concat(freshScripts);
-			this.applyLanguageWarnings();
+			this.distinguishDuplicateBots(this.scriptPool);
 			this.showProgressSpinner = false;
 		},
 
-		applyLanguageWarnings: function () {
+		applyLanguageWarnings: function (bots) {
 			if (this.languageSupport) {
-				this.noPython = !this.languageSupport.python;
-
-				this.botPool.concat(this.scriptPool).forEach((bot) => {
+				bots.forEach((bot) => {
 					if (bot.info && bot.info.language) {
 						const language = bot.info.language.toLowerCase();
 						if (!this.languageSupport.java && language.match(/java|kotlin|scala/) && !language.match(/javascript/)) {
@@ -685,19 +693,18 @@ export default {
 			}
 		},
 
-		distinguishDuplicateBots: function() {
-			const uniqueNames = [...new Set(this.botPool.map(bot => bot.name))];
+		distinguishDuplicateBots: function(pool) {
+			const uniqueNames = [...new Set(pool.filter(bot => bot.path).map(bot => bot.name))];
 			const splitPath = bot => bot.path.split(/[\\|\/]/).reverse();
 
 			for (const name of uniqueNames) {
-				const bots = this.botPool.filter(bot => bot.name == name);
+				const bots = pool.filter(bot => bot.name == name);
 				if (bots.length == 1) {
 					bots[0].uniquePathSegment = null;
 					continue;
 				}
 				for (let i = 0; bots.length > 0 && i < 99; i++) {
 					const pathSegments = bots.map(b => splitPath(b)[i]);
-
 					for (const bot of bots.slice()) {
 						const path = splitPath(bot);
 						const count = pathSegments.filter(s => s == path[i]).length;
@@ -728,6 +735,15 @@ export default {
 				this.blueTeam = teamSettings.blue_team;
 				this.orangeTeam = teamSettings.orange_team;
 			}
+			this.distinguishDuplicateBots(this.blueTeam.concat(this.orangeTeam));
+			this.applyLanguageWarnings(this.blueTeam.concat(this.orangeTeam));
+		},
+
+		recommendationsReceived: function (recommendations) {
+			if (recommendations) {
+				recommendations.recommendations.forEach(recommendation => this.applyLanguageWarnings(recommendation.bots));
+				this.recommendations = recommendations;
+			}
 		},
 
 		folderSettingsReceived: function (folderSettings) {
@@ -747,7 +763,7 @@ export default {
 			this.showSnackbar = true;
 			this.$bvModal.hide('download-modal');
 			invoke("get_folder_settings").then(this.folderSettingsReceived);
-			invoke("get_recommendations").then((recommendations) => this.recommendations = recommendations);
+			invoke("get_recommendations").then(this.recommendationsReceived);
 			invoke("get_match_options").then(this.matchOptionsReceived);
 			this.$refs.botPool.setDefaultCategory();
 			this.isBotpackUpToDate = true;
@@ -755,10 +771,21 @@ export default {
 
 		onInstallationComplete: function (result) {
 			let message = result.exitCode === 0 ? 'Successfully installed ' : 'Failed to install ';
-			message += result.package;
+			message += result.packages.join(", ");
 			this.snackbarContent = message;
 			this.showSnackbar = true;
 			this.showProgressSpinner = false;
+			
+			if (result.exitCode === 0) {
+				// remove missing packages from other bots and maybe hide the yellow triangle
+				for (const runnable of this.allUsableRunnables) if (runnable.missing_python_packages) {
+					runnable.missing_python_packages = runnable.missing_python_packages.filter(pkg => !result.packages.includes(pkg));
+					if (runnable.missing_python_packages.length == 0 && runnable.warn == "pythonpkg") {
+						runnable.warn = null;
+					}
+				}
+				this.$bvModal.hide('language-warning-modal');
+			}
 		},
 		installPackage: function () {
 			this.showProgressSpinner = true;
@@ -771,6 +798,7 @@ export default {
 		selectRecommendation: function(bots) {
 			this.blueTeam = [HUMAN];
 			this.orangeTeam = bots.slice();
+			bots.forEach(this.handleBotAddedToTeam);
 			this.$bvModal.hide('recommendations-modal');
 		},
 		startup: function() {
@@ -785,11 +813,11 @@ export default {
 
 			invoke("get_language_support").then((support) => {
 				this.languageSupport = support;
-				this.applyLanguageWarnings();
+				this.applyLanguageWarnings(this.botPool.concat(this.scriptPool));
 			});
 
 			// eel.is_botpack_up_to_date()(this.botpackUpdateChecked);
-			invoke("get_recommendations").then((recommendations) => this.recommendations = recommendations);
+			invoke("get_recommendations").then(this.recommendationsReceived);
 
 			// eel.expose(noRLBotFlagPopup)
 			// function noRLBotFlagPopup(title, text){
@@ -802,13 +830,27 @@ export default {
 			// 	this.matchStarting = false;
 			// 	this.gameAlreadyLaunched = true;
 			// }
+			
+			// eel.expose(matchStartFailed)
+			// function matchStartFailed(message){
+			// 	self.matchStarting = false;
+			// 	self.snackbarContent = "Error starting match: " + message + "\n See console for more details.";
+			// 	self.showSnackbar = true;
+			// }
 
 			// eel.expose(updateDownloadProgress);
 			// function updateDownloadProgress(progress, status) {
 			// 	this.downloadStatus = status;
 			// 	this.downloadProgressPercent = progress;
 			// }
-		}
+		},
+		allUsableRunnables: function() {
+			let runnables = this.botPool.concat(this.scriptPool).concat(this.blueTeam).concat(this.orangeTeam).concat(this.matchSettings.scripts);
+			if (this.recommendations) this.recommendations.recommendations.forEach(recommendation => {
+				runnables = runnables.concat(recommendation.bots);
+			});
+			return runnables;
+		},
 	},
 	computed: {
 		activeMutatorCount: function() {
