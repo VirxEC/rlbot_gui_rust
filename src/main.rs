@@ -7,17 +7,19 @@ use core::fmt;
 use std::{
     collections::{HashMap, HashSet},
     env,
-    fs::create_dir_all,
+    fs::{create_dir_all, read_to_string},
     path::{Path, PathBuf},
     process::{self, Stdio},
     str::FromStr,
 };
 
+use glob::glob;
+
 use custom_maps::find_all_custom_maps;
 use lazy_static::{initialize, lazy_static};
 use rlbot::parsing::{
     agent_config_parser::BotLooksConfig,
-    bot_config_bundle::{BotConfigBundle, ScriptConfigBundle, Clean},
+    bot_config_bundle::{BotConfigBundle, Clean, ScriptConfigBundle},
     directory_scanner::scan_directory_for_script_configs,
 };
 use rlbot::{agents::runnable::Runnable, parsing::match_settings_config_parser::*};
@@ -383,8 +385,7 @@ fn get_bots_from_directory(path: &str) -> Vec<BotConfigBundle> {
     filter_hidden_bundles(scan_directory_for_bot_configs(path))
 }
 
-#[tauri::command]
-async fn scan_for_bots() -> Vec<BotConfigBundle> {
+fn scan_for_bots_r() -> Vec<BotConfigBundle> {
     let bfs = BOT_FOLDER_SETTINGS.lock().unwrap();
     let mut bots = Vec::with_capacity(bfs.folders.len() + bfs.files.len());
 
@@ -401,6 +402,11 @@ async fn scan_for_bots() -> Vec<BotConfigBundle> {
     }
 
     bots
+}
+
+#[tauri::command]
+async fn scan_for_bots() -> Vec<BotConfigBundle> {
+    scan_for_bots_r()
 }
 
 fn get_scripts_from_directory(path: &str) -> Vec<ScriptConfigBundle> {
@@ -582,6 +588,71 @@ async fn set_python_path(path: String) {
     config.to_file(&*config_path).unwrap();
 }
 
+#[tauri::command]
+async fn get_recommendations() -> Option<HashMap<String, Vec<HashMap<String, Vec<BotConfigBundle>>>>> {
+    let mut json: Option<HashMap<String, Vec<HashMap<String, Vec<String>>>>> = None;
+    
+    {
+        let bfs = BOT_FOLDER_SETTINGS.lock().unwrap();
+
+        for path in dbg!(bfs.folders.keys()) {
+            let pattern = Path::new(path).join("**/recommendations.json");
+
+            for path2 in glob(pattern.to_str().unwrap()).unwrap().flatten() {
+                let raw_json = match read_to_string(&path2) {
+                    Ok(s) => s,
+                    Err(_) => {
+                        println!("Failed to read {}", path2.to_str().unwrap());
+                        continue
+                    },
+                };
+
+                match serde_json::from_str(&raw_json) {
+                    Ok(j) => json = Some(j),
+                    Err(e) => {
+                        println!("Failed to parse file {}: {}", path2.to_str().unwrap(), e);
+                        continue
+                    },
+                }
+            }
+        }
+    }
+
+    // this can be optimized if need, but for now it's fine
+    // it loads all visible bot config bundles when we really only need name/path pairs
+    // if a match is found, only that bundle could get loaded
+    let bot_config_bundles = scan_for_bots_r();
+
+    json.map(|j| {
+        let mut recommendations: Vec<HashMap<String, Vec<BotConfigBundle>>> = Vec::new();
+
+        for bots in j.get("recommendations").unwrap() {
+            recommendations.push(HashMap::from([(
+                "bots".to_string(),
+                bots.get("bots")
+                    .unwrap()
+                    .iter()
+                    .filter_map(|bot_name| {
+                        for bundle in &bot_config_bundles {
+                            if let Some(name) = &bundle.name {
+                                if name == bot_name {
+                                    return Some(bundle.clone());
+                                }
+                            }
+                        }
+
+                        None
+                    })
+                    .collect(),
+            )]));
+        }
+
+        HashMap::from([
+            ("recommendations".to_string(), recommendations),
+        ])
+    })
+}
+
 fn main() {
     initialize(&CONFIG_PATH);
     initialize(&BOT_FOLDER_SETTINGS);
@@ -605,6 +676,7 @@ fn main() {
             get_language_support,
             get_python_path,
             set_python_path,
+            get_recommendations,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

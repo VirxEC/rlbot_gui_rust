@@ -745,7 +745,7 @@ export default {
 			this.showSnackbar = true;
 			this.$bvModal.hide('download-modal');
 			invoke("get_folder_settings").then(this.folderSettingsReceived);
-			// eel.get_recommendations()(recommendations => this.recommendations = recommendations);
+			invoke("get_recommendations").then((recommendations) => this.recommendations = recommendations);
 			invoke("get_match_options").then(this.matchOptionsReceived);
 			this.$refs.botPool.setDefaultCategory();
 			this.isBotpackUpToDate = true;
@@ -787,7 +787,7 @@ export default {
 			});
 
 			// eel.is_botpack_up_to_date()(this.botpackUpdateChecked);
-			// eel.get_recommendations()(recommendations => this.recommendations = recommendations);
+			invoke("get_recommendations").then((recommendations) => this.recommendations = recommendations);
 
 			// eel.expose(noRLBotFlagPopup)
 			// function noRLBotFlagPopup(title, text){
