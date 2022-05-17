@@ -86,6 +86,11 @@ impl BotFolderSettings {
         self.folders.insert(path, BotFolder { visible: true });
         self.update_config(self.clone());
     }
+
+    fn add_file(&mut self, path: String) {
+        self.files.insert(path, BotFolder { visible: true });
+        self.update_config(self.clone());
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -412,7 +417,7 @@ fn get_bots_from_directory(path: &str) -> Vec<BotConfigBundle> {
 
 fn scan_for_bots_r() -> Vec<BotConfigBundle> {
     let bfs = BOT_FOLDER_SETTINGS.lock().unwrap();
-    let mut bots = Vec::with_capacity(bfs.folders.len() + bfs.files.len());
+    let mut bots = Vec::new();
 
     for (path, props) in bfs.folders.iter() {
         if props.visible {
@@ -422,7 +427,10 @@ fn scan_for_bots_r() -> Vec<BotConfigBundle> {
 
     for (path, props) in bfs.files.iter() {
         if props.visible {
-            bots.extend(BotConfigBundle::from_path(Path::new(path)));
+            let bundle = BotConfigBundle::from_path(Path::new(path));
+            if let Ok(bundle) = bundle {
+                bots.push(bundle);
+            }
         }
     }
 
@@ -451,7 +459,10 @@ async fn scan_for_scripts() -> Vec<ScriptConfigBundle> {
 
     for (path, props) in bfs.files.iter() {
         if props.visible {
-            scripts.extend(ScriptConfigBundle::from_path(Path::new(path)));
+            let bundle = ScriptConfigBundle::from_path(Path::new(path));
+            if let Ok(bundle) = bundle {
+                scripts.push(bundle);
+            }
         }
     }
 
@@ -468,6 +479,16 @@ async fn pick_bot_folder() {
     };
 
     BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(path.to_str().unwrap().to_string());
+}
+
+#[tauri::command]
+async fn pick_bot_config() {
+    let path = match FileDialog::new().add_filter("Bot Cfg File", &["cfg"]).show_open_single_file().unwrap() {
+        Some(path) => path,
+        None => return,
+    };
+
+    BOT_FOLDER_SETTINGS.lock().unwrap().add_file(path.to_str().unwrap().to_string());
 }
 
 #[tauri::command]
@@ -616,6 +637,17 @@ async fn set_python_path(path: String) {
 }
 
 #[tauri::command]
+async fn pick_appearance_file() -> Option<String> {
+    match FileDialog::new().add_filter("Appearance Cfg File", &["cfg"]).show_open_single_file() {
+        Ok(path) => path.map(|path| path.to_str().unwrap().to_string()),
+        Err(e) => {
+            dbg!(e);
+            None
+        },
+    }
+}
+
+#[tauri::command]
 async fn get_recommendations() -> Option<HashMap<String, Vec<HashMap<String, Vec<BotConfigBundle>>>>> {
     type BotNames = Vec<String>;
     type Recommendation = HashMap<String, BotNames>;
@@ -651,7 +683,18 @@ async fn get_recommendations() -> Option<HashMap<String, Vec<HashMap<String, Vec
     // this can be optimized if need, but for now it's fine
     // it loads all visible bot config bundles when we really only need name/path pairs
     // if a match is found, only that bundle could get loaded
-    let bot_config_bundles = scan_for_bots_r();
+    let mut bot_config_bundles = scan_for_bots_r();
+
+    {
+        let bfs = BOT_FOLDER_SETTINGS.lock().unwrap();
+        for (path, settings) in bfs.files.iter() {
+            if settings.visible {
+                if let Ok(bundle) = BotConfigBundle::from_path(Path::new(path)) {
+                    bot_config_bundles.push(bundle);
+                }
+            }
+        }
+    }
 
     json.map(|j| {
         let mut recommendations: Vec<HashMap<String, Vec<BotConfigBundle>>> = Vec::new();
@@ -696,6 +739,7 @@ fn main() {
             get_folder_settings,
             save_folder_settings,
             pick_bot_folder,
+            pick_bot_config,
             show_path_in_explorer,
             scan_for_bots,
             get_looks,
@@ -710,6 +754,7 @@ fn main() {
             get_python_path,
             set_python_path,
             get_recommendations,
+            pick_appearance_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

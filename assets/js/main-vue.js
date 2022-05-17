@@ -511,12 +511,14 @@ export default {
 			this.matchStarting = false;
 		},
 		pickBotFolder: function (event) {
-			invoke("pick_bot_folder");
-			invoke("get_folder_settings").then(this.folderSettingsReceived);
+			invoke("pick_bot_folder").then(() => {
+				invoke("get_folder_settings").then(this.folderSettingsReceived);
+			});
 		},
 		pickBotConfig: function (event) {
-			invoke("pick_bot_config");
-			invoke("get_folder_settings").then(this.folderSettingsReceived);
+			invoke("pick_bot_config").then(() => {
+				invoke("get_folder_settings").then(this.folderSettingsReceived);
+			});
 		},
 		addToTeam: function(bot, team) {
 			if (team === 'orange') {
@@ -598,10 +600,11 @@ export default {
 			this.appearancePath = looksPath;
 			this.$bvModal.show('appearance-editor-dialog');
 		},
-		pickAndEditAppearanceFile: async function() {
-			// let path = await eel.pick_location(false)();
-			this.$store.commit('setActiveBot', null);
-			// if (path) this.showAppearanceEditor(path);
+		pickAndEditAppearanceFile: function() {
+			invoke("pick_appearance_file").then((path) => {
+				this.$store.commit('setActiveBot', null);
+				if (path) this.showAppearanceEditor(path);
+			});
 		},
 		showPathInExplorer: function (path) {
 			invoke("show_path_in_explorer", { path: path });
@@ -646,15 +649,12 @@ export default {
 			}
 		},
 		botsReceived: function (bots) {
-
 			const freshBots = bots.filter( (bot) =>
 					!this.botPool.find( (element) => element.path === bot.path ));
-
 			freshBots.forEach((bot) => bot.warn = false);
-			freshBots.sort((a, b) => a.name.localeCompare(b.name));
 
 			this.applyLanguageWarnings(freshBots);
-			this.botPool = this.botPool.concat(freshBots);
+			this.botPool = this.botPool.concat(freshBots).sort((a, b) => a.name.localeCompare(b.name));
 			this.distinguishDuplicateBots(this.botPool);
 			this.showProgressSpinner = false;
 		},
@@ -663,10 +663,9 @@ export default {
 			const freshScripts = scripts.filter( (script) =>
 					!this.scriptPool.find( (element) => element.path === script.path ));
 			freshScripts.forEach((script) => {script.enabled = !!this.matchSettings.scripts.find( (element) => element.path === script.path )});
-			freshScripts.sort((a, b) => a.name.localeCompare(b.name));
 
 			this.applyLanguageWarnings(freshScripts);
-			this.scriptPool = this.scriptPool.concat(freshScripts);
+			this.scriptPool = this.scriptPool.concat(freshScripts).sort((a, b) => a.name.localeCompare(b.name));
 			this.distinguishDuplicateBots(this.scriptPool);
 			this.showProgressSpinner = false;
 		},
