@@ -29,6 +29,7 @@ use std::sync::Mutex;
 use tini::Ini;
 
 use rlbot::parsing::directory_scanner::scan_directory_for_bot_configs;
+use tauri::{SystemTray, SystemTrayMenu};
 
 use cfg_if::cfg_if;
 
@@ -305,6 +306,27 @@ impl MatchSettings {
     }
 }
 
+fn auto_detect_python() -> String{
+    if cfg!(target_os = "windows") {
+        match Path::new(&env::var_os("LOCALAPPDATA").unwrap()).join("RLBotGUIX\\Python37\\python.exe") {
+            path if path.exists() => path.to_str().unwrap().to_string(),
+            _ => {
+                match Path::new(&env::var_os("LOCALAPPDATA").unwrap()).join("RLBotGUIX\\venv\\python.exe") {
+                    path if path.exists() => path.to_str().unwrap().to_string(),
+                    _ => "python3.7".to_string(),
+                }
+            },
+        }
+    } else if cfg!(target_os = "macos") {
+        "python3.7".to_string()
+    } else {
+        match Path::new(&env::var_os("HOME").unwrap()).join(".RLBotGUI/Python37/bin/python") {
+            path if path.exists() => path.to_str().unwrap().to_string(),
+            _ => "python3.7".to_string(),
+        }
+    }
+}
+
 lazy_static! {
     static ref CONFIG_PATH: Mutex<String> = {
         let path = if cfg!(target_os = "windows") {
@@ -353,7 +375,7 @@ lazy_static! {
                 .item("demolish", DEMOLISH_MUTATOR_TYPES[0].to_string())
                 .item("respawn_time", RESPAWN_TIME_MUTATOR_TYPES[0].to_string())
                 .section("python_config")
-                .item("path", "python3.7");
+                .item("path", auto_detect_python());
 
             conf.to_file(&path).unwrap();
         }
@@ -365,11 +387,15 @@ lazy_static! {
 lazy_static! {
     static ref BOT_FOLDER_SETTINGS: Mutex<BotFolderSettings> = Mutex::new(BotFolderSettings::from_path(&*CONFIG_PATH.lock().unwrap()));
     static ref MATCH_SETTINGS: Mutex<MatchSettings> = Mutex::new(MatchSettings::from_path(&*CONFIG_PATH.lock().unwrap()));
+    static ref PYTHON_PATH: Mutex<String> = Mutex::new({
+        let config = Ini::from_file(&*CONFIG_PATH.lock().unwrap()).unwrap();
+        config.get("python_config", "path").unwrap_or_else(auto_detect_python)
+    });
 }
 
 #[tauri::command]
 async fn save_folder_settings(bot_folder_settings: BotFolderSettings) {
-    BOT_FOLDER_SETTINGS.lock().unwrap().update_config(bot_folder_settings);
+    BOT_FOLDER_SETTINGS.lock().unwrap().update_config(bot_folder_settings)
 }
 
 #[tauri::command]
@@ -535,29 +561,30 @@ fn get_command_status(program: &str, version: Vec<&str>) -> bool {
 }
 
 fn has_chrome() -> bool {
+    use registry::{Hive, Security};
     cfg_if! {
         if #[cfg(target_os = "windows")] {
-            use registry::{Hive, Security};
             let reg_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe";
 
             for install_type in [Hive::CurrentUser, Hive::LocalMachine].iter() {
-                let reg_key = install_type.open(reg_path, Security::Read).unwrap();
-                if let Ok(chrome_path) = reg_key.value(reg_key) {
-                    if Path(chrome_path).exists() {
+                let reg_key = match install_type.open(reg_path, Security::Read) {
+                    Ok(key) => key,
+                    Err(_) => continue,
+                };
+
+                if let Ok(chrome_path) = reg_key.value("") {
+                    if Path::new(&chrome_path.to_string()).is_file() {
                         return true;
                     }
                 }
             }
+
+            false
         } else {
             // google chrome works, but many Linux users especally may prefer to use Chromium instead
             get_command_status("google-chrome", vec!["--product-version"]) || get_command_status("chromium", vec!["--product-version"])
         }
     }
-}
-
-fn get_python_path_r() -> String {
-    let config = Ini::from_file(&*CONFIG_PATH.lock().unwrap()).unwrap();
-    config.get("python_config", "path").unwrap_or_default()
 }
 
 #[tauri::command]
@@ -568,21 +595,22 @@ async fn get_language_support() -> HashMap<String, bool> {
     lang_support.insert("node".to_string(), get_command_status("node", vec!["--version"]));
     lang_support.insert("chrome".to_string(), has_chrome());
 
-    let python_path = get_python_path_r();
+    let python_path = PYTHON_PATH.lock().unwrap().to_string();
     let python_check = get_command_status(&*python_path, vec!["--version"]);
     lang_support.insert("python".to_string(), python_check);
     lang_support.insert("fullpython".to_string(), python_check && get_command_status(&*python_path, vec!["-c", "import tkinter"]));
 
-    dbg!(lang_support)
+    lang_support
 }
 
 #[tauri::command]
 async fn get_python_path() -> String {
-    get_python_path_r()
+    PYTHON_PATH.lock().unwrap().to_string()
 }
 
 #[tauri::command]
 async fn set_python_path(path: String) {
+    *PYTHON_PATH.lock().unwrap() = path.clone();
     let config_path = CONFIG_PATH.lock().unwrap();
     let config = Ini::from_file(&*config_path).unwrap().section("python_config").item("path", path);
     config.to_file(&*config_path).unwrap();
@@ -590,12 +618,15 @@ async fn set_python_path(path: String) {
 
 #[tauri::command]
 async fn get_recommendations() -> Option<HashMap<String, Vec<HashMap<String, Vec<BotConfigBundle>>>>> {
-    let mut json: Option<HashMap<String, Vec<HashMap<String, Vec<String>>>>> = None;
+    type BotNames = Vec<String>;
+    type Recommendation = HashMap<String, BotNames>;
+    type AllRecommendations = HashMap<String, Vec<Recommendation>>;
+    let mut json: Option<AllRecommendations> = None;
     
     {
         let bfs = BOT_FOLDER_SETTINGS.lock().unwrap();
 
-        for path in dbg!(bfs.folders.keys()) {
+        for path in bfs.folders.keys() {
             let pattern = Path::new(path).join("**/recommendations.json");
 
             for path2 in glob(pattern.to_str().unwrap()).unwrap().flatten() {
@@ -657,8 +688,13 @@ fn main() {
     initialize(&CONFIG_PATH);
     initialize(&BOT_FOLDER_SETTINGS);
     initialize(&MATCH_SETTINGS);
+    initialize(&PYTHON_PATH);
+
+    let tray_menu = SystemTrayMenu::new(); // insert the menu items here
+    let system_tray = SystemTray::new().with_menu(tray_menu);
 
     tauri::Builder::default()
+        .system_tray(system_tray)
         .invoke_handler(tauri::generate_handler![
             get_folder_settings,
             save_folder_settings,

@@ -11,9 +11,9 @@ const invoke = window.__TAURI__.invoke;
 const HUMAN = {'name': 'Human', 'type_': 'human', 'image': 'imgs/human.png'};
 const STARTING_BOT_POOL = [
 	HUMAN,
-	{'name': 'Psyonix Allstar', 'type_': 'psyonix', 'skill': 1, 'image': 'imgs/psyonix.png'},
-	{'name': 'Psyonix Pro', 'type_': 'psyonix', 'skill': 0.5, 'image': 'imgs/psyonix.png'},
-	{'name': 'Psyonix Rookie', 'type_': 'psyonix', 'skill': 0, 'image': 'imgs/psyonix.png'}
+	{'name': 'Psyonix Allstar', 'type_': 'psyonix', 'skill': 1, 'image': 'imgs/psyonix.png' },
+	{'name': 'Psyonix Pro', 'type_': 'psyonix', 'skill': 0.5, 'image': 'imgs/psyonix.png' },
+	{'name': 'Psyonix Rookie', 'type_': 'psyonix', 'skill': 0, 'image': 'imgs/psyonix.png' }
 ];
 
 export default {
@@ -52,6 +52,9 @@ export default {
 					Menu
 				</template>
 
+				<b-dropdown-item @click="pythonSetup()">
+					Edit Python Settings
+				</b-dropdown-item>
 				<b-dropdown-item @click="downloadBotPack()">
 					Repair bot pack
 				</b-dropdown-item>
@@ -181,9 +184,9 @@ export default {
 			</div>
 
 			<b-modal title="No Python installion detected!" id="python-setup" hide-footer centered>
-				<b-form inline>
-					<label class="mr-3">Path to Python executable or command: </label>
-					<b-form-input id="python-exe-path" v-model="python_path" size="lg"></b-form-input>
+				<b-form>
+					<p class="mr-3">Path to Python executable or command:</p>
+					<b-form-input id="python-exe-path" v-model="python_path" size="md" width="100%"></b-form-input>
 				</b-form>
 				<br>
 				<b-button variant="primary" class="mt-3" @click="applyPythonSetup()">Apply</b-button>
@@ -462,7 +465,7 @@ export default {
 			recommendations: null,
 			downloadModalTitle: "Downloading Bot Pack",
 			noPython: false,
-			python_path: "",
+			python_path: ""
 		}
 	},
 
@@ -487,7 +490,6 @@ export default {
 			if (this.matchSettings.randomizeMap) await this.setRandomMap();
 
 			this.matchSettings.scripts = this.scriptPool.filter((val) => { return val.enabled });
-			console.log(this.matchSettings);
 			invoke("save_match_settings", { settings: this.matchSettings });
 			invoke("save_team_settings", { blueTeam: this.blueTeam, orangeTeam: this.orangeTeam });
 

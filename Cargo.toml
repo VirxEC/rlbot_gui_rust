@@ -12,7 +12,7 @@ rust-version = "1.57"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
-tauri-build = "1.0.0-rc.7"
+tauri-build = "1.0.0-rc.8"
 
 [dependencies]
 serde_json = "1"
@@ -35,10 +35,11 @@ version = "0.6"
 features = ["windows_dpi_awareness", "windows_visual_styles"]
 
 [dependencies.tauri]
-version = "1.0.0-rc.8"
+version = "1.0.0-rc.10"
+features = ["system-tray"]
 
 [target.'cfg(linux)'.dependencies.tauri]
-version = "1.0.0-rc.8"
+version = "1.0.0-rc.10"
 features = ["ayatana-tray"]
 
 [features]

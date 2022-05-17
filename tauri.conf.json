@@ -1,6 +1,6 @@
 {
   "package": {
-    "productName": "rlbot_gui_rust",
+    "productName": "RLBotGUI",
     "version": "0.1.0"
   },
   "build": {
@@ -11,6 +11,10 @@
     "withGlobalTauri": true
   },
   "tauri": {
+    "systemTray": {
+      "iconPath": "icons/icon.png",
+      "iconAsTemplate": true
+    },
     "bundle": {
       "active": true,
       "targets": "all",

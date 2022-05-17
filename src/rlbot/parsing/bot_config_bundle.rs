@@ -122,7 +122,7 @@ pub struct BotConfigBundle {
     pub type_: String,
     pub skill: Option<u8>,
     pub image: String,
-    pub missing_python_packages: Vec<String>,
+    pub missing_python_packages: Option<Vec<String>>,
 }
 
 impl BotConfigBundle {
@@ -147,7 +147,7 @@ impl BotConfigBundle {
         let type_ = String::from("rlbot");
         let skill = Some(1);
         let image = String::from("imgs/rlbot.png");
-        let missing_python_packages = Vec::new();
+        let missing_python_packages = Some(Vec::new());
 
         let path = Some(path);
         let logo_path = Some(ta_logo);
@@ -181,7 +181,7 @@ impl Clean for BotConfigBundle {
         let mut b = self.clone();
         b.info = None;
         b.logo = None;
-        b.missing_python_packages = Vec::new();
+        b.missing_python_packages = Some(Vec::new());
         b
     }
 
