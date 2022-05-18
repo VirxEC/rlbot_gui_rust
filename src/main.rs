@@ -7,7 +7,8 @@ use core::fmt;
 use std::{
     collections::{HashMap, HashSet},
     env,
-    fs::{create_dir_all, read_to_string},
+    fs::{self, create_dir_all, read_to_string},
+    io::Cursor,
     path::Path,
     process::{self, Stdio},
     str::FromStr,
@@ -20,10 +21,11 @@ use lazy_static::{initialize, lazy_static};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rlbot::parsing::{
     agent_config_parser::BotLooksConfig,
-    bot_config_bundle::{BotConfigBundle, Clean, ScriptConfigBundle},
+    bot_config_bundle::{BotConfigBundle, Clean, ScriptConfigBundle, BOT_CONFIG_MODULE_HEADER, PYTHON_FILE_KEY},
     directory_scanner::scan_directory_for_script_configs,
 };
 use rlbot::{agents::runnable::Runnable, parsing::match_settings_config_parser::*};
+use sanitize_filename::sanitize;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 
@@ -32,7 +34,7 @@ use tini::Ini;
 use rlbot::parsing::directory_scanner::scan_directory_for_bot_configs;
 use tauri::{SystemTray, SystemTrayMenu};
 
-use cfg_if::cfg_if;
+const CREATED_BOTS_FOLDER: &str = "MyBots";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BotFolder {
@@ -580,31 +582,36 @@ fn get_command_status(program: &str, version: Vec<&str>) -> bool {
     }
 }
 
+#[cfg(windows)]
 fn has_chrome() -> bool {
-    cfg_if! {
-        if #[cfg(target_os = "windows")] {
-            use registry::{Hive, Security};
-            let reg_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe";
+    use registry::{Hive, Security};
+    let reg_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe";
 
-            for install_type in [Hive::CurrentUser, Hive::LocalMachine].iter() {
-                let reg_key = match install_type.open(reg_path, Security::Read) {
-                    Ok(key) => key,
-                    Err(_) => continue,
-                };
+    for install_type in [Hive::CurrentUser, Hive::LocalMachine].iter() {
+        let reg_key = match install_type.open(reg_path, Security::Read) {
+            Ok(key) => key,
+            Err(_) => continue,
+        };
 
-                if let Ok(chrome_path) = reg_key.value("") {
-                    if Path::new(&chrome_path.to_string()).is_file() {
-                        return true;
-                    }
-                }
+        if let Ok(chrome_path) = reg_key.value("") {
+            if Path::new(&chrome_path.to_string()).is_file() {
+                return true;
             }
-
-            false
-        } else {
-            // google chrome works, but many Linux users especally may prefer to use Chromium instead
-            get_command_status("google-chrome", vec!["--product-version"]) || get_command_status("chromium", vec!["--product-version"])
         }
     }
+
+    false
+}
+
+#[cfg(target_os = "macos")]
+fn has_chrome() -> bool {
+    get_command_status("/Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome", vec!["--version"])
+}
+
+#[cfg(target_os = "linux")]
+fn has_chrome() -> bool {
+    // google chrome works, but many Linux users especally may prefer to use Chromium instead
+    get_command_status("google-chrome", vec!["--product-version"]) || get_command_status("chromium", vec!["--product-version"])
 }
 
 #[tauri::command]
@@ -643,7 +650,7 @@ async fn pick_appearance_file() -> Option<String> {
         Err(e) => {
             dbg!(e);
             None
-        },
+        }
     }
 }
 
@@ -724,6 +731,76 @@ async fn get_recommendations() -> Option<HashMap<String, Vec<HashMap<String, Vec
     })
 }
 
+fn get_content_folder() -> String {
+    let current_folder = env::current_dir().unwrap().to_str().unwrap().to_string();
+
+    if current_folder.contains("RLBotGUI") {
+        current_folder
+    } else {
+        match env::var_os("LOCALAPPDATA") {
+            Some(path) => Path::new(&path).join("RLBotGUIX").to_str().unwrap().to_string(),
+            None => current_folder,
+        }
+    }
+}
+
+fn ensure_bot_directory() -> String {
+    let bot_directory = get_content_folder();
+    let bot_directory_path = Path::new(&bot_directory).join(CREATED_BOTS_FOLDER);
+
+    if !bot_directory_path.exists() {
+        fs::create_dir_all(&bot_directory_path).unwrap();
+    }
+
+    bot_directory
+}
+
+fn bootstrap_python_bot(bot_name: String, directory: &str) -> Result<String, String> {
+    let sanitized_name = sanitize(&bot_name);
+    let top_dir = Path::new(directory).join(&sanitized_name);
+
+    if top_dir.exists() {
+        return Err(format!("There is already a bot named {}, please choose a different name!", sanitized_name));
+    }
+
+    match reqwest::blocking::get("https://github.com/RLBot/RLBotPythonExample/archive/master.zip") {
+        Ok(res) => {
+            zip_extract::extract(Cursor::new(res.text().unwrap().as_bytes()), top_dir.as_path(), true).unwrap();
+        }
+        Err(e) => {
+            println!("Failed to download python bot: {}", e);
+            return Err(format!("Failed to download python bot: {}", e));
+        }
+    }
+
+    let bundles = scan_directory_for_bot_configs(top_dir.to_str().unwrap());
+    let bundle = bundles.iter().next().unwrap();
+    let config_file = bundle.path.clone().unwrap();
+    let python_file = bundle.python_path.clone();
+
+    let config = Ini::from_file(&config_file).unwrap().section(BOT_CONFIG_MODULE_HEADER).item(PYTHON_FILE_KEY, bot_name);
+    config.to_file(&config_file).unwrap();
+
+    if !get_command_status(&python_file, vec![]) {
+        println!("You have no default program to open .py files. Your new bot is located at {}", top_dir.to_str().unwrap());
+    }
+
+    Ok(config_file)
+}
+
+#[tauri::command]
+async fn begin_python_bot(bot_name: String) -> HashMap<String, String> {
+    let bot_directory = ensure_bot_directory();
+
+    match bootstrap_python_bot(bot_name, &bot_directory) {
+        Ok(config_file) => {
+            let bundle = BotConfigBundle::from_path(Path::new(&config_file)).unwrap();
+            HashMap::from([("bots".to_string(), serde_json::to_string(&bundle).unwrap())])
+        }
+        Err(e) => HashMap::from([("err".to_string(), e)]),
+    }
+}
+
 fn main() {
     initialize(&CONFIG_PATH);
     initialize(&BOT_FOLDER_SETTINGS);
@@ -755,6 +832,7 @@ fn main() {
             set_python_path,
             get_recommendations,
             pick_appearance_file,
+            begin_python_bot,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

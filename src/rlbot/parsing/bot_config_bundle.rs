@@ -8,7 +8,7 @@ use crate::rlbot::agents::{base_script::SCRIPT_FILE_KEY, runnable::Runnable};
 
 pub const BOT_CONFIG_MODULE_HEADER: &str = "Locations";
 pub const BOT_CONFIG_DETAILS_HEADER: &str = "Details";
-// pub const PYTHON_FILE_KEY: &str = "python_file";
+pub const PYTHON_FILE_KEY: &str = "python_file";
 // pub const SUPPORTS_STANDALONE: &str = "supports_standalone";
 // pub const LOADOUT_GENERATOR_FILE_KEY: &str = "loadout_generator";
 pub const LOGO_FILE_KEY: &str = "logo_file";
@@ -119,6 +119,7 @@ pub struct BotConfigBundle {
     pub skill: Option<u8>,
     pub image: String,
     pub missing_python_packages: Option<Vec<String>>,
+    pub python_path: String,
 }
 
 impl BotConfigBundle {
@@ -132,6 +133,7 @@ impl BotConfigBundle {
         let looks_path = config
             .get::<String>(BOT_CONFIG_MODULE_HEADER, LOOKS_CONFIG_KEY)
             .map(|path| format!("{}/{}", config_directory, path));
+        let python_path = config.get::<String>(BOT_CONFIG_MODULE_HEADER, PYTHON_FILE_KEY).unwrap_or_default();
 
         let t_logo = config.get::<String>(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY).unwrap_or_else(|| String::from("logo.png"));
         let ta_logo = format!("{}/{}", config_directory, t_logo);
@@ -160,6 +162,7 @@ impl BotConfigBundle {
             skill,
             image,
             missing_python_packages,
+            python_path,
         })
     }
 

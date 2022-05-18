@@ -615,7 +615,7 @@ export default {
 				this.showSnackbar = true;
 			} else if (language === 'python') {
 				this.showProgressSpinner = true;
-				// eel.begin_python_bot(bot_name)(this.botLoadHandler);
+				invoke("begin_python_bot", { bot_name: bot_name }).then(this.botLoadHandler);
 			} else if (language === 'scratch') {
 				this.showProgressSpinner = true;
 				// eel.begin_scratch_bot(bot_name)(this.botLoadHandler);
