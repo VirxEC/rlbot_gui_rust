@@ -551,8 +551,8 @@ async fn get_team_settings() -> HashMap<String, Vec<BotConfigBundle>> {
             .get::<String>("team_settings", "blue_team")
             .unwrap_or_else(|| "[{\"name\": \"Human\", \"type_\": \"human\", \"image\": \"imgs/human.png\"}]".to_string()),
     )
-    .unwrap();
-    let orange_team = serde_json::from_str(&*config.get::<String>("team_settings", "orange_team").unwrap_or_else(|| "[]".to_string())).unwrap();
+    .unwrap_or_default();
+    let orange_team = serde_json::from_str(&*config.get::<String>("team_settings", "orange_team").unwrap_or_else(|| "[]".to_string())).unwrap_or_default();
 
     let mut bots = HashMap::new();
     bots.insert("blue_team".to_string(), fetch_logos(blue_team));

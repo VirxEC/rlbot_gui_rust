@@ -654,7 +654,8 @@ export default {
 			freshBots.forEach((bot) => bot.warn = false);
 
 			this.applyLanguageWarnings(freshBots);
-			this.botPool = this.botPool.concat(freshBots).sort((a, b) => a.name.localeCompare(b.name));
+			const firstFour = this.botPool.slice(0, 4);
+			this.botPool = firstFour.concat(this.botPool.slice(4, this.botPool.length).concat(freshBots).sort((a, b) => a.name.localeCompare(b.name)));
 			this.distinguishDuplicateBots(this.botPool);
 			this.showProgressSpinner = false;
 		},

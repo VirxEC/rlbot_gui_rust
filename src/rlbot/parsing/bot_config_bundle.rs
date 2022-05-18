@@ -171,7 +171,7 @@ impl BotConfigBundle {
             return false;
         }
 
-        true
+        Path::new(&*self.python_path).exists()
     }
 }
 
