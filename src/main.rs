@@ -778,7 +778,7 @@ fn bootstrap_python_bot(bot_name: String, directory: &str) -> Result<String, Str
     let bundles = scan_directory_for_bot_configs(top_dir.to_str().unwrap());
     let bundle = bundles.iter().next().unwrap();
     let config_file = bundle.path.clone().unwrap();
-    let python_file = bundle.python_path.clone();
+    let python_file = bundle.python_path.clone().unwrap();
 
     let config = Ini::from_file(&config_file).unwrap().section(BOT_CONFIG_MODULE_HEADER).item(PYTHON_FILE_KEY, bot_name);
     config.to_file(&config_file).unwrap();

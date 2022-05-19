@@ -119,7 +119,7 @@ pub struct BotConfigBundle {
     pub skill: Option<u8>,
     pub image: String,
     pub missing_python_packages: Option<Vec<String>>,
-    pub python_path: String,
+    pub python_path: Option<String>,
 }
 
 impl BotConfigBundle {
@@ -133,7 +133,7 @@ impl BotConfigBundle {
         let looks_path = config
             .get::<String>(BOT_CONFIG_MODULE_HEADER, LOOKS_CONFIG_KEY)
             .map(|path| format!("{}/{}", config_directory, path));
-        let python_path = config.get::<String>(BOT_CONFIG_MODULE_HEADER, PYTHON_FILE_KEY).map(|path| format!("{}/{}", config_directory, path)).unwrap_or_default();
+        let python_path = config.get::<String>(BOT_CONFIG_MODULE_HEADER, PYTHON_FILE_KEY).map(|path| format!("{}/{}", config_directory, path));
 
         let t_logo = config.get::<String>(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY).unwrap_or_else(|| String::from("logo.png"));
         let ta_logo = format!("{}/{}", config_directory, t_logo);
@@ -171,7 +171,10 @@ impl BotConfigBundle {
             return false;
         }
 
-        Path::new(&*self.python_path).exists()
+        match &self.python_path {
+            Some(path) => Path::new(path).exists(),
+            None => false,
+        }
     }
 }
 
