@@ -133,7 +133,7 @@ impl BotConfigBundle {
         let looks_path = config
             .get::<String>(BOT_CONFIG_MODULE_HEADER, LOOKS_CONFIG_KEY)
             .map(|path| format!("{}/{}", config_directory, path));
-        let python_path = config.get::<String>(BOT_CONFIG_MODULE_HEADER, PYTHON_FILE_KEY).unwrap_or_default();
+        let python_path = config.get::<String>(BOT_CONFIG_MODULE_HEADER, PYTHON_FILE_KEY).map(|path| format!("{}/{}", config_directory, path)).unwrap_or_default();
 
         let t_logo = config.get::<String>(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY).unwrap_or_else(|| String::from("logo.png"));
         let ta_logo = format!("{}/{}", config_directory, t_logo);
@@ -178,7 +178,6 @@ impl BotConfigBundle {
 impl Clean for BotConfigBundle {
     fn cleaned(&self) -> Self {
         let mut b = self.clone();
-        b.info = None;
         b.logo = None;
         b.missing_python_packages = Some(Vec::new());
         b
@@ -210,7 +209,7 @@ pub struct ScriptConfigBundle {
     pub logo_path: Option<String>,
     pub missing_python_packages: Vec<String>,
     config_file_name: String,
-    script_file: Option<String>,
+    script_file: String,
 }
 
 impl ScriptConfigBundle {
@@ -230,7 +229,7 @@ impl ScriptConfigBundle {
 
         let script_file = config
             .get::<String>(BOT_CONFIG_MODULE_HEADER, SCRIPT_FILE_KEY)
-            .map(|path| format!("{}/{}", config_directory, path));
+            .map(|path| format!("{}/{}", config_directory, path)).unwrap_or_default();
 
         let info = DevInfo::from_config(config);
 
@@ -252,10 +251,7 @@ impl ScriptConfigBundle {
     }
 
     pub fn is_valid_script_config(&self) -> bool {
-        match &self.script_file {
-            Some(s) => Path::new(&*s).exists(),
-            None => false,
-        }
+        Path::new(&*self.script_file).exists()
     }
 }
 

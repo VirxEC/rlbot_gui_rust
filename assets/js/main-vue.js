@@ -132,13 +132,13 @@ export default {
 		</b-card>
 
 		<b-row>
-			<b-col>
+			<b-col @click="teamSelection = 'blue'">
 				<team-card v-model="blueTeam" team-class="blu" @botadded="handleBotAddedToTeam">
 					<b-form-radio v-model="teamSelection" name="team-radios" value="blue">Add to Blue Team</b-form-radio>
 				</team-card>
 			</b-col>
 
-			<b-col>
+			<b-col @click="teamSelection = 'orange'">
 				<team-card v-model="orangeTeam" team-class="org" @botadded="handleBotAddedToTeam">
 					<b-form-radio v-model="teamSelection" name="team-radios" value="orange">Add to Orange Team</b-form-radio>
 				</team-card>

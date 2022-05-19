@@ -429,9 +429,10 @@ fn scan_for_bots_r() -> Vec<BotConfigBundle> {
 
     for (path, props) in bfs.files.iter() {
         if props.visible {
-            let bundle = BotConfigBundle::from_path(Path::new(path));
-            if let Ok(bundle) = bundle {
-                bots.push(bundle);
+            if let Ok(bundle) = BotConfigBundle::from_path(Path::new(path)) {
+                if bundle.is_valid_bot_config() {
+                    bots.push(bundle);
+                }
             }
         }
     }
@@ -461,9 +462,10 @@ async fn scan_for_scripts() -> Vec<ScriptConfigBundle> {
 
     for (path, props) in bfs.files.iter() {
         if props.visible {
-            let bundle = ScriptConfigBundle::from_path(Path::new(path));
-            if let Ok(bundle) = bundle {
-                scripts.push(bundle);
+            if let Ok(bundle) = ScriptConfigBundle::from_path(Path::new(path)) {
+                if bundle.is_valid_script_config() {
+                    scripts.push(bundle);
+                }
             }
         }
     }
