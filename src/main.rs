@@ -21,7 +21,7 @@ use lazy_static::{initialize, lazy_static};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rlbot::parsing::{
     agent_config_parser::BotLooksConfig,
-    bot_config_bundle::{BotConfigBundle, Clean, ScriptConfigBundle, BOT_CONFIG_MODULE_HEADER, PYTHON_FILE_KEY},
+    bot_config_bundle::{BotConfigBundle, Clean, ScriptConfigBundle, BOT_CONFIG_MODULE_HEADER, BOT_NAME_KEY},
     directory_scanner::scan_directory_for_script_configs,
 };
 use rlbot::{agents::runnable::Runnable, parsing::match_settings_config_parser::*};
@@ -29,7 +29,7 @@ use sanitize_filename::sanitize;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 
-use tini::Ini;
+use configparser::ini::Ini;
 
 use rlbot::parsing::directory_scanner::scan_directory_for_bot_configs;
 use tauri::{SystemTray, SystemTrayMenu};
@@ -63,10 +63,11 @@ pub struct BotFolderSettings {
 
 impl BotFolderSettings {
     fn from_path(path: &String) -> Self {
-        let conf = Ini::from_file(path).unwrap();
-        let files = serde_json::from_str(&*conf.get::<String>("bot_folder_settings", "files").unwrap_or_else(|| "[]".to_string())).unwrap_or_default();
+        let mut conf = Ini::new();
+        conf.load(path).unwrap();
+        let files = serde_json::from_str(&conf.get("bot_folder_settings", "files").unwrap_or_else(|| String::from("[]"))).unwrap_or_default();
 
-        let folders = serde_json::from_str(&*conf.get::<String>("bot_folder_settings", "folders").unwrap_or_else(|| "[]".to_string())).unwrap_or_default();
+        let folders = serde_json::from_str(&*conf.get("bot_folder_settings", "folders").unwrap_or_else(|| String::from("[]"))).unwrap_or_default();
 
         Self { files, folders }
     }
@@ -76,12 +77,11 @@ impl BotFolderSettings {
         self.folders = bfs.folders;
 
         let path = CONFIG_PATH.lock().unwrap();
-        let conf = Ini::from_file(&*path)
-            .unwrap()
-            .section("bot_folder_settings")
-            .item("files", serde_json::to_string(&self.files).unwrap())
-            .item("folders", serde_json::to_string(&self.folders).unwrap());
-        conf.to_file(&*path).unwrap();
+        let mut conf = Ini::new();
+        conf.load(&*path).unwrap();
+        conf.set("bot_folder_settings", "files", serde_json::to_string(&self.files).ok());
+        conf.set("bot_folder_settings", "folders", serde_json::to_string(&self.folders).ok());
+        conf.write(&*path).unwrap();
     }
 
     fn add_folder(&mut self, path: String) {
@@ -117,44 +117,31 @@ struct MutatorSettings {
 
 impl MutatorSettings {
     fn from_path(path: &String) -> Self {
-        let conf = Ini::from_file(path).unwrap();
+        let mut conf = Ini::new();
+        conf.load(path).unwrap();
 
-        let match_length = conf.get::<String>("mutator_settings", "match_length").unwrap_or_else(|| MATCH_LENGTH_TYPES[0].to_string());
-        let max_score = conf.get::<String>("mutator_settings", "max_score").unwrap_or_else(|| MAX_SCORE_TYPES[0].to_string());
-        let overtime = conf.get::<String>("mutator_settings", "overtime").unwrap_or_else(|| OVERTIME_MUTATOR_TYPES[0].to_string());
-        let series_length = conf
-            .get::<String>("mutator_settings", "series_length")
-            .unwrap_or_else(|| SERIES_LENGTH_MUTATOR_TYPES[0].to_string());
-        let game_speed = conf
-            .get::<String>("mutator_settings", "game_speed")
-            .unwrap_or_else(|| GAME_SPEED_MUTATOR_TYPES[0].to_string());
+        let match_length = conf.get("mutator_settings", "match_length").unwrap_or_else(|| MATCH_LENGTH_TYPES[0].to_string());
+        let max_score = conf.get("mutator_settings", "max_score").unwrap_or_else(|| MAX_SCORE_TYPES[0].to_string());
+        let overtime = conf.get("mutator_settings", "overtime").unwrap_or_else(|| OVERTIME_MUTATOR_TYPES[0].to_string());
+        let series_length = conf.get("mutator_settings", "series_length").unwrap_or_else(|| SERIES_LENGTH_MUTATOR_TYPES[0].to_string());
+        let game_speed = conf.get("mutator_settings", "game_speed").unwrap_or_else(|| GAME_SPEED_MUTATOR_TYPES[0].to_string());
         let ball_max_speed = conf
-            .get::<String>("mutator_settings", "ball_max_speed")
+            .get("mutator_settings", "ball_max_speed")
             .unwrap_or_else(|| BALL_MAX_SPEED_MUTATOR_TYPES[0].to_string());
-        let ball_type = conf
-            .get::<String>("mutator_settings", "ball_type")
-            .unwrap_or_else(|| BALL_TYPE_MUTATOR_TYPES[0].to_string());
-        let ball_weight = conf
-            .get::<String>("mutator_settings", "ball_weight")
-            .unwrap_or_else(|| BALL_WEIGHT_MUTATOR_TYPES[0].to_string());
-        let ball_size = conf
-            .get::<String>("mutator_settings", "ball_size")
-            .unwrap_or_else(|| BALL_SIZE_MUTATOR_TYPES[0].to_string());
+        let ball_type = conf.get("mutator_settings", "ball_type").unwrap_or_else(|| BALL_TYPE_MUTATOR_TYPES[0].to_string());
+        let ball_weight = conf.get("mutator_settings", "ball_weight").unwrap_or_else(|| BALL_WEIGHT_MUTATOR_TYPES[0].to_string());
+        let ball_size = conf.get("mutator_settings", "ball_size").unwrap_or_else(|| BALL_SIZE_MUTATOR_TYPES[0].to_string());
         let ball_bounciness = conf
-            .get::<String>("mutator_settings", "ball_bounciness")
+            .get("mutator_settings", "ball_bounciness")
             .unwrap_or_else(|| BALL_BOUNCINESS_MUTATOR_TYPES[0].to_string());
-        let boost_amount = conf
-            .get::<String>("mutator_settings", "boost_amount")
-            .unwrap_or_else(|| BOOST_AMOUNT_MUTATOR_TYPES[0].to_string());
-        let rumble = conf.get::<String>("mutator_settings", "rumble").unwrap_or_else(|| RUMBLE_MUTATOR_TYPES[0].to_string());
+        let boost_amount = conf.get("mutator_settings", "boost_amount").unwrap_or_else(|| BOOST_AMOUNT_MUTATOR_TYPES[0].to_string());
+        let rumble = conf.get("mutator_settings", "rumble").unwrap_or_else(|| RUMBLE_MUTATOR_TYPES[0].to_string());
         let boost_strength = conf
-            .get::<String>("mutator_settings", "boost_strength")
+            .get("mutator_settings", "boost_strength")
             .unwrap_or_else(|| BOOST_STRENGTH_MUTATOR_TYPES[0].to_string());
-        let gravity = conf.get::<String>("mutator_settings", "gravity").unwrap_or_else(|| GRAVITY_MUTATOR_TYPES[0].to_string());
-        let demolish = conf.get::<String>("mutator_settings", "demolish").unwrap_or_else(|| DEMOLISH_MUTATOR_TYPES[0].to_string());
-        let respawn_time = conf
-            .get::<String>("mutator_settings", "respawn_time")
-            .unwrap_or_else(|| RESPAWN_TIME_MUTATOR_TYPES[0].to_string());
+        let gravity = conf.get("mutator_settings", "gravity").unwrap_or_else(|| GRAVITY_MUTATOR_TYPES[0].to_string());
+        let demolish = conf.get("mutator_settings", "demolish").unwrap_or_else(|| DEMOLISH_MUTATOR_TYPES[0].to_string());
+        let respawn_time = conf.get("mutator_settings", "respawn_time").unwrap_or_else(|| RESPAWN_TIME_MUTATOR_TYPES[0].to_string());
 
         Self {
             match_length,
@@ -195,26 +182,25 @@ impl MutatorSettings {
         self.respawn_time = ms.respawn_time;
 
         let path = CONFIG_PATH.lock().unwrap();
-        let conf = Ini::from_file(&*path)
-            .unwrap()
-            .section("mutator_settings")
-            .item("match_length", &self.match_length)
-            .item("max_score", &self.max_score)
-            .item("overtime", &self.overtime)
-            .item("series_length", &self.series_length)
-            .item("game_speed", &self.game_speed)
-            .item("ball_max_speed", &self.ball_max_speed)
-            .item("ball_type", &self.ball_type)
-            .item("ball_weight", &self.ball_weight)
-            .item("ball_size", &self.ball_size)
-            .item("ball_bounciness", &self.ball_bounciness)
-            .item("boost_amount", &self.boost_amount)
-            .item("rumble", &self.rumble)
-            .item("boost_strength", &self.boost_strength)
-            .item("gravity", &self.gravity)
-            .item("demolish", &self.demolish)
-            .item("respawn_time", &self.respawn_time);
-        conf.to_file(&*path).unwrap();
+        let mut conf = Ini::new();
+        conf.load(&*path).unwrap();
+        conf.set("mutator_settings", "match_length", Some(self.match_length.clone()));
+        conf.set("mutator_settings", "max_score", Some(self.max_score.clone()));
+        conf.set("mutator_settings", "overtime", Some(self.overtime.clone()));
+        conf.set("mutator_settings", "series_length", Some(self.series_length.clone()));
+        conf.set("mutator_settings", "game_speed", Some(self.game_speed.clone()));
+        conf.set("mutator_settings", "ball_max_speed", Some(self.ball_max_speed.clone()));
+        conf.set("mutator_settings", "ball_type", Some(self.ball_type.clone()));
+        conf.set("mutator_settings", "ball_weight", Some(self.ball_weight.clone()));
+        conf.set("mutator_settings", "ball_size", Some(self.ball_size.clone()));
+        conf.set("mutator_settings", "ball_bounciness", Some(self.ball_bounciness.clone()));
+        conf.set("mutator_settings", "boost_amount", Some(self.boost_amount.clone()));
+        conf.set("mutator_settings", "rumble", Some(self.rumble.clone()));
+        conf.set("mutator_settings", "boost_strength", Some(self.boost_strength.clone()));
+        conf.set("mutator_settings", "gravity", Some(self.gravity.clone()));
+        conf.set("mutator_settings", "demolish", Some(self.demolish.clone()));
+        conf.set("mutator_settings", "respawn_time", Some(self.respawn_time.clone()));
+        conf.write(&*path).unwrap();
     }
 }
 
@@ -236,21 +222,20 @@ struct MatchSettings {
 
 impl MatchSettings {
     fn from_path(path: &String) -> Self {
-        let conf = Ini::from_file(path).unwrap();
+        let mut conf = Ini::new();
+        conf.load(path).unwrap();
 
-        let map = conf.get::<String>("match_settings", "map").unwrap_or_else(|| MAP_TYPES[0].to_string());
-        let game_mode = conf.get::<String>("match_settings", "game_mode").unwrap_or_else(|| GAME_MODES[0].to_string());
-        let match_behavior = conf
-            .get::<String>("match_settings", "match_behavior")
-            .unwrap_or_else(|| EXISTING_MATCH_BEHAVIOR_TYPES[0].to_string());
-        let skip_replays = conf.get::<bool>("match_settings", "skip_replays").unwrap_or(false);
-        let instant_start = conf.get::<bool>("match_settings", "instant_start").unwrap_or(false);
-        let enable_lockstep = conf.get::<bool>("match_settings", "enable_lockstep").unwrap_or(false);
-        let randomize_map = conf.get::<bool>("match_settings", "randomize_map").unwrap_or(false);
-        let enable_rendering = conf.get::<bool>("match_settings", "enable_rendering").unwrap_or(false);
-        let enable_state_setting = conf.get::<bool>("match_settings", "enable_state_setting").unwrap_or(true);
-        let auto_save_replay = conf.get::<bool>("match_settings", "auto_save_replay").unwrap_or(false);
-        let scripts = conf.get::<String>("match_settings", "scripts").unwrap_or_else(|| "[]".to_string());
+        let map = conf.get("match_settings", "map").unwrap_or_else(|| MAP_TYPES[0].to_string());
+        let game_mode = conf.get("match_settings", "game_mode").unwrap_or_else(|| GAME_MODES[0].to_string());
+        let match_behavior = conf.get("match_settings", "match_behavior").unwrap_or_else(|| EXISTING_MATCH_BEHAVIOR_TYPES[0].to_string());
+        let skip_replays = conf.getbool("match_settings", "skip_replays").unwrap_or(Some(false)).unwrap_or(false);
+        let instant_start = conf.getbool("match_settings", "instant_start").unwrap_or(Some(false)).unwrap_or(false);
+        let enable_lockstep = conf.getbool("match_settings", "enable_lockstep").unwrap_or(Some(false)).unwrap_or(false);
+        let randomize_map = conf.getbool("match_settings", "randomize_map").unwrap_or(Some(false)).unwrap_or(false);
+        let enable_rendering = conf.getbool("match_settings", "enable_rendering").unwrap_or(Some(false)).unwrap_or(false);
+        let enable_state_setting = conf.getbool("match_settings", "enable_state_setting").unwrap_or(Some(true)).unwrap_or(true);
+        let auto_save_replay = conf.getbool("match_settings", "auto_save_replay").unwrap_or(Some(false)).unwrap_or(false);
+        let scripts = serde_json::from_str(&conf.get("match_settings", "scripts").unwrap_or_else(|| "[]".to_string())).unwrap_or_default();
 
         Self {
             map,
@@ -263,7 +248,7 @@ impl MatchSettings {
             enable_rendering,
             enable_state_setting,
             auto_save_replay,
-            scripts: serde_json::from_str(&scripts).unwrap_or_default(),
+            scripts,
             mutators: MutatorSettings::from_path(path),
         }
     }
@@ -284,21 +269,20 @@ impl MatchSettings {
         self.mutators.update_config(ms.mutators);
 
         let path = CONFIG_PATH.lock().unwrap();
-        let conf = Ini::from_file(&*path)
-            .unwrap()
-            .section("match_settings")
-            .item("map", &self.map)
-            .item("game_mode", &self.game_mode)
-            .item("match_behavior", &self.match_behavior)
-            .item("skip_replays", self.skip_replays)
-            .item("instant_start", self.instant_start)
-            .item("enable_lockstep", self.enable_lockstep)
-            .item("randomize_map", self.randomize_map)
-            .item("enable_rendering", self.enable_rendering)
-            .item("enable_state_setting", self.enable_state_setting)
-            .item("auto_save_replay", self.auto_save_replay)
-            .item("scripts", serde_json::to_string(&self.scripts).unwrap_or_default());
-        conf.to_file(&*path).unwrap();
+        let mut conf = Ini::new();
+        conf.load(&*path).unwrap();
+        conf.set("match_settings", "map", Some(self.map.clone()));
+        conf.set("match_settings", "game_mode", Some(self.game_mode.clone()));
+        conf.set("match_settings", "match_behavior", Some(self.match_behavior.clone()));
+        conf.set("match_settings", "skip_replays", Some(self.skip_replays.to_string()));
+        conf.set("match_settings", "instant_start", Some(self.instant_start.to_string()));
+        conf.set("match_settings", "enable_lockstep", Some(self.enable_lockstep.to_string()));
+        conf.set("match_settings", "randomize_map", Some(self.randomize_map.to_string()));
+        conf.set("match_settings", "enable_rendering", Some(self.enable_rendering.to_string()));
+        conf.set("match_settings", "enable_state_setting", Some(self.enable_state_setting.to_string()));
+        conf.set("match_settings", "auto_save_replay", Some(self.auto_save_replay.to_string()));
+        conf.set("match_settings", "scripts", Some(serde_json::to_string(&self.scripts).unwrap_or_default()));
+        conf.write(&*path).unwrap();
     }
 
     fn cleaned_scripts(&self) -> Self {
@@ -347,43 +331,39 @@ lazy_static! {
 
         if !path.exists() {
             create_dir_all(path.parent().unwrap()).unwrap();
-            let conf = Ini::new()
-                .section("bot_folder_settings")
-                .item("files", "{}")
-                .item("folders", "{}")
-                .section("match_settings")
-                .item("map", MAP_TYPES[0].to_string())
-                .item("game_mode", GAME_MODES[0].to_string())
-                .item("match_behavior", EXISTING_MATCH_BEHAVIOR_TYPES[0].to_string())
-                .item("skip_replays", false)
-                .item("instant_start", false)
-                .item("enable_lockstep", false)
-                .item("randomize_map", false)
-                .item("enable_rendering", false)
-                .item("enable_state_setting", true)
-                .item("auto_save_replay", false)
-                .item("scripts", "[]")
-                .section("mutator_settings")
-                .item("match_length", MATCH_LENGTH_TYPES[0].to_string())
-                .item("max_score", MAX_SCORE_TYPES[0].to_string())
-                .item("overtime", OVERTIME_MUTATOR_TYPES[0].to_string())
-                .item("series_length", SERIES_LENGTH_MUTATOR_TYPES[0].to_string())
-                .item("game_speed", GAME_SPEED_MUTATOR_TYPES[0].to_string())
-                .item("ball_max_speed", BALL_MAX_SPEED_MUTATOR_TYPES[0].to_string())
-                .item("ball_type", BALL_TYPE_MUTATOR_TYPES[0].to_string())
-                .item("ball_weight", BALL_WEIGHT_MUTATOR_TYPES[0].to_string())
-                .item("ball_size", BALL_SIZE_MUTATOR_TYPES[0].to_string())
-                .item("ball_bounciness", BALL_BOUNCINESS_MUTATOR_TYPES[0].to_string())
-                .item("boost_amount", BOOST_AMOUNT_MUTATOR_TYPES[0].to_string())
-                .item("rumble", RUMBLE_MUTATOR_TYPES[0].to_string())
-                .item("boost_strength", BOOST_STRENGTH_MUTATOR_TYPES[0].to_string())
-                .item("gravity", GRAVITY_MUTATOR_TYPES[0].to_string())
-                .item("demolish", DEMOLISH_MUTATOR_TYPES[0].to_string())
-                .item("respawn_time", RESPAWN_TIME_MUTATOR_TYPES[0].to_string())
-                .section("python_config")
-                .item("path", auto_detect_python());
+            let mut conf = Ini::new();
+            conf.set("bot_folder_settings", "files", Some("{}".to_string()));
+            conf.set("bot_folder_settings", "folders", Some("{}".to_string()));
+            conf.set("match_settings", "map", Some(MAP_TYPES[0].to_string()));
+            conf.set("match_settings", "game_mode", Some(GAME_MODES[0].to_string()));
+            conf.set("match_settings", "match_behavior", Some(EXISTING_MATCH_BEHAVIOR_TYPES[0].to_string()));
+            conf.set("match_settings", "skip_replays", Some("false".to_string()));
+            conf.set("match_settings", "instant_start", Some("false".to_string()));
+            conf.set("match_settings", "enable_lockstep", Some("false".to_string()));
+            conf.set("match_settings", "randomize_map", Some("false".to_string()));
+            conf.set("match_settings", "enable_rendering", Some("false".to_string()));
+            conf.set("match_settings", "enable_state_setting", Some("true".to_string()));
+            conf.set("match_settings", "auto_save_replay", Some("false".to_string()));
+            conf.set("match_settings", "scripts", Some("[]".to_string()));
+            conf.set("mutator_settings", "match_length", Some(MATCH_LENGTH_TYPES[0].to_string()));
+            conf.set("mutator_settings", "max_score", Some(MAX_SCORE_TYPES[0].to_string()));
+            conf.set("mutator_settings", "overtime", Some(OVERTIME_MUTATOR_TYPES[0].to_string()));
+            conf.set("mutator_settings", "series_length", Some(SERIES_LENGTH_MUTATOR_TYPES[0].to_string()));
+            conf.set("mutator_settings", "game_speed", Some(GAME_SPEED_MUTATOR_TYPES[0].to_string()));
+            conf.set("mutator_settings", "ball_max_speed", Some(BALL_MAX_SPEED_MUTATOR_TYPES[0].to_string()));
+            conf.set("mutator_settings", "ball_type", Some(BALL_TYPE_MUTATOR_TYPES[0].to_string()));
+            conf.set("mutator_settings", "ball_weight", Some(BALL_WEIGHT_MUTATOR_TYPES[0].to_string()));
+            conf.set("mutator_settings", "ball_size", Some(BALL_SIZE_MUTATOR_TYPES[0].to_string()));
+            conf.set("mutator_settings", "ball_bounciness", Some(BALL_BOUNCINESS_MUTATOR_TYPES[0].to_string()));
+            conf.set("mutator_settings", "boost_amount", Some(BOOST_AMOUNT_MUTATOR_TYPES[0].to_string()));
+            conf.set("mutator_settings", "rumble", Some(RUMBLE_MUTATOR_TYPES[0].to_string()));
+            conf.set("mutator_settings", "boost_strength", Some(BOOST_STRENGTH_MUTATOR_TYPES[0].to_string()));
+            conf.set("mutator_settings", "gravity", Some(GRAVITY_MUTATOR_TYPES[0].to_string()));
+            conf.set("mutator_settings", "demolish", Some(DEMOLISH_MUTATOR_TYPES[0].to_string()));
+            conf.set("mutator_settings", "respawn_time", Some(RESPAWN_TIME_MUTATOR_TYPES[0].to_string()));
+            conf.set("python_config", "path", Some(auto_detect_python()));
 
-            conf.to_file(&path).unwrap();
+            conf.write(&path).unwrap();
         }
 
         Mutex::new(path.to_str().unwrap().to_string())
@@ -394,8 +374,12 @@ lazy_static! {
     static ref BOT_FOLDER_SETTINGS: Mutex<BotFolderSettings> = Mutex::new(BotFolderSettings::from_path(&*CONFIG_PATH.lock().unwrap()));
     static ref MATCH_SETTINGS: Mutex<MatchSettings> = Mutex::new(MatchSettings::from_path(&*CONFIG_PATH.lock().unwrap()));
     static ref PYTHON_PATH: Mutex<String> = Mutex::new({
-        let config = Ini::from_file(&*CONFIG_PATH.lock().unwrap()).unwrap();
-        config.get("python_config", "path").unwrap_or_else(auto_detect_python)
+        let mut config = Ini::new();
+        config.load(&*CONFIG_PATH.lock().unwrap()).unwrap();
+        match config.get("python_config", "path") {
+            Some(path) => path,
+            None => auto_detect_python(),
+        }
     });
 }
 
@@ -547,14 +531,15 @@ fn fetch_logos<T: Clean>(items: Vec<T>) -> Vec<T> {
 
 #[tauri::command]
 async fn get_team_settings() -> HashMap<String, Vec<BotConfigBundle>> {
-    let config = Ini::from_file(&*CONFIG_PATH.lock().unwrap()).unwrap();
+    let mut config = Ini::new();
+    config.load(&*CONFIG_PATH.lock().unwrap()).unwrap();
     let blue_team = serde_json::from_str(
-        &*config
-            .get::<String>("team_settings", "blue_team")
+        &config
+            .get("team_settings", "blue_team")
             .unwrap_or_else(|| "[{\"name\": \"Human\", \"type_\": \"human\", \"image\": \"imgs/human.png\"}]".to_string()),
     )
     .unwrap_or_default();
-    let orange_team = serde_json::from_str(&*config.get::<String>("team_settings", "orange_team").unwrap_or_else(|| "[]".to_string())).unwrap_or_default();
+    let orange_team = serde_json::from_str(&config.get("team_settings", "orange_team").unwrap_or_else(|| "[]".to_string())).unwrap_or_default();
 
     let mut bots = HashMap::new();
     bots.insert("blue_team".to_string(), fetch_logos(blue_team));
@@ -569,12 +554,11 @@ fn clean<T: Clean>(items: Vec<T>) -> Vec<T> {
 
 #[tauri::command]
 async fn save_team_settings(blue_team: Vec<BotConfigBundle>, orange_team: Vec<BotConfigBundle>) {
-    let config = Ini::from_file(&*CONFIG_PATH.lock().unwrap())
-        .unwrap()
-        .section("team_settings")
-        .item("blue_team", serde_json::to_string(&clean(blue_team)).unwrap())
-        .item("orange_team", serde_json::to_string(&clean(orange_team)).unwrap());
-    config.to_file(&*CONFIG_PATH.lock().unwrap()).unwrap();
+    let mut config = Ini::new();
+    config.load(&*CONFIG_PATH.lock().unwrap()).unwrap();
+    config.set("team_settings", "blue_team", Some(serde_json::to_string(&clean(blue_team)).unwrap()));
+    config.set("team_settings", "orange_team", Some(serde_json::to_string(&clean(orange_team)).unwrap()));
+    config.write(&*CONFIG_PATH.lock().unwrap()).unwrap();
 }
 
 fn get_command_status(program: &str, version: Vec<&str>) -> bool {
@@ -641,8 +625,10 @@ async fn get_python_path() -> String {
 async fn set_python_path(path: String) {
     *PYTHON_PATH.lock().unwrap() = path.clone();
     let config_path = CONFIG_PATH.lock().unwrap();
-    let config = Ini::from_file(&*config_path).unwrap().section("python_config").item("path", path);
-    config.to_file(&*config_path).unwrap();
+    let mut config = Ini::new();
+    config.load(&*config_path).unwrap();
+    config.set("python_config", "path", Some(path));
+    config.write(&*config_path).unwrap();
 }
 
 #[tauri::command]
@@ -757,20 +743,19 @@ fn ensure_bot_directory() -> String {
     bot_directory
 }
 
-fn bootstrap_python_bot(bot_name: String, directory: &str) -> Result<String, String> {
+async fn bootstrap_python_bot(bot_name: String, directory: &str) -> Result<String, String> {
     let sanitized_name = sanitize(&bot_name);
-    let top_dir = Path::new(directory).join(&sanitized_name);
+    let top_dir = Path::new(directory).join(CREATED_BOTS_FOLDER).join(&sanitized_name);
 
     if top_dir.exists() {
         return Err(format!("There is already a bot named {}, please choose a different name!", sanitized_name));
     }
 
-    match reqwest::blocking::get("https://github.com/RLBot/RLBotPythonExample/archive/master.zip") {
+    match reqwest::get("https://github.com/RLBot/RLBotPythonExample/archive/master.zip").await {
         Ok(res) => {
-            zip_extract::extract(Cursor::new(res.text().unwrap().as_bytes()), top_dir.as_path(), true).unwrap();
+            zip_extract::extract(Cursor::new(&res.bytes().await.unwrap()), top_dir.as_path(), true).unwrap();
         }
         Err(e) => {
-            println!("Failed to download python bot: {}", e);
             return Err(format!("Failed to download python bot: {}", e));
         }
     }
@@ -780,10 +765,14 @@ fn bootstrap_python_bot(bot_name: String, directory: &str) -> Result<String, Str
     let config_file = bundle.path.clone().unwrap();
     let python_file = bundle.python_path.clone().unwrap();
 
-    let config = Ini::from_file(&config_file).unwrap().section(BOT_CONFIG_MODULE_HEADER).item(PYTHON_FILE_KEY, bot_name);
-    config.to_file(&config_file).unwrap();
+    let mut config = Ini::new();
+    config.load(&config_file).unwrap();
+    config.set(BOT_CONFIG_MODULE_HEADER, BOT_NAME_KEY, Some(bot_name));
+    config.write(&config_file).unwrap();
 
-    if !get_command_status(&python_file, vec![]) {
+    BOT_FOLDER_SETTINGS.lock().unwrap().add_file(config_file.clone());
+
+    if process::Command::new(&python_file).spawn().is_err() {
         println!("You have no default program to open .py files. Your new bot is located at {}", top_dir.to_str().unwrap());
     }
 
@@ -791,15 +780,10 @@ fn bootstrap_python_bot(bot_name: String, directory: &str) -> Result<String, Str
 }
 
 #[tauri::command]
-async fn begin_python_bot(bot_name: String) -> HashMap<String, String> {
-    let bot_directory = ensure_bot_directory();
-
-    match bootstrap_python_bot(bot_name, &bot_directory) {
-        Ok(config_file) => {
-            let bundle = BotConfigBundle::from_path(Path::new(&config_file)).unwrap();
-            HashMap::from([("bots".to_string(), serde_json::to_string(&bundle).unwrap())])
-        }
-        Err(e) => HashMap::from([("err".to_string(), e)]),
+async fn begin_python_bot(bot_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
+    match bootstrap_python_bot(bot_name, &ensure_bot_directory()).await {
+        Ok(config_file) => Ok(HashMap::from([("bot".to_string(), BotConfigBundle::from_path(Path::new(&config_file)).unwrap())])),
+        Err(e) => Err(HashMap::from([("error".to_string(), e)])),
     }
 }
 

@@ -1,8 +1,8 @@
 use std::{fs, io::Read, path::Path};
 
+use configparser::ini::Ini;
 use imghdr::Type;
 use serde::{Deserialize, Serialize};
-use tini::{Error, Ini};
 
 use crate::rlbot::agents::{base_script::SCRIPT_FILE_KEY, runnable::Runnable};
 
@@ -29,18 +29,12 @@ pub struct DevInfo {
 
 impl DevInfo {
     pub fn from_config(config: Ini) -> Self {
-        let developer = config.get::<String>(BOT_CONFIG_DETAILS_HEADER, "developer").unwrap_or_default();
-        let description = config.get::<String>(BOT_CONFIG_DETAILS_HEADER, "description").unwrap_or_default();
-        let fun_fact = config.get::<String>(BOT_CONFIG_DETAILS_HEADER, "fun_fact").unwrap_or_default();
-        let github = config.get::<String>(BOT_CONFIG_DETAILS_HEADER, "github").unwrap_or_default();
-        let language = config.get::<String>(BOT_CONFIG_DETAILS_HEADER, "language").unwrap_or_default();
-        let tags = config
-            .get_vec::<String>(BOT_CONFIG_DETAILS_HEADER, "tags")
-            .unwrap_or_default()
-            .iter()
-            .map(|s| s.trim().to_string())
-            .filter(|s| !s.is_empty())
-            .collect();
+        let developer = config.get(BOT_CONFIG_DETAILS_HEADER, "developer").unwrap_or_default();
+        let description = config.get(BOT_CONFIG_DETAILS_HEADER, "description").unwrap_or_default();
+        let fun_fact = config.get(BOT_CONFIG_DETAILS_HEADER, "fun_fact").unwrap_or_default();
+        let github = config.get(BOT_CONFIG_DETAILS_HEADER, "github").unwrap_or_default();
+        let language = config.get(BOT_CONFIG_DETAILS_HEADER, "language").unwrap_or_default();
+        let tags = serde_json::from_str(&config.get(BOT_CONFIG_DETAILS_HEADER, "tags").unwrap_or_default()).unwrap_or_default();
 
         Self {
             developer,
@@ -123,19 +117,19 @@ pub struct BotConfigBundle {
 }
 
 impl BotConfigBundle {
-    pub fn from_path(config_path: &Path) -> Result<Self, Error> {
-        let config = Ini::from_file(config_path.to_str().unwrap())?;
+    pub fn from_path(config_path: &Path) -> Result<Self, String> {
+        let mut config = Ini::new();
+        config.load(config_path.to_str().unwrap())?;
+
         let path = config_path.to_str().unwrap().to_string();
         let config_directory = config_path.parent().unwrap().to_str().unwrap().to_string();
         let config_file_name = Some(config_path.file_name().unwrap().to_str().unwrap().to_string());
 
         let name = config.get(BOT_CONFIG_MODULE_HEADER, BOT_NAME_KEY);
-        let looks_path = config
-            .get::<String>(BOT_CONFIG_MODULE_HEADER, LOOKS_CONFIG_KEY)
-            .map(|path| format!("{}/{}", config_directory, path));
-        let python_path = config.get::<String>(BOT_CONFIG_MODULE_HEADER, PYTHON_FILE_KEY).map(|path| format!("{}/{}", config_directory, path));
+        let looks_path = config.get(BOT_CONFIG_MODULE_HEADER, LOOKS_CONFIG_KEY).map(|path| format!("{}/{}", config_directory, path));
+        let python_path = config.get(BOT_CONFIG_MODULE_HEADER, PYTHON_FILE_KEY).map(|path| format!("{}/{}", config_directory, path));
 
-        let t_logo = config.get::<String>(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY).unwrap_or_else(|| String::from("logo.png"));
+        let t_logo = config.get(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY).unwrap_or_else(|| String::from("logo.png"));
         let ta_logo = format!("{}/{}", config_directory, t_logo);
 
         let logo = if Path::new(&ta_logo).exists() { to_base64(&ta_logo) } else { None };
@@ -167,14 +161,17 @@ impl BotConfigBundle {
     }
 
     pub fn is_valid_bot_config(&self) -> bool {
-        if self.looks_path.is_none() || self.name.is_none() || self.config_file_name.is_none() {
+        if self.name.is_none() {
             return false;
         }
 
-        match &self.python_path {
+        (match &self.looks_path {
             Some(path) => Path::new(path).exists(),
             None => false,
-        }
+        }) && (match &self.python_path {
+            Some(path) => Path::new(path).exists(),
+            None => false,
+        })
     }
 }
 
@@ -216,8 +213,9 @@ pub struct ScriptConfigBundle {
 }
 
 impl ScriptConfigBundle {
-    pub fn from_path(config_path: &Path) -> Result<Self, Error> {
-        let config = Ini::from_file(config_path.to_str().unwrap())?;
+    pub fn from_path(config_path: &Path) -> Result<Self, String> {
+        let mut config = Ini::new();
+        config.load(config_path.to_str().unwrap())?;
 
         let name = config.get(BOT_CONFIG_MODULE_HEADER, BOT_NAME_KEY);
         let type_ = String::from("script");
@@ -226,13 +224,14 @@ impl ScriptConfigBundle {
         let config_directory = config_path.parent().unwrap().to_str().unwrap().to_string();
         let config_file_name = config_path.file_name().unwrap().to_str().unwrap().to_string();
 
-        let t_logo = config.get::<String>(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY).unwrap_or_else(|| String::from("logo.png"));
+        let t_logo = config.get(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY).unwrap_or_else(|| String::from("logo.png"));
         let ta_logo = format!("{}/{}", config_directory, t_logo);
         let logo = if Path::new(&ta_logo).exists() { to_base64(&ta_logo) } else { None };
 
         let script_file = config
-            .get::<String>(BOT_CONFIG_MODULE_HEADER, SCRIPT_FILE_KEY)
-            .map(|path| format!("{}/{}", config_directory, path)).unwrap_or_default();
+            .get(BOT_CONFIG_MODULE_HEADER, SCRIPT_FILE_KEY)
+            .map(|path| format!("{}/{}", config_directory, path))
+            .unwrap_or_default();
 
         let info = DevInfo::from_config(config);
 

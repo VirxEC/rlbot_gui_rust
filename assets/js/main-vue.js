@@ -615,7 +615,7 @@ export default {
 				this.showSnackbar = true;
 			} else if (language === 'python') {
 				this.showProgressSpinner = true;
-				invoke("begin_python_bot", { bot_name: bot_name }).then(this.botLoadHandler);
+				invoke("begin_python_bot", { botName: bot_name }).then(this.botLoadHandler);
 			} else if (language === 'scratch') {
 				this.showProgressSpinner = true;
 				// eel.begin_scratch_bot(bot_name)(this.botLoadHandler);
@@ -645,7 +645,9 @@ export default {
 				this.snackbarContent = response.error;
 				this.showSnackbar = true;
 			} else {
-				this.botsReceived(response.bots);
+				console.log(response);
+				this.folderSettings["files"][response.bot.name] = response.bot;
+				this.botsReceived([response.bot]);
 			}
 		},
 		botsReceived: function (bots) {
@@ -655,7 +657,9 @@ export default {
 
 			this.applyLanguageWarnings(freshBots);
 			const firstFour = this.botPool.slice(0, 4);
-			this.botPool = firstFour.concat(this.botPool.slice(4, this.botPool.length).concat(freshBots).sort((a, b) => a.name.localeCompare(b.name)));
+			this.botPool = this.botPool.slice(4, this.botPool.length).concat(freshBots);
+			this.botPool = this.botPool.sort((a, b) => a.name.localeCompare(b.name));
+			this.botPool = firstFour.concat(this.botPool);
 			this.distinguishDuplicateBots(this.botPool);
 			this.showProgressSpinner = false;
 		},
