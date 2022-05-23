@@ -53,7 +53,7 @@ export default {
 				</template>
 
 				<b-dropdown-item @click="pythonSetup()">
-					Edit Python Settings
+					Edit/Repair Python Settings
 				</b-dropdown-item>
 				<b-dropdown-item @click="downloadBotPack()">
 					Repair bot pack

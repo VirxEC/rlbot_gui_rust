@@ -21,6 +21,7 @@ This hasn't been implemented, but it's easy to do.
 - Running RLBot with a custom Python executable
 - Reloading misssing python packages upon executable change/package install
 - Add new bots into their proper place in the bot list instead of the end
+- Easy Python pip fixing if something breaks; top right -> menu -> "Edit/Repair Python Settings"
 - [Self-updating of the GUI: TODO](https://tauri.studio/v1/guides/distribution/updater#update-file-json-format)
 
 ## Installation

@@ -40,7 +40,6 @@
         "height": 870,
         "resizable": true,
         "fullscreen": false,
-        "skipTaskbar": true,
         "fileDropEnabled": false
       }
     ]

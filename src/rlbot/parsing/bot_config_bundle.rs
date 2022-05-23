@@ -293,16 +293,15 @@ impl Runnable for BotConfigBundle {
 
             args.push(&file);
 
-            match process::Command::new(python).args(args).output() {
+            match process::Command::new(python).args(args).stdout(process::Stdio::piped()).spawn() {
                 Ok(proc) => {
-                    let output = std::str::from_utf8(proc.stdout.as_slice()).unwrap();
+                    let out_proc = proc.wait_with_output().unwrap();
+                    let output = std::str::from_utf8(out_proc.stdout.as_slice()).unwrap();
                     if let Ok(packages) = serde_json::from_str(output) {
                         self.missing_python_packages = Some(packages);
                     }
                 }
-                Err(e) => {
-                    println!("Failed to calculate missing packages: {}", e);
-                }
+                Err(e) => println!("Failed to calculate missing packages: {}", e),
             }
         } else if requires_tkinter && !get_command_status(&python, vec!["-c", "import tkinter"]) {
             self.missing_python_packages = Some(vec![String::from("tkinter")]);
@@ -472,9 +471,7 @@ impl Runnable for ScriptConfigBundle {
                         self.missing_python_packages = packages;
                     }
                 }
-                Err(e) => {
-                    println!("Failed to calculate missing packages: {}", e);
-                }
+                Err(e) => println!("Failed to calculate missing packages: {}", e),
             }
         } else if self.requires_tkinter && !get_command_status(&python, vec!["-c", "import tkinter"]) {
             self.missing_python_packages = vec![String::from("tkinter")];

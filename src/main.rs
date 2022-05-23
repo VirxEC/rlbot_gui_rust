@@ -796,9 +796,19 @@ struct PackageResult {
     packages: Vec<String>,
 }
 
+fn ensure_pip(python: &String) -> i32 {
+    match process::Command::new(&python)
+        .args(["-m", "ensurepip"])
+        .status()
+    {
+        Ok(status) => status.code().unwrap_or(1),
+        Err(_) => 2,
+    }
+}
+
 #[tauri::command]
 async fn install_package(package_string: String) -> PackageResult {
-    let exit_code = match process::Command::new(&*PYTHON_PATH.lock().unwrap())
+    let exit_code = match process::Command::new(PYTHON_PATH.lock().unwrap().to_string())
         .args(["-m", "pip", "install", "-U", "--no-warn-script-location", &package_string])
         .status()
     {
@@ -815,15 +825,27 @@ async fn install_package(package_string: String) -> PackageResult {
 #[tauri::command]
 async fn install_requirements(config_path: String) -> PackageResult {
     let bundle = BotConfigBundle::from_path(Path::new(&config_path)).unwrap();
-
+    
     if let Some(file) = bundle.get_requirements_file() {
-        let exit_code = match process::Command::new(&*PYTHON_PATH.lock().unwrap())
-            .args(["-m", "pip", "install", "-U", "--no-warn-script-location", "-r", file])
+        let python = PYTHON_PATH.lock().unwrap().to_string();
+
+        let mut exit_code = match process::Command::new(&python)
+            .args(["-m", "pip", "-m", "-U", "--no-warn-script-location", "-r", file])
             .status()
         {
             Ok(status) => status.code().unwrap_or(1),
             Err(_) => 2,
         };
+
+        if exit_code == 0 {
+            exit_code = match process::Command::new(python)
+                .args(["-m", "pip", "install", "-U", "--no-warn-script-location", "-r", file])
+                .status()
+            {
+                Ok(status) => status.code().unwrap_or(1),
+                Err(_) => 2,
+            };
+        }
 
         PackageResult {
             exit_code,
