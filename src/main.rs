@@ -21,7 +21,7 @@ use lazy_static::{initialize, lazy_static};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 use rlbot::parsing::{
     agent_config_parser::BotLooksConfig,
-    bot_config_bundle::{BotConfigBundle, Clean, ScriptConfigBundle, BOT_CONFIG_MODULE_HEADER, BOT_NAME_KEY},
+    bot_config_bundle::{BotConfigBundle, Clean, ScriptConfigBundle, BOT_CONFIG_MODULE_HEADER, NAME_KEY},
     directory_scanner::scan_directory_for_script_configs,
 };
 use rlbot::{agents::runnable::Runnable, parsing::match_settings_config_parser::*};
@@ -293,7 +293,7 @@ impl MatchSettings {
 
     fn with_logos(&self) -> Self {
         let mut new = self.clone();
-        new.scripts = fetch_logos(new.scripts);
+        new.scripts = pre_fetch(new.scripts);
         new
     }
 }
@@ -383,6 +383,16 @@ lazy_static! {
     });
 }
 
+#[cfg(windows)]
+fn get_missing_packages_script_path() -> String {
+    format!("{}\\RLBotGUIX\\get_missing_packages.py", env::var("LOCALAPPDATA").unwrap())
+}
+
+#[cfg(not(windows))]
+fn get_missing_packages_script_path() -> String {
+    format!("{}/.RLBotGUI/get_missing_packages.py", env::var("HOME").unwrap())
+}
+
 #[tauri::command]
 async fn save_folder_settings(bot_folder_settings: BotFolderSettings) {
     BOT_FOLDER_SETTINGS.lock().unwrap().update_config(bot_folder_settings)
@@ -414,9 +424,7 @@ fn scan_for_bots_r() -> Vec<BotConfigBundle> {
     for (path, props) in bfs.files.iter() {
         if props.visible {
             if let Ok(bundle) = BotConfigBundle::from_path(Path::new(path)) {
-                if bundle.is_valid_bot_config() {
-                    bots.push(bundle);
-                }
+                bots.push(bundle);
             }
         }
     }
@@ -447,9 +455,7 @@ async fn scan_for_scripts() -> Vec<ScriptConfigBundle> {
     for (path, props) in bfs.files.iter() {
         if props.visible {
             if let Ok(bundle) = ScriptConfigBundle::from_path(Path::new(path)) {
-                if bundle.is_valid_script_config() {
-                    scripts.push(bundle);
-                }
+                scripts.push(bundle);
             }
         }
     }
@@ -525,8 +531,8 @@ async fn save_match_settings(settings: MatchSettings) {
     MATCH_SETTINGS.lock().unwrap().update_config(settings.cleaned_scripts());
 }
 
-fn fetch_logos<T: Clean>(items: Vec<T>) -> Vec<T> {
-    items.iter().map(|b| b.with_logo()).collect()
+fn pre_fetch<T: Clean>(items: Vec<T>) -> Vec<T> {
+    items.iter().map(|b| b.pre_fetch()).collect()
 }
 
 #[tauri::command]
@@ -542,8 +548,8 @@ async fn get_team_settings() -> HashMap<String, Vec<BotConfigBundle>> {
     let orange_team = serde_json::from_str(&config.get("team_settings", "orange_team").unwrap_or_else(|| "[]".to_string())).unwrap_or_default();
 
     let mut bots = HashMap::new();
-    bots.insert("blue_team".to_string(), fetch_logos(blue_team));
-    bots.insert("orange_team".to_string(), fetch_logos(orange_team));
+    bots.insert("blue_team".to_string(), pre_fetch(blue_team));
+    bots.insert("orange_team".to_string(), pre_fetch(orange_team));
 
     bots
 }
@@ -561,8 +567,8 @@ async fn save_team_settings(blue_team: Vec<BotConfigBundle>, orange_team: Vec<Bo
     config.write(&*CONFIG_PATH.lock().unwrap()).unwrap();
 }
 
-fn get_command_status(program: &str, version: Vec<&str>) -> bool {
-    match process::Command::new(program).args(version).stdout(Stdio::null()).stderr(Stdio::null()).status() {
+fn get_command_status(program: &str, args: Vec<&str>) -> bool {
+    match process::Command::new(program).args(args).stdout(Stdio::null()).stderr(Stdio::null()).status() {
         Ok(status) => status.success(),
         Err(_) => false,
     }
@@ -612,8 +618,16 @@ async fn get_language_support() -> HashMap<String, bool> {
     let python_check = get_command_status(&*python_path, vec!["--version"]);
     lang_support.insert("python".to_string(), python_check);
     lang_support.insert("fullpython".to_string(), python_check && get_command_status(&*python_path, vec!["-c", "import tkinter"]));
+    lang_support.insert(
+        "rlbotpython".to_string(),
+        python_check
+            && get_command_status(
+                &*python_path,
+                vec!["-c", "import rlbot; import numpy; import numba; import scipy; import websockets; import selenium"],
+            ),
+    );
 
-    lang_support
+    dbg!(lang_support)
 }
 
 #[tauri::command]
@@ -678,18 +692,7 @@ async fn get_recommendations() -> Option<HashMap<String, Vec<HashMap<String, Vec
     // this can be optimized if need, but for now it's fine
     // it loads all visible bot config bundles when we really only need name/path pairs
     // if a match is found, only that bundle could get loaded
-    let mut bot_config_bundles = scan_for_bots_r();
-
-    {
-        let bfs = BOT_FOLDER_SETTINGS.lock().unwrap();
-        for (path, settings) in bfs.files.iter() {
-            if settings.visible {
-                if let Ok(bundle) = BotConfigBundle::from_path(Path::new(path)) {
-                    bot_config_bundles.push(bundle);
-                }
-            }
-        }
-    }
+    let bot_config_bundles = scan_for_bots_r();
 
     json.map(|j| {
         let mut recommendations: Vec<HashMap<String, Vec<BotConfigBundle>>> = Vec::new();
@@ -767,7 +770,7 @@ async fn bootstrap_python_bot(bot_name: String, directory: &str) -> Result<Strin
 
     let mut config = Ini::new();
     config.load(&config_file).unwrap();
-    config.set(BOT_CONFIG_MODULE_HEADER, BOT_NAME_KEY, Some(bot_name));
+    config.set(BOT_CONFIG_MODULE_HEADER, NAME_KEY, Some(bot_name));
     config.write(&config_file).unwrap();
 
     BOT_FOLDER_SETTINGS.lock().unwrap().add_file(config_file.clone());
@@ -787,11 +790,123 @@ async fn begin_python_bot(bot_name: String) -> Result<HashMap<String, BotConfigB
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct PackageResult {
+    exit_code: i32,
+    packages: Vec<String>,
+}
+
+#[tauri::command]
+async fn install_package(package_string: String) -> PackageResult {
+    let exit_code = match process::Command::new(&*PYTHON_PATH.lock().unwrap())
+        .args(["-m", "pip", "install", "-U", "--no-warn-script-location", &package_string])
+        .status()
+    {
+        Ok(status) => status.code().unwrap_or(1),
+        Err(_) => 2,
+    };
+
+    PackageResult {
+        exit_code,
+        packages: vec![package_string],
+    }
+}
+
+#[tauri::command]
+async fn install_requirements(config_path: String) -> PackageResult {
+    let bundle = BotConfigBundle::from_path(Path::new(&config_path)).unwrap();
+
+    if let Some(file) = bundle.get_requirements_file() {
+        let exit_code = match process::Command::new(&*PYTHON_PATH.lock().unwrap())
+            .args(["-m", "pip", "install", "-U", "--no-warn-script-location", "-r", file])
+            .status()
+        {
+            Ok(status) => status.code().unwrap_or(1),
+            Err(_) => 2,
+        };
+
+        PackageResult {
+            exit_code,
+            packages: vec![file.to_owned()], // to do - list the actual packages installed,
+        }
+    } else {
+        PackageResult {
+            exit_code: 1,
+            packages: vec!["Unknown file".to_owned()],
+        }
+    }
+}
+
+fn install_upgrade_basic_packages() -> PackageResult {
+    let packages = vec![
+        String::from("pip"),
+        String::from("setuptools"),
+        String::from("wheel"),
+        String::from("numpy"),
+        String::from("scipy"),
+        String::from("numba"),
+        String::from("websockets"),
+        String::from("selenium"),
+        String::from("rlbot"),
+    ];
+
+    let python = PYTHON_PATH.lock().unwrap().to_string();
+    if let Ok(proc) = process::Command::new(&python).args(["-m", "ensurepip"]).status() {
+        if proc.success() {
+            if let Ok(proc) = process::Command::new(&python)
+                .args(["-m", "pip", "install", "-U", "--no-warn-script-location", "pip"])
+                .status()
+            {
+                if proc.success() {
+                    if let Ok(proc) = process::Command::new(&python)
+                        .args(["-m", "pip", "install", "-U", "--no-warn-script-location", "setuptools", "wheel"])
+                        .status()
+                    {
+                        if proc.success() {
+                            if let Ok(proc) = process::Command::new(&python)
+                                .args([
+                                    "-m",
+                                    "pip",
+                                    "install",
+                                    "-U",
+                                    "--no-warn-script-location",
+                                    "numpy",
+                                    "scipy",
+                                    "numba",
+                                    "websockets",
+                                    "selenium",
+                                    "rlbot",
+                                ])
+                                .status()
+                            {
+                                return PackageResult {
+                                    exit_code: proc.code().unwrap_or(1),
+                                    packages,
+                                };
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    PackageResult { exit_code: 2, packages }
+}
+
+#[tauri::command]
+async fn install_basic_packages() -> PackageResult {
+    install_upgrade_basic_packages()
+}
+
 fn main() {
     initialize(&CONFIG_PATH);
     initialize(&BOT_FOLDER_SETTINGS);
     initialize(&MATCH_SETTINGS);
     initialize(&PYTHON_PATH);
+
+    println!("get_missing_packages.py: {}", get_missing_packages_script_path());
+    fs::write(get_missing_packages_script_path(), include_str!("get_missing_packages.py")).unwrap();
 
     let tray_menu = SystemTrayMenu::new(); // insert the menu items here
     let system_tray = SystemTray::new().with_menu(tray_menu);
@@ -819,6 +934,9 @@ fn main() {
             get_recommendations,
             pick_appearance_file,
             begin_python_bot,
+            install_package,
+            install_requirements,
+            install_basic_packages,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
