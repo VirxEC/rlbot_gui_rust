@@ -1,7 +1,5 @@
 # RLBotGUI
 
-[<img src="https://img.shields.io/pypi/v/rlbot-gui.svg">](https://pypi.org/project/rlbot-gui/)
-
 ## About
 
 RLBotGUI is a streamlined user interface that helps you run custom
@@ -10,25 +8,20 @@ project to work its magic: https://github.com/RLBot/RLBot
 
 Works on Windows and Linux
 
-## Features
+## Auto-deploy changes with Github Actions
 
-- Download various bots programmed by the community
-- Get started with creating your own bot
-- Create matches against bots
-  - Customize game mode, arena and mutators!
-- Try out the Story Mode
+This hasn't been implemented, but it's easy to do.
 
-## Screenshots
+[See this guide](https://github.com/tauri-apps/tauri-action)
 
-You can download, update or create bots
+## Features unqiue to the Rust port
 
-![HomeScreenshot](screenshots/RLBotGUI-Home.PNG)
-
-
-In Story Mode, you can take over cities by beating challenges and can also
-recruit teammates and purchase upgrades for your car!
-
-![StoryMode](screenshots/rl-story-mode.PNG)
+- Launching of the GUI without Python
+- Managing Python from within the GUI
+- Running RLBot with a custom Python executable
+- Reloading misssing python packages upon executable change/package install
+- Add new bots into their proper place in the bot list instead of the end
+- [Self-updating of the GUI: TODO](https://tauri.studio/v1/guides/distribution/updater#update-file-json-format)
 
 ## Installation
 
@@ -40,47 +33,22 @@ It will put "RLBotGUI" in your Windows start menu.
 
 ### Prerequisites
 
-- Python 3.7
+1. Follow the [Tauri prerequisites guide](https://tauri.studio/v1/guides/getting-started/prerequisites) for either Windows or Linux (for Linux, you may need to install the addition system package `libayatana-appindicator3-dev`)
+2. A system with 16gb of RAM is recommended. If you have less, you may not be able to build the GUI while having other apps open (like your editor).
 
 ### Setup
 
-1. In a command prompt, run `pip install -r requirements.txt`
-2. Run `python run.py`
+2. Clone this repository
+3. `cargo run` in the project directory
 
-### Deployment to PyPI
+### Building the GUI installer for other users
 
-For normal changes, e.g. things happening inside the rlbot_gui folder,
-you should be publishing an update to PyPI. All users will get this change
-automatically without needing to reinstall!
+Taken from the [Tauri guide](https://tauri.studio/v1/guides/getting-started/beginning-tutorial):
 
-To deploy:
-1. Create a .pypirc file like the one described here:
-https://github.com/RLBot/RLBot/wiki/Deploying-Changes#first-time-setup
-1. Look in setup.py and increment the version number.
-1. Run `publish-to-pypi-prod.bat`
+1. Run `cargo install tauri-cli --locked --version "^1.0.0-rc"`
+2. In the project directory, run `cargo tauri build`
 
-#### Note
-When deploying to pypi, the files which get included are controlled by the MANIFEST.in file.
-You may wish to exclude anything which does not belong in the initial install, e.g.
-bot logos which get copied in to the GUI folder as you use the program.
-
-As a rule of thumb, if you add something to .gitignore, it may also belong in MANIFEST.in
-as a prune line.
-
-### Building the Installer
-
-You can build an installer executable for users to download. You will rarely need
-to do this, because normal updates should be pushed to users by deploying to PyPI.
-
-You really only need a new installer if you changed something in the pynsist_helpers
-folder, run.py, or anything else that gets referenced in installer.cfg. **AVOID THIS**
-because you don't want to run around bugging users to reinstall.
-
-1. Follow https://pynsist.readthedocs.io/en/latest/index.html to get NSIS installed.
-2. Run `pip install pynsist`
-3. Run `pynsist installer.cfg`
-
-Find the resulting executable in build\nsis.
+Note that for Linux, you should build on the oldest version of Ubuntu possible. Ubuntu 14.04 is recommended for the best compatibility.
 
 ### How to update items in the appearance editor
 1. Install and run [BakkesMod](http://www.bakkesmod.com/)
