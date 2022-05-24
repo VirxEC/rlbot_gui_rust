@@ -27,6 +27,7 @@ use rlbot::parsing::{
 use rlbot::{agents::runnable::Runnable, parsing::match_settings_config_parser::*};
 use sanitize_filename::sanitize;
 use serde::{Deserialize, Serialize};
+use tauri::Manager;
 use std::sync::Mutex;
 
 use configparser::ini::Ini;
@@ -917,6 +918,16 @@ async fn install_basic_packages() -> PackageResult {
     install_upgrade_basic_packages()
 }
 
+#[tauri::command]
+async fn show_console(window: tauri::Window) {
+    window.get_window("console").unwrap().show().unwrap();
+}
+
+#[tauri::command]
+async fn hide_console(window: tauri::Window) {
+    window.get_window("console").unwrap().hide().unwrap();
+}
+
 fn main() {
     initialize(&CONFIG_PATH);
     initialize(&BOT_FOLDER_SETTINGS);
@@ -951,6 +962,8 @@ fn main() {
             install_package,
             install_requirements,
             install_basic_packages,
+            show_console,
+            hide_console,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

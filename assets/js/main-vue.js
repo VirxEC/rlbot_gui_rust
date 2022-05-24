@@ -47,6 +47,10 @@ export default {
 				Story Mode
 			</b-button>
 
+			<b-button @click="$router.replace('/console')" variant="dark" class="ml-2">
+				Console
+			</b-button>
+
 			<b-dropdown right class="ml-4" variant="dark">
 				<template v-slot:button-content>
 					Menu
@@ -473,7 +477,7 @@ export default {
 			downloadModalTitle: "Downloading Bot Pack",
 			noPython: false,
 			hasRLBot: false,
-			python_path: ""
+			python_path: "",
 		}
 	},
 

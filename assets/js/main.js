@@ -1,9 +1,11 @@
 import Main from './main-vue.js'
 import Sandbox from './sandbox-vue.js'
 import Story from './story-mode.js'
+import Console from './console-vue.js'
 
 const routes = [
     { path: '/', component: Main },
+    { path: '/console', component: Console },
     { path: '/sandbox', component: Sandbox },
     { path: '/story', component: Story }
 ];
