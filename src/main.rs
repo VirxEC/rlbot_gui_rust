@@ -7,18 +7,21 @@ use core::fmt;
 use std::{
     collections::{HashMap, HashSet},
     env,
-    fs::{self, create_dir_all, read_to_string},
-    io::Cursor,
+    fs::{create_dir_all, read_to_string, write},
+    io::{BufRead, BufReader, Cursor},
     path::Path,
-    process::{self, Stdio},
+    process::{ChildStdout, Command, Stdio},
     str::FromStr,
+    sync::Arc,
+    thread,
+    time::Duration,
 };
 
 use glob::glob;
 
 use custom_maps::find_all_custom_maps;
 use lazy_static::{initialize, lazy_static};
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::iter::{IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator};
 use rlbot::parsing::{
     agent_config_parser::BotLooksConfig,
     bot_config_bundle::{BotConfigBundle, Clean, ScriptConfigBundle, BOT_CONFIG_MODULE_HEADER, NAME_KEY},
@@ -27,8 +30,8 @@ use rlbot::parsing::{
 use rlbot::{agents::runnable::Runnable, parsing::match_settings_config_parser::*};
 use sanitize_filename::sanitize;
 use serde::{Deserialize, Serialize};
-use tauri::Manager;
 use std::sync::Mutex;
+use tauri::Manager;
 
 use configparser::ini::Ini;
 
@@ -381,6 +384,8 @@ lazy_static! {
             None => auto_detect_python(),
         }
     });
+    static ref CONSOLE_TEXT: Mutex<Vec<String>> = Mutex::new(vec!["Welcome to the RLBot Console!".to_string()]);
+    static ref CAPTURE_COMMANDS: Arc<Mutex<Vec<Option<ChildStdout>>>> = Arc::new(Mutex::new(Vec::new()));
 }
 
 #[cfg(windows)]
@@ -498,7 +503,7 @@ async fn show_path_in_explorer(path: String) {
     let ppath = Path::new(&*path);
     let path = if ppath.is_file() { ppath.parent().unwrap().to_str().unwrap() } else { &*path };
 
-    process::Command::new(command).arg(path).spawn().unwrap();
+    Command::new(command).arg(path).spawn().unwrap();
 }
 
 #[tauri::command]
@@ -568,7 +573,7 @@ async fn save_team_settings(blue_team: Vec<BotConfigBundle>, orange_team: Vec<Bo
 }
 
 fn get_command_status(program: &str, args: Vec<&str>) -> bool {
-    match process::Command::new(program).args(args).stdout(Stdio::null()).stderr(Stdio::null()).status() {
+    match Command::new(program).args(args).stdout(Stdio::null()).stderr(Stdio::null()).status() {
         Ok(status) => status.success(),
         Err(_) => false,
     }
@@ -740,7 +745,7 @@ fn ensure_bot_directory() -> String {
     let bot_directory_path = Path::new(&bot_directory).join(CREATED_BOTS_FOLDER);
 
     if !bot_directory_path.exists() {
-        fs::create_dir_all(&bot_directory_path).unwrap();
+        create_dir_all(&bot_directory_path).unwrap();
     }
 
     bot_directory
@@ -775,7 +780,7 @@ async fn bootstrap_python_bot(bot_name: String, directory: &str) -> Result<Strin
 
     BOT_FOLDER_SETTINGS.lock().unwrap().add_file(config_file.clone());
 
-    if process::Command::new(&python_file).spawn().is_err() {
+    if Command::new(&python_file).spawn().is_err() {
         println!("You have no default program to open .py files. Your new bot is located at {}", top_dir.to_str().unwrap());
     }
 
@@ -797,21 +802,36 @@ struct PackageResult {
 }
 
 fn ensure_pip(python: &String) -> i32 {
-    match process::Command::new(&python).args(["-m", "ensurepip"]).status() {
+    match Command::new(&python).args(["-m", "ensurepip"]).status() {
         Ok(status) => status.code().unwrap_or(1),
         Err(_) => 2,
     }
 }
 
+fn spawn_capture_process_and_get_exit_code(command: String, args: &[&str]) -> i32 {
+    let mut child = Command::new(command).args(args).stdout(Stdio::piped()).spawn().unwrap();
+    let capture_index = {
+        let mut capture_commands = CAPTURE_COMMANDS.lock().unwrap();
+        if let Some(index) = capture_commands.iter().position(|c| c.is_none()) {
+            capture_commands[index] = Some(child.stdout.take().unwrap());
+            index
+        } else {
+            capture_commands.push(Some(child.stdout.take().unwrap()));
+            capture_commands.len() - 1
+        }
+    };
+
+    let exit_code = child.wait().unwrap().code().unwrap_or(1);
+    CAPTURE_COMMANDS.lock().unwrap()[capture_index] = None;
+    exit_code
+}
+
 #[tauri::command]
 async fn install_package(package_string: String) -> PackageResult {
-    let exit_code = match process::Command::new(PYTHON_PATH.lock().unwrap().to_string())
-        .args(["-m", "pip", "install", "-U", "--no-warn-script-location", &package_string])
-        .status()
-    {
-        Ok(status) => status.code().unwrap_or(1),
-        Err(_) => 2,
-    };
+    let exit_code = spawn_capture_process_and_get_exit_code(
+        PYTHON_PATH.lock().unwrap().to_string(),
+        &["-m", "pip", "install", "-U", "--no-warn-script-location", &package_string],
+    );
 
     PackageResult {
         exit_code,
@@ -826,19 +846,13 @@ async fn install_requirements(config_path: String) -> PackageResult {
     if let Some(file) = bundle.get_requirements_file() {
         let python = PYTHON_PATH.lock().unwrap().to_string();
 
-        let mut exit_code = match process::Command::new(&python)
-            .args(["-m", "pip", "-m", "-U", "--no-warn-script-location", "-r", file])
-            .status()
-        {
+        let mut exit_code = match Command::new(&python).args(["-m", "pip", "-m", "-U", "--no-warn-script-location", "-r", file]).status() {
             Ok(status) => status.code().unwrap_or(1),
             Err(_) => 2,
         };
 
         if exit_code == 0 {
-            exit_code = match process::Command::new(python)
-                .args(["-m", "pip", "install", "-U", "--no-warn-script-location", "-r", file])
-                .status()
-            {
+            exit_code = match Command::new(python).args(["-m", "pip", "install", "-U", "--no-warn-script-location", "-r", file]).status() {
                 Ok(status) => status.code().unwrap_or(1),
                 Err(_) => 2,
             };
@@ -870,19 +884,16 @@ fn install_upgrade_basic_packages() -> PackageResult {
     ];
 
     let python = PYTHON_PATH.lock().unwrap().to_string();
-    if let Ok(proc) = process::Command::new(&python).args(["-m", "ensurepip"]).status() {
+    if let Ok(proc) = Command::new(&python).args(["-m", "ensurepip"]).status() {
         if proc.success() {
-            if let Ok(proc) = process::Command::new(&python)
-                .args(["-m", "pip", "install", "-U", "--no-warn-script-location", "pip"])
-                .status()
-            {
+            if let Ok(proc) = Command::new(&python).args(["-m", "pip", "install", "-U", "--no-warn-script-location", "pip"]).status() {
                 if proc.success() {
-                    if let Ok(proc) = process::Command::new(&python)
+                    if let Ok(proc) = Command::new(&python)
                         .args(["-m", "pip", "install", "-U", "--no-warn-script-location", "setuptools", "wheel"])
                         .status()
                     {
                         if proc.success() {
-                            if let Ok(proc) = process::Command::new(&python)
+                            if let Ok(proc) = Command::new(&python)
                                 .args([
                                     "-m",
                                     "pip",
@@ -919,13 +930,8 @@ async fn install_basic_packages() -> PackageResult {
 }
 
 #[tauri::command]
-async fn show_console(window: tauri::Window) {
-    window.get_window("console").unwrap().show().unwrap();
-}
-
-#[tauri::command]
-async fn hide_console(window: tauri::Window) {
-    window.get_window("console").unwrap().hide().unwrap();
+async fn get_console_texts() -> Vec<String> {
+    CONSOLE_TEXT.lock().unwrap().clone()
 }
 
 fn main() {
@@ -933,11 +939,48 @@ fn main() {
     initialize(&BOT_FOLDER_SETTINGS);
     initialize(&MATCH_SETTINGS);
     initialize(&PYTHON_PATH);
+    initialize(&CONSOLE_TEXT);
+    initialize(&CAPTURE_COMMANDS);
 
     println!("get_missing_packages.py: {}", get_missing_packages_script_path());
-    fs::write(get_missing_packages_script_path(), include_str!("get_missing_packages.py")).unwrap();
+    write(get_missing_packages_script_path(), include_str!("get_missing_packages.py")).unwrap();
 
     tauri::Builder::default()
+        .setup(|app| {
+            let main_window = app.get_window("main").unwrap();
+
+            let capture_commands = Arc::clone(&CAPTURE_COMMANDS);
+            thread::spawn(move || loop {
+                let mut outs = capture_commands.lock().unwrap();
+
+                while !outs.is_empty() && outs.last().unwrap().is_none() {
+                    outs.pop();
+                }
+
+                if !outs.is_empty() {
+                    let out_strs: Vec<String> = outs
+                        .par_iter_mut()
+                        .flatten()
+                        .filter_map(|s| {
+                            let out = BufReader::new(s).lines().flatten().collect::<Vec<_>>();
+                            if !out.is_empty() {
+                                Some(out)
+                            } else {
+                                None
+                            }
+                        })
+                        .flatten()
+                        .collect();
+
+                    if !out_strs.is_empty() {
+                        CONSOLE_TEXT.lock().unwrap().extend_from_slice(&out_strs);
+                        main_window.emit("new-console-text", dbg!(out_strs)).unwrap();
+                    }
+                }
+                thread::sleep(Duration::from_secs_f32(1. / 10.));
+            });
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             get_folder_settings,
             save_folder_settings,
@@ -962,8 +1005,7 @@ fn main() {
             install_package,
             install_requirements,
             install_basic_packages,
-            show_console,
-            hide_console,
+            get_console_texts,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

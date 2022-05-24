@@ -1,4 +1,5 @@
 const invoke = window.__TAURI__.invoke;
+const listen = window.__TAURI__.event.listen;
 
 export default {
 	name: 'console',
@@ -17,7 +18,7 @@ export default {
 	</b-navbar>
 	<b-container fluid class="rlbot-main-config noscroll-flex flex-grow-1">
 		<b-card no-body>
-			<div class="center-flex my-2">
+			<div class="my-2">
 				<p v-for="text in consoleTexts">{{ text }}</p>
 			</div>
 		</b-card>
@@ -27,12 +28,19 @@ export default {
 	components: {},
 	data () {
 		return {
-			consoleTexts: []
+			consoleTexts: [],
+			newTextListener: listen('new-console-text', event => {
+				console.log(event.payload);
+				this.consoleTexts.push(...event.payload);
+			})
 		}
 	},
 	methods: {
 		startup: function() {
-			this.consoleTexts.push("Welcome to the RLBot Console!");
+			// this.consoleTexts.push("Welcome to the RLBot Console!");
+			invoke("get_console_texts").then((texts) => {
+				this.consoleTexts = texts;
+			});
 		}
 	},
 	computed: {},
