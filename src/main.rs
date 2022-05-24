@@ -8,7 +8,7 @@ use std::{
     collections::{HashMap, HashSet},
     env,
     fs::{create_dir_all, read_to_string, write},
-    io::{BufRead, BufReader, Cursor},
+    io::{Cursor, Read},
     path::Path,
     process::{ChildStdout, Command, Stdio},
     str::FromStr,
@@ -628,7 +628,7 @@ async fn get_language_support() -> HashMap<String, bool> {
         python_check
             && get_command_status(
                 &*python_path,
-                vec!["-c", "import rlbot; import numpy; import numba; import scipy; import websockets; import selenium"],
+                vec!["-c", "import rlbot; import numpy; import numba; import scipy; import selenium"],
             ),
     );
 
@@ -810,6 +810,7 @@ fn ensure_pip(python: &String) -> i32 {
 
 fn spawn_capture_process_and_get_exit_code(command: String, args: &[&str]) -> i32 {
     let mut child = Command::new(command).args(args).stdout(Stdio::piped()).spawn().unwrap();
+    dbg!(&child);
     let capture_index = {
         let mut capture_commands = CAPTURE_COMMANDS.lock().unwrap();
         if let Some(index) = capture_commands.iter().position(|c| c.is_none()) {
@@ -820,9 +821,11 @@ fn spawn_capture_process_and_get_exit_code(command: String, args: &[&str]) -> i3
             capture_commands.len() - 1
         }
     };
+    dbg!(capture_index);
 
     let exit_code = child.wait().unwrap().code().unwrap_or(1);
-    CAPTURE_COMMANDS.lock().unwrap()[capture_index] = None;
+    dbg!(exit_code);
+    CAPTURE_COMMANDS.lock().unwrap()[capture_index] = dbg!(None);
     exit_code
 }
 
@@ -878,7 +881,6 @@ fn install_upgrade_basic_packages() -> PackageResult {
         String::from("numpy"),
         String::from("scipy"),
         String::from("numba"),
-        String::from("websockets"),
         String::from("selenium"),
         String::from("rlbot"),
     ];
@@ -903,7 +905,6 @@ fn install_upgrade_basic_packages() -> PackageResult {
                                     "numpy",
                                     "scipy",
                                     "numba",
-                                    "websockets",
                                     "selenium",
                                     "rlbot",
                                 ])
@@ -951,33 +952,51 @@ fn main() {
 
             let capture_commands = Arc::clone(&CAPTURE_COMMANDS);
             thread::spawn(move || loop {
-                let mut outs = capture_commands.lock().unwrap();
+                {
+                    let mut outs = capture_commands.lock().unwrap();
 
-                while !outs.is_empty() && outs.last().unwrap().is_none() {
-                    outs.pop();
-                }
+                    while !outs.is_empty() && outs.last().unwrap().is_none() {
+                        outs.pop();
+                    }
 
-                if !outs.is_empty() {
-                    let out_strs: Vec<String> = outs
-                        .par_iter_mut()
-                        .flatten()
-                        .filter_map(|s| {
-                            let out = BufReader::new(s).lines().flatten().collect::<Vec<_>>();
-                            if !out.is_empty() {
-                                Some(out)
-                            } else {
-                                None
-                            }
-                        })
-                        .flatten()
-                        .collect();
+                    if !outs.is_empty() {
+                        let out_strs: Vec<String> = outs
+                            .par_iter_mut()
+                            .flatten()
+                            .filter_map(|s| {
+                                let mut out = String::new();
+                                loop {
+                                    let mut buf = [0];
+                                    match s.read(&mut buf[..]) {
+                                        Ok(0) => break,
+                                        Ok(_) => {
+                                            let string = String::from_utf8_lossy(&buf).to_string();
+                                            if &string == "\n" {
+                                                break;
+                                            }
+                                            out.push_str(&string);
+                                        },
+                                        Err(_) => break,
+                                    };
+                                }
+                                
+                                if out.is_empty() {
+                                    None
+                                } else {
+                                    Some(dbg!(out))
+                                }
+                            })
+                            .collect();
+                        drop(outs);
 
-                    if !out_strs.is_empty() {
-                        CONSOLE_TEXT.lock().unwrap().extend_from_slice(&out_strs);
-                        main_window.emit("new-console-text", dbg!(out_strs)).unwrap();
+                        if !out_strs.is_empty() {
+                            CONSOLE_TEXT.lock().unwrap().extend_from_slice(&out_strs);
+                            main_window.emit("new-console-text", dbg!(out_strs)).unwrap();
+                        }
                     }
                 }
-                thread::sleep(Duration::from_secs_f32(1. / 10.));
+
+                thread::sleep(Duration::from_millis(100));
             });
             Ok(())
         })

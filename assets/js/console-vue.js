@@ -16,10 +16,16 @@ export default {
 			</b-button>
 		</b-navbar-nav>
 	</b-navbar>
-	<b-container fluid class="rlbot-main-config noscroll-flex flex-grow-1">
-		<b-card no-body>
+	<b-container fluid class="noscroll-flex flex-grow-1">
+		<b-card no-body class="bot-pool noscroll-flex flex-grow-1">
 			<div class="my-2">
-				<p v-for="text in consoleTexts">{{ text }}</p>
+				<div class="p-1 noscroll-flex">
+					<div class="overflow-auto">
+						<div v-for="text in consoleTexts" style="display: inline;">
+							<p>{{ text }}</p>
+						</div>
+					</div>
+				</div>
 			</div>
 		</b-card>
 	</b-container>
