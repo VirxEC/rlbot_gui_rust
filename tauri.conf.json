@@ -9,9 +9,6 @@
     "withGlobalTauri": true
   },
   "tauri": {
-    "systemTray": {
-      "iconPath": "icons/icon.png"
-    },
     "bundle": {
       "active": true,
       "targets": "all",
@@ -35,6 +32,7 @@
     },
     "windows": [
       {
+        "label": "main",
         "title": "RLBotGUI",
         "width": 1300,
         "height": 870,

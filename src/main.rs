@@ -32,7 +32,6 @@ use std::sync::Mutex;
 use configparser::ini::Ini;
 
 use rlbot::parsing::directory_scanner::scan_directory_for_bot_configs;
-use tauri::{SystemTray, SystemTrayMenu};
 
 const CREATED_BOTS_FOLDER: &str = "MyBots";
 
@@ -797,10 +796,7 @@ struct PackageResult {
 }
 
 fn ensure_pip(python: &String) -> i32 {
-    match process::Command::new(&python)
-        .args(["-m", "ensurepip"])
-        .status()
-    {
+    match process::Command::new(&python).args(["-m", "ensurepip"]).status() {
         Ok(status) => status.code().unwrap_or(1),
         Err(_) => 2,
     }
@@ -825,7 +821,7 @@ async fn install_package(package_string: String) -> PackageResult {
 #[tauri::command]
 async fn install_requirements(config_path: String) -> PackageResult {
     let bundle = BotConfigBundle::from_path(Path::new(&config_path)).unwrap();
-    
+
     if let Some(file) = bundle.get_requirements_file() {
         let python = PYTHON_PATH.lock().unwrap().to_string();
 
@@ -930,11 +926,7 @@ fn main() {
     println!("get_missing_packages.py: {}", get_missing_packages_script_path());
     fs::write(get_missing_packages_script_path(), include_str!("get_missing_packages.py")).unwrap();
 
-    let tray_menu = SystemTrayMenu::new(); // insert the menu items here
-    let system_tray = SystemTray::new().with_menu(tray_menu);
-
     tauri::Builder::default()
-        .system_tray(system_tray)
         .invoke_handler(tauri::generate_handler![
             get_folder_settings,
             save_folder_settings,

@@ -34,7 +34,7 @@ It will put "RLBotGUI" in your Windows start menu.
 
 ### Prerequisites
 
-1. Follow the [Tauri prerequisites guide](https://tauri.studio/v1/guides/getting-started/prerequisites) for either Windows or Linux (for Linux, you may need to install the addition system package `libayatana-appindicator3-dev`)
+1. Follow the [Tauri prerequisites guide](https://tauri.studio/v1/guides/getting-started/prerequisites) for either Windows or Linux.
 2. A system with 16gb of RAM is recommended. If you have less, you may not be able to build the GUI while having other apps open (like your editor).
 
 ### Setup
@@ -49,7 +49,7 @@ Taken from the [Tauri guide](https://tauri.studio/v1/guides/getting-started/begi
 1. Run `cargo install tauri-cli --locked --version "^1.0.0-rc"`
 2. In the project directory, run `cargo tauri build`
 
-Note that for Linux, you should build on the oldest version of Ubuntu possible. Ubuntu 14.04 is recommended for the best compatibility.
+Note that for Linux, you should build on the oldest version of Ubuntu possible. Ubuntu 18.04 is recommended for the best compatibility.
 
 ### How to update items in the appearance editor
 1. Install and run [BakkesMod](http://www.bakkesmod.com/)

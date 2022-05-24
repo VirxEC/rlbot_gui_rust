@@ -44,11 +44,7 @@ features = ["windows_dpi_awareness", "windows_visual_styles"]
 
 [dependencies.tauri]
 version = "1.0.0-rc.11"
-features = ["system-tray"]
-
-[target.'cfg(target_os = "linux")'.dependencies.tauri]
-version = "1.0.0-rc.11"
-features = ["ayatana-tray"]
+features = ["devtools"]
 
 [features]
 # by default Tauri runs in production mode
