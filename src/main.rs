@@ -24,7 +24,7 @@ use glob::glob;
 
 use custom_maps::find_all_custom_maps;
 use lazy_static::{initialize, lazy_static};
-use rayon::iter::{IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator};
+use rayon::iter::{IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator, ParallelExtend};
 use rlbot::parsing::{
     agent_config_parser::BotLooksConfig,
     bot_config_bundle::{BotConfigBundle, Clean, ScriptConfigBundle},
@@ -754,36 +754,74 @@ async fn get_recommendations() -> Option<HashMap<String, Vec<HashMap<String, Vec
                 }
             }
         }
+
+        for path in bfs.files.keys() {
+            if path.ends_with("recommendations.json") {
+                let raw_json = match read_to_string(&path) {
+                    Ok(s) => s,
+                    Err(_) => {
+                        println!("Failed to read {}", path);
+                        continue;
+                    }
+                };
+
+                match serde_json::from_str(&raw_json) {
+                    Ok(j) => json = Some(j),
+                    Err(e) => {
+                        println!("Failed to parse file {}: {}", path, e);
+                        continue;
+                    }
+                }
+            }
+        }
     }
 
-    // this can be optimized if need, but for now it's fine
-    // it loads all visible bot config bundles when we really only need name/path pairs
-    // if a match is found, only that bundle could get loaded
-    let bot_config_bundles = scan_for_bots_r();
+    let name_path_pairs = {
+        let bfs = BOT_FOLDER_SETTINGS.lock().unwrap();
+        let mut bots = Vec::new();
+
+        bots.par_extend(bfs.folders.par_iter().filter_map(|(path, props)| {
+            if props.visible {
+                let pattern = Path::new(path).join("**/*.cfg");
+                let paths = glob(pattern.to_str().unwrap()).unwrap().flatten().collect::<Vec<_>>();
+
+                Some(paths.par_iter().filter_map(|path| BotConfigBundle::mini_from_path(path.as_path()).ok()).collect::<Vec<_>>())
+            } else {
+                None
+            }
+        }).flatten());
+    
+        bots.par_extend(bfs.files.par_iter().filter_map(|(path, props)| {
+            if props.visible {
+                BotConfigBundle::mini_from_path(Path::new(path)).ok()
+            } else {
+                None
+            }
+        }));
+    
+        bots
+    };
 
     json.map(|j| {
-        let mut recommendations: Vec<HashMap<String, Vec<BotConfigBundle>>> = Vec::new();
-
-        for bots in j.get("recommendations").unwrap() {
-            recommendations.push(HashMap::from([(
+        let has_rlbot = check_has_rlbot();
+        let recommendations: Vec<HashMap<String, Vec<BotConfigBundle>>> = j.get("recommendations").unwrap().par_iter().map(|bots| {
+            HashMap::from([(
                 "bots".to_string(),
                 bots.get("bots")
                     .unwrap()
                     .par_iter()
                     .filter_map(|bot_name| {
-                        for bundle in &bot_config_bundles {
-                            if let Some(name) = &bundle.name {
-                                if name == bot_name {
-                                    return Some(bundle.clone());
-                                }
+                        for (name, path) in &name_path_pairs {
+                            if name == bot_name {
+                                return BotConfigBundle::from_path(Path::new(path), has_rlbot).ok()
                             }
                         }
 
                         None
                     })
                     .collect(),
-            )]));
-        }
+            )])
+        }).collect();
 
         HashMap::from([("recommendations".to_string(), recommendations)])
     })

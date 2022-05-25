@@ -132,7 +132,7 @@ pub struct BotConfigBundle {
 impl BotConfigBundle {
     pub fn from_path(config_path: &Path, has_rlbot: bool) -> Result<Self, String> {
         let mut config = Ini::new();
-        config.load(config_path.to_str().unwrap())?;
+        config.load(config_path)?;
 
         let path = config_path.to_str().unwrap().to_string();
         let config_directory = config_path.parent().unwrap().to_str().unwrap().to_string();
@@ -209,6 +209,45 @@ impl BotConfigBundle {
             b.calculate_missing_packages();
         }
         Ok(b)
+    }
+
+    pub fn mini_from_path(config_path: &Path) -> Result<(String, String), String> {
+        let mut config = Ini::new();
+        config.load(config_path).unwrap();
+
+        let name= if let Some(the_name) = config.get(BOT_CONFIG_MODULE_HEADER, NAME_KEY) {
+            the_name
+        } else {
+            return Err("Bot name not found".to_string());
+        };
+        
+        let path = config_path.to_str().unwrap().to_string();
+
+        let config_directory = config_path.parent().unwrap().to_str().unwrap().to_string();
+
+        let looks_path = config.get(BOT_CONFIG_MODULE_HEADER, LOOKS_CONFIG_KEY).map(|path| format!("{}/{}", config_directory, path));
+        
+        let valid_looks = match &looks_path {
+            Some(path) => Path::new(path).exists(),
+            None => false,
+        };
+        
+        if !valid_looks {
+            return Err("Looks config not found".to_string());
+        }
+        
+        let python_path = config.get(BOT_CONFIG_MODULE_HEADER, PYTHON_FILE_KEY).map(|path| format!("{}/{}", config_directory, path));
+        
+        let valid_path = match &python_path {
+            Some(path) => Path::new(path).exists(),
+            None => false,
+        };
+        
+        if !valid_path {
+            return Err("Python file not found".to_string());
+        }
+
+        Ok((name, path))
     }
 }
 
