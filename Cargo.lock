@@ -2344,7 +2344,9 @@ dependencies = [
  "lazy_static",
  "native-dialog",
  "open",
+ "rand 0.8.5",
  "rayon",
+ "regex",
  "registry",
  "reqwest",
  "sanitize-filename",
@@ -2834,9 +2836,9 @@ dependencies = [
 
 [[package]]
 name = "tauri"
-version = "1.0.0-rc.12"
+version = "1.0.0-rc.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "073781b465bd478c86d2dded16008d8cc249fd87d8b30107b50011da307250b0"
+checksum = "495d21bdf8b7d89d8ed569b6bad19dba2c3872250ce94d4776aa525cc1551a56"
 dependencies = [
  "anyhow",
  "bincode",
@@ -2872,7 +2874,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "url",
- "uuid 1.0.0",
+ "uuid 1.1.0",
  "webkit2gtk",
  "webview2-com",
  "windows",
@@ -2880,12 +2882,13 @@ dependencies = [
 
 [[package]]
 name = "tauri-build"
-version = "1.0.0-rc.10"
+version = "1.0.0-rc.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08486bbcae11faef73a8ca6f0d57a269089c584462582d70f6a971ac1213c7b6"
+checksum = "ab213cbd01c1d4bd31620f23b00f42690bd988864953069eae2bd91b7d3fdfd5"
 dependencies = [
  "anyhow",
  "cargo_toml",
+ "heck 0.4.0",
  "semver 1.0.9",
  "serde_json",
  "tauri-utils",
@@ -2909,7 +2912,7 @@ dependencies = [
  "sha2",
  "tauri-utils",
  "thiserror",
- "uuid 1.0.0",
+ "uuid 1.1.0",
  "walkdir",
 ]
 
@@ -2941,7 +2944,7 @@ dependencies = [
  "serde_json",
  "tauri-utils",
  "thiserror",
- "uuid 1.0.0",
+ "uuid 1.1.0",
  "webview2-com",
  "windows",
 ]
@@ -2958,7 +2961,7 @@ dependencies = [
  "rand 0.8.5",
  "tauri-runtime",
  "tauri-utils",
- "uuid 1.0.0",
+ "uuid 1.1.0",
  "webkit2gtk",
  "webview2-com",
  "windows",
@@ -3280,9 +3283,9 @@ checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
 
 [[package]]
 name = "uuid"
-version = "1.0.0"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8cfcd319456c4d6ea10087ed423473267e1a071f3bc0aa89f80d60997843c6f0"
+checksum = "93bbc61e655a4833cf400d0d15bf3649313422fa7572886ad6dab16d79886365"
 dependencies = [
  "getrandom 0.2.6",
 ]

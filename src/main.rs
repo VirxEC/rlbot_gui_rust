@@ -1,5 +1,6 @@
 #![cfg_attr(all(not(debug_assertions), target_os = "windows"), windows_subsystem = "windows")]
 
+mod bot_management;
 mod custom_maps;
 mod rlbot;
 
@@ -9,7 +10,7 @@ use std::{
     env,
     ffi::OsStr,
     fs::{create_dir_all, read_to_string, write},
-    io::{Cursor, Read},
+    io::Read,
     path::Path,
     process::{ChildStdout, Command, Stdio},
     str::FromStr,
@@ -18,6 +19,7 @@ use std::{
     time::Duration,
 };
 
+use bot_management::bot_creation::{bootstrap_python_bot, bootstrap_python_hivemind, CREATED_BOTS_FOLDER};
 use glob::glob;
 
 use custom_maps::find_all_custom_maps;
@@ -25,11 +27,10 @@ use lazy_static::{initialize, lazy_static};
 use rayon::iter::{IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator};
 use rlbot::parsing::{
     agent_config_parser::BotLooksConfig,
-    bot_config_bundle::{BotConfigBundle, Clean, ScriptConfigBundle, BOT_CONFIG_MODULE_HEADER, NAME_KEY},
+    bot_config_bundle::{BotConfigBundle, Clean, ScriptConfigBundle},
     directory_scanner::scan_directory_for_script_configs,
 };
 use rlbot::{agents::runnable::Runnable, parsing::match_settings_config_parser::*};
-use sanitize_filename::sanitize;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::Manager;
@@ -37,8 +38,6 @@ use tauri::Manager;
 use configparser::ini::Ini;
 
 use rlbot::parsing::directory_scanner::scan_directory_for_bot_configs;
-
-const CREATED_BOTS_FOLDER: &str = "MyBots";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BotFolder {
@@ -387,6 +386,10 @@ lazy_static! {
     });
     static ref CONSOLE_TEXT: Mutex<Vec<String>> = Mutex::new(vec!["Welcome to the RLBot Console!".to_string()]);
     static ref CAPTURE_COMMANDS: Arc<Mutex<Vec<Option<ChildStdout>>>> = Arc::new(Mutex::new(Vec::new()));
+}
+
+pub fn ccprintln(text: String) {
+    CONSOLE_TEXT.lock().unwrap().push(text);
 }
 
 fn check_has_rlbot() -> bool {
@@ -756,46 +759,24 @@ fn ensure_bot_directory() -> String {
     bot_directory
 }
 
-async fn bootstrap_python_bot(bot_name: String, directory: &str) -> Result<String, String> {
-    let sanitized_name = sanitize(&bot_name);
-    let top_dir = Path::new(directory).join(CREATED_BOTS_FOLDER).join(&sanitized_name);
-
-    if top_dir.exists() {
-        return Err(format!("There is already a bot named {}, please choose a different name!", sanitized_name));
-    }
-
-    match reqwest::get("https://github.com/RLBot/RLBotPythonExample/archive/master.zip").await {
-        Ok(res) => {
-            zip_extract::extract(Cursor::new(&res.bytes().await.unwrap()), top_dir.as_path(), true).unwrap();
-        }
-        Err(e) => {
-            return Err(format!("Failed to download python bot: {}", e));
-        }
-    }
-
-    let bundles = scan_directory_for_bot_configs(top_dir.to_str().unwrap(), false);
-    let bundle = bundles.iter().next().unwrap();
-    let config_file = bundle.path.clone().unwrap();
-    let python_file = bundle.python_path.clone().unwrap();
-
-    let mut config = Ini::new();
-    config.load(&config_file).unwrap();
-    config.set(BOT_CONFIG_MODULE_HEADER, NAME_KEY, Some(bot_name));
-    config.write(&config_file).unwrap();
-
-    BOT_FOLDER_SETTINGS.lock().unwrap().add_file(config_file.clone());
-
-    if open::that(python_file).is_err() {
-        println!("You have no default program to open .py files. Your new bot is located at {}", top_dir.to_str().unwrap());
-    }
-
-    Ok(config_file)
-}
-
 #[tauri::command]
 async fn begin_python_bot(bot_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
     match bootstrap_python_bot(bot_name, &ensure_bot_directory()).await {
-        Ok(config_file) => Ok(HashMap::from([("bot".to_string(), BotConfigBundle::from_path(Path::new(&config_file), check_has_rlbot()).unwrap())])),
+        Ok(config_file) => Ok(HashMap::from([(
+            "bot".to_string(),
+            BotConfigBundle::from_path(Path::new(&config_file), check_has_rlbot()).unwrap(),
+        )])),
+        Err(e) => Err(HashMap::from([("error".to_string(), e)])),
+    }
+}
+
+#[tauri::command]
+async fn begin_python_hivemind(hive_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
+    match bootstrap_python_hivemind(hive_name, &ensure_bot_directory()).await {
+        Ok(config_file) => Ok(HashMap::from([(
+            "bot".to_string(),
+            BotConfigBundle::from_path(Path::new(&config_file), check_has_rlbot()).unwrap(),
+        )])),
         Err(e) => Err(HashMap::from([("error".to_string(), e)])),
     }
 }
@@ -998,6 +979,7 @@ fn main() {
             get_recommendations,
             pick_appearance_file,
             begin_python_bot,
+            begin_python_hivemind,
             install_package,
             install_requirements,
             install_basic_packages,

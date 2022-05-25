@@ -1,4 +1,4 @@
-use std::process;
+use std::process::{self, Stdio};
 use std::{fs, io::Read, path::Path};
 
 use configparser::ini::Ini;
@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::rlbot::agents::{base_script::SCRIPT_FILE_KEY, runnable::Runnable};
 
-use crate::{get_command_status, get_missing_packages_script_path, PYTHON_PATH};
+use crate::{get_command_status, get_missing_packages_script_path, PYTHON_PATH, ccprintln};
 
 pub const PYTHON_FILE_KEY: &str = "python_file";
 pub const REQUIREMENTS_FILE_KEY: &str = "requirements_file";
@@ -295,15 +295,14 @@ impl Runnable for BotConfigBundle {
 
             args.push(&file);
 
-            match process::Command::new(python).args(args).stdout(process::Stdio::piped()).spawn() {
+            match process::Command::new(python).args(args).stdin(Stdio::null()).output() {
                 Ok(proc) => {
-                    let out_proc = proc.wait_with_output().unwrap();
-                    let output = std::str::from_utf8(out_proc.stdout.as_slice()).unwrap();
+                    let output = std::str::from_utf8(proc.stdout.as_slice()).unwrap();
                     if let Ok(packages) = serde_json::from_str(output) {
                         self.missing_python_packages = Some(packages);
                     }
                 }
-                Err(e) => println!("Failed to calculate missing packages: {}", e),
+                Err(e) => ccprintln(format!("Failed to calculate missing packages: {}", e)),
             }
         } else if requires_tkinter && !get_command_status(&python, vec!["-c", "import tkinter"]) {
             self.missing_python_packages = Some(vec![String::from("tkinter")]);
@@ -468,14 +467,14 @@ impl Runnable for ScriptConfigBundle {
 
             args.push(&file);
 
-            match process::Command::new(python).args(args).output() {
+            match process::Command::new(python).args(args).stdin(Stdio::null()).output() {
                 Ok(proc) => {
                     let output = std::str::from_utf8(proc.stdout.as_slice()).unwrap();
                     if let Ok(packages) = serde_json::from_str(output) {
                         self.missing_python_packages = packages;
                     }
                 }
-                Err(e) => println!("Failed to calculate missing packages: {}", e),
+                Err(e) => ccprintln(format!("Failed to calculate missing packages: {}", e)),
             }
         } else if self.requires_tkinter && !get_command_status(&python, vec!["-c", "import tkinter"]) {
             self.missing_python_packages = vec![String::from("tkinter")];

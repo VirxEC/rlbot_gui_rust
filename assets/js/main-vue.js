@@ -28,10 +28,10 @@ export default {
 
 
 		<b-navbar-nav class="ml-auto">
+			<b-spinner v-if="showProgressSpinner" variant="success" label="Spinning" class="mr-2"></b-spinner>
 			<b-button @click="$router.replace('/console')" variant="dark" class="ml-2">
 				Console
 			</b-button>
-			<b-spinner v-if="showProgressSpinner" variant="success" label="Spinning" class="mr-2"></b-spinner>
 			<span id="sandbox-button-wrapper">
 				<b-button
 					@click="$router.replace('/sandbox')" variant="dark" class="ml-2"
@@ -625,7 +625,7 @@ export default {
 				// eel.begin_scratch_bot(bot_name)(this.botLoadHandler);
 			} else if (language === 'python_hive') {
 				this.showProgressSpinner = true;
-				// eel.begin_python_hivemind(bot_name)(this.botLoadHandler);
+				invoke("begin_python_hivemind", { hiveName: bot_name }).then(this.botLoadHandler);
 			} else if (language === 'rust') {
 				this.showProgressSpinner = true;
 				// eel.begin_rust_bot(bot_name)(this.botLoadHandler);
