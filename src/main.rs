@@ -401,7 +401,12 @@ fn get_missing_packages_script_path() -> PathBuf {
     PathBuf::from(format!("{}\\RLBotGUIX\\get_missing_packages.py", env::var("LOCALAPPDATA").unwrap()))
 }
 
-#[cfg(not(windows))]
+#[cfg(target_os = "macos")]
+fn get_missing_packages_script_path() -> PathBuf {
+    PathBuf::from(format!("{}/Library/Application Support/rlbotgui/get_missing_packages.py", env::var("HOME").unwrap()))
+}
+
+#[cfg(all(not(windows), not(target_os = "macos")))]
 fn get_missing_packages_script_path() -> PathBuf {
     PathBuf::from(format!("{}/.RLBotGUI/get_missing_packages.py", env::var("HOME").unwrap()))
 }
