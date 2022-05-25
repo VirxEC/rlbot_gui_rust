@@ -28,6 +28,9 @@ export default {
 
 
 		<b-navbar-nav class="ml-auto">
+			<b-button @click="$router.replace('/console')" variant="dark" class="ml-2">
+				Console
+			</b-button>
 			<b-spinner v-if="showProgressSpinner" variant="success" label="Spinning" class="mr-2"></b-spinner>
 			<span id="sandbox-button-wrapper">
 				<b-button
@@ -45,10 +48,6 @@ export default {
 				@click="$router.replace('/story')" variant="dark" class="ml-2"
 				>
 				Story Mode
-			</b-button>
-
-			<b-button @click="$router.replace('/console')" variant="dark" class="ml-2">
-				Console
 			</b-button>
 
 			<b-dropdown right class="ml-4" variant="dark">
@@ -650,7 +649,6 @@ export default {
 				this.snackbarContent = response.error;
 				this.showSnackbar = true;
 			} else {
-				console.log(response);
 				this.folderSettings["files"][response.bot.name] = response.bot;
 				this.botsReceived([response.bot]);
 			}

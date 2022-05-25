@@ -962,7 +962,12 @@ fn main() {
                         drop(outs);
 
                         if !out_strs.is_empty() {
-                            CONSOLE_TEXT.lock().unwrap().extend_from_slice(&out_strs);
+                            let mut console_text = CONSOLE_TEXT.lock().unwrap();
+                            console_text.extend_from_slice(&out_strs);
+                            if console_text.len() > 1200 {
+                                let diff = console_text.len() - 1200;
+                                console_text.drain(..diff);
+                            }
                             main_window.emit("new-console-text", out_strs).unwrap();
                         }
                     }

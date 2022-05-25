@@ -4,7 +4,7 @@ const listen = window.__TAURI__.event.listen;
 export default {
 	name: 'console',
 	template: /*html*/`
-	<div class="noscroll-flex flex-grow-1">
+	<div class="overflow-auto flex-grow-1">
 	<b-navbar class="navbar">
 		<b-navbar-brand>
 			<img class="logo" src="imgs/rlbot_logo.png">
@@ -16,17 +16,11 @@ export default {
 			</b-button>
 		</b-navbar-nav>
 	</b-navbar>
-	<b-container fluid class="noscroll-flex flex-grow-1">
-		<b-card no-body class="bot-pool noscroll-flex flex-grow-1">
-			<div class="my-2">
-				<div class="p-1 noscroll-flex">
-					<div class="overflow-auto">
-						<div v-for="text in consoleTexts" style="display: inline;">
-							<p>{{ text }}</p>
-						</div>
-					</div>
-				</div>
-			</div>
+	<b-container fluid>
+		<b-card no-body class="bot-pool p-1">
+			<span v-for="text in consoleTexts.slice().reverse()">
+				{{ text }}<br>
+			</span>
 		</b-card>
 	</b-container>
 	</div>
@@ -38,12 +32,14 @@ export default {
 			newTextListener: listen('new-console-text', event => {
 				console.log(event.payload);
 				this.consoleTexts.push(...event.payload);
+				if (this.consoleTexts.length > 1200) {
+					this.consoleTexts = this.consoleTexts.slice(0, this.consoleTexts.length - 1200);
+				}
 			})
 		}
 	},
 	methods: {
 		startup: function() {
-			// this.consoleTexts.push("Welcome to the RLBot Console!");
 			invoke("get_console_texts").then((texts) => {
 				this.consoleTexts = texts;
 			});
