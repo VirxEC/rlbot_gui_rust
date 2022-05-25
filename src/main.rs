@@ -978,8 +978,12 @@ fn main() {
     initialize(&CONSOLE_TEXT);
     initialize(&CAPTURE_COMMANDS);
 
-    println!("get_missing_packages.py: {}", get_missing_packages_script_path());
-    write(get_missing_packages_script_path(), include_str!("get_missing_packages.py")).unwrap();
+    let missing_packages_script_path = get_missing_packages_script_path();
+    println!("get_missing_packages.py: {}", &missing_packages_script_path);
+    if !Path::new(&missing_packages_script_path).parent().unwrap().exists() {
+        create_dir_all(&missing_packages_script_path).unwrap();
+    }
+    write(missing_packages_script_path, include_str!("get_missing_packages.py")).unwrap();
 
     tauri::Builder::default()
         .setup(|app| {
