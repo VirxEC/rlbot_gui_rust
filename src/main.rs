@@ -482,6 +482,7 @@ async fn scan_for_scripts() -> Vec<ScriptConfigBundle> {
 
 use native_dialog::FileDialog;
 
+#[cfg(not(target_os = "macos"))]
 #[tauri::command]
 async fn pick_bot_folder() {
     let path = match FileDialog::new().show_open_single_dir().unwrap() {
@@ -490,6 +491,25 @@ async fn pick_bot_folder() {
     };
 
     BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(path.to_str().unwrap().to_string());
+}
+
+#[cfg(target_os = "macos")]
+use tauri::Window;
+
+#[cfg(target_os = "macos")]
+#[tauri::command]
+async fn pick_bot_folder(window: Window) {
+    // FileDialog must be ran on the main thread when running on MacOS, it will panic if it isn't
+    window
+        .run_on_main_thread(|| {
+            let path = match FileDialog::new().show_open_single_dir().unwrap() {
+                Some(path) => path,
+                None => return,
+            };
+
+            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(path.to_str().unwrap().to_string());
+        })
+        .unwrap();
 }
 
 #[tauri::command]
@@ -585,7 +605,16 @@ async fn save_team_settings(blue_team: Vec<BotConfigBundle>, orange_team: Vec<Bo
 }
 
 fn get_command_status(program: &str, args: Vec<&str>) -> bool {
-    match Command::new(program).args(args).stdout(Stdio::null()).stderr(Stdio::null()).status() {
+    let mut command = Command::new(program);
+
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // disable window creation
+        command.creation_flags(0x08000000);
+    };
+
+    match command.args(args).stdout(Stdio::null()).stderr(Stdio::null()).status() {
         Ok(status) => status.success(),
         Err(_) => false,
     }
@@ -658,6 +687,7 @@ async fn set_python_path(path: String) {
     config.write(&*config_path).unwrap();
 }
 
+#[cfg(not(target_os = "macos"))]
 #[tauri::command]
 async fn pick_appearance_file() -> Option<String> {
     match FileDialog::new().add_filter("Appearance Cfg File", &["cfg"]).show_open_single_file() {
@@ -667,6 +697,30 @@ async fn pick_appearance_file() -> Option<String> {
             None
         }
     }
+}
+
+#[cfg(target_os = "macos")]
+#[tauri::command]
+async fn pick_appearance_file(window: Window) -> Option<String> {
+    // FileDialog must be ran on the main thread when running on MacOS, it will panic if it isn't
+    let out = Arc::new(Mutex::new(None));
+    let out_clone = Arc::clone(&out);
+    window
+        .run_on_main_thread(move || {
+            let mut out_ref = out_clone.lock().unwrap();
+            *out_ref = match FileDialog::new().add_filter("Appearance Cfg File", &["cfg"]).show_open_single_file() {
+                Ok(path) => path.map(|path| path.to_str().unwrap().to_string()),
+                Err(e) => {
+                    dbg!(e);
+                    None
+                }
+            };
+        })
+        .unwrap();
+
+    // Rust requries that we first store the clone in a variable before we return it so out can be dropped safely
+    let x = out.lock().unwrap().clone();
+    x
 }
 
 #[tauri::command]
@@ -787,8 +841,17 @@ struct PackageResult {
     packages: Vec<String>,
 }
 
-fn spawn_capture_process_and_get_exit_code<S: AsRef<OsStr>>(command: S, args: &[&str]) -> i32 {
-    let mut child = Command::new(command).args(args).stdout(Stdio::piped()).spawn().unwrap();
+fn spawn_capture_process_and_get_exit_code<S: AsRef<OsStr>>(program: S, args: &[&str]) -> i32 {
+    let mut command = Command::new(program);
+
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // disable window creation
+        command.creation_flags(0x08000000);
+    };
+
+    let mut child = command.args(args).stdout(Stdio::piped()).spawn().unwrap();
 
     let capture_index = {
         let mut capture_commands = CAPTURE_COMMANDS.lock().unwrap();

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::rlbot::agents::{base_script::SCRIPT_FILE_KEY, runnable::Runnable};
 
-use crate::{get_command_status, get_missing_packages_script_path, PYTHON_PATH, ccprintln};
+use crate::{ccprintln, get_command_status, get_missing_packages_script_path, PYTHON_PATH};
 
 pub const PYTHON_FILE_KEY: &str = "python_file";
 pub const REQUIREMENTS_FILE_KEY: &str = "requirements_file";
@@ -295,7 +295,16 @@ impl Runnable for BotConfigBundle {
 
             args.push(&file);
 
-            match process::Command::new(python).args(args).stdin(Stdio::null()).output() {
+            let mut command = process::Command::new(python);
+
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                // disable window creation
+                command.creation_flags(0x08000000);
+            };
+
+            match command.args(args).stdin(Stdio::null()).output() {
                 Ok(proc) => {
                     let output = std::str::from_utf8(proc.stdout.as_slice()).unwrap();
                     if let Ok(packages) = serde_json::from_str(output) {
@@ -467,7 +476,16 @@ impl Runnable for ScriptConfigBundle {
 
             args.push(&file);
 
-            match process::Command::new(python).args(args).stdin(Stdio::null()).output() {
+            let mut command = process::Command::new(python);
+
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                // disable window creation
+                command.creation_flags(0x08000000);
+            };
+
+            match command.args(args).stdin(Stdio::null()).output() {
                 Ok(proc) => {
                     let output = std::str::from_utf8(proc.stdout.as_slice()).unwrap();
                     if let Ok(packages) = serde_json::from_str(output) {

@@ -1,5 +1,5 @@
 use std::collections::hash_map::DefaultHasher;
-use std::fs::{File, write};
+use std::fs::{write, File};
 use std::hash::{Hash, Hasher};
 use std::io::Read;
 use std::{io::Cursor, path::Path};
@@ -10,7 +10,7 @@ use sanitize_filename::sanitize;
 
 use crate::rlbot::parsing::bot_config_bundle::{BOT_CONFIG_MODULE_HEADER, NAME_KEY};
 use crate::rlbot::parsing::directory_scanner::scan_directory_for_bot_configs;
-use crate::{BOT_FOLDER_SETTINGS, ccprintln};
+use crate::{ccprintln, BOT_FOLDER_SETTINGS};
 
 pub const CREATED_BOTS_FOLDER: &str = "MyBots";
 
@@ -44,7 +44,10 @@ pub async fn bootstrap_python_bot(bot_name: String, directory: &str) -> Result<S
     BOT_FOLDER_SETTINGS.lock().unwrap().add_file(config_file.clone());
 
     if open::that(python_file).is_err() {
-        ccprintln(format!("You have no default program to open .py files. Your new bot is located at {}", top_dir.to_str().unwrap()));
+        ccprintln(format!(
+            "You have no default program to open .py files. Your new bot is located at {}",
+            top_dir.to_str().unwrap()
+        ));
     }
 
     Ok(config_file)
@@ -104,7 +107,10 @@ pub async fn bootstrap_python_hivemind(hive_name: String, directory: &str) -> Re
     BOT_FOLDER_SETTINGS.lock().unwrap().add_file(config_file.to_string());
 
     if open::that(hive_file).is_err() {
-        ccprintln(format!("You have no default program to open .py files. Your new bot is located at {}", top_dir.to_str().unwrap()));
+        ccprintln(format!(
+            "You have no default program to open .py files. Your new bot is located at {}",
+            top_dir.to_str().unwrap()
+        ));
     }
 
     Ok(config_file.to_string())
