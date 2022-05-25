@@ -324,7 +324,7 @@ impl Runnable for BotConfigBundle {
 
         if let Some(req_file) = self.get_requirements_file() {
             let script_path = get_missing_packages_script_path();
-            let mut args: Vec<&str> = vec![&script_path];
+            let mut args: Vec<&str> = vec![script_path.to_str().unwrap()];
 
             if requires_tkinter {
                 args.push("requires_tkinter");
@@ -505,7 +505,7 @@ impl Runnable for ScriptConfigBundle {
 
         if let Some(req_file) = self.get_requirements_file() {
             let script_path = get_missing_packages_script_path();
-            let mut args: Vec<&str> = vec![&script_path];
+            let mut args: Vec<&str> = vec![script_path.to_str().unwrap()];
 
             if self.requires_tkinter {
                 args.push("requires_tkinter");

@@ -11,7 +11,7 @@ use std::{
     ffi::OsStr,
     fs::{create_dir_all, read_to_string, write},
     io::Read,
-    path::Path,
+    path::{Path, PathBuf},
     process::{ChildStdout, Command, Stdio},
     str::FromStr,
     sync::Arc,
@@ -397,13 +397,13 @@ fn check_has_rlbot() -> bool {
 }
 
 #[cfg(windows)]
-fn get_missing_packages_script_path() -> String {
-    format!("{}\\RLBotGUIX\\get_missing_packages.py", env::var("LOCALAPPDATA").unwrap())
+fn get_missing_packages_script_path() -> PathBuf {
+    PathBuf::from(format!("{}\\RLBotGUIX\\get_missing_packages.py", env::var("LOCALAPPDATA").unwrap()))
 }
 
 #[cfg(not(windows))]
-fn get_missing_packages_script_path() -> String {
-    format!("{}/.RLBotGUI/get_missing_packages.py", env::var("HOME").unwrap())
+fn get_missing_packages_script_path() -> PathBuf {
+    PathBuf::from(format!("{}/.RLBotGUI/get_missing_packages.py", env::var("HOME").unwrap()))
 }
 
 #[tauri::command]
@@ -979,10 +979,19 @@ fn main() {
     initialize(&CAPTURE_COMMANDS);
 
     let missing_packages_script_path = get_missing_packages_script_path();
-    println!("get_missing_packages.py: {}", &missing_packages_script_path);
-    if !Path::new(&missing_packages_script_path).parent().unwrap().exists() {
+    println!("get_missing_packages.py: {}", missing_packages_script_path.to_str().unwrap());
+
+    if !missing_packages_script_path.parent().unwrap().exists() {
         create_dir_all(&missing_packages_script_path).unwrap();
     }
+
+    // macos is werid with overwriting files
+    #[cfg(target_os = "macos")]
+    if missing_packages_script_path.exists() {
+        use std::fs::remove_file;
+        remove_file(&missing_packages_script_path).unwrap();
+    }
+
     write(missing_packages_script_path, include_str!("get_missing_packages.py")).unwrap();
 
     tauri::Builder::default()
