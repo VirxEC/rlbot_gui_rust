@@ -625,11 +625,7 @@ async fn get_language_support() -> HashMap<String, bool> {
     lang_support.insert("fullpython".to_string(), python_check && get_command_status(&*python_path, vec!["-c", "import tkinter"]));
     lang_support.insert(
         "rlbotpython".to_string(),
-        python_check
-            && get_command_status(
-                &*python_path,
-                vec!["-c", "import rlbot; import numpy; import numba; import scipy; import selenium"],
-            ),
+        python_check && get_command_status(&*python_path, vec!["-c", "import rlbot; import numpy; import numba; import scipy; import selenium"]),
     );
 
     dbg!(lang_support)
@@ -780,7 +776,7 @@ async fn bootstrap_python_bot(bot_name: String, directory: &str) -> Result<Strin
 
     BOT_FOLDER_SETTINGS.lock().unwrap().add_file(config_file.clone());
 
-    if Command::new(&python_file).spawn().is_err() {
+    if open::that(python_file).is_err() {
         println!("You have no default program to open .py files. Your new bot is located at {}", top_dir.to_str().unwrap());
     }
 
@@ -896,18 +892,7 @@ fn install_upgrade_basic_packages() -> PackageResult {
                     {
                         if proc.success() {
                             if let Ok(proc) = Command::new(&python)
-                                .args([
-                                    "-m",
-                                    "pip",
-                                    "install",
-                                    "-U",
-                                    "--no-warn-script-location",
-                                    "numpy",
-                                    "scipy",
-                                    "numba",
-                                    "selenium",
-                                    "rlbot",
-                                ])
+                                .args(["-m", "pip", "install", "-U", "--no-warn-script-location", "numpy", "scipy", "numba", "selenium", "rlbot"])
                                 .status()
                             {
                                 return PackageResult {
@@ -975,11 +960,11 @@ fn main() {
                                                 break;
                                             }
                                             out.push_str(&string);
-                                        },
+                                        }
                                         Err(_) => break,
                                     };
                                 }
-                                
+
                                 if out.is_empty() {
                                     None
                                 } else {
