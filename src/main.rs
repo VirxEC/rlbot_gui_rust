@@ -424,7 +424,8 @@ fn get_bots_from_directory(path: &str, has_rlbot: bool) -> Vec<BotConfigBundle> 
     filter_hidden_bundles(scan_directory_for_bot_configs(path, has_rlbot))
 }
 
-fn scan_for_bots_r() -> Vec<BotConfigBundle> {
+#[tauri::command]
+async fn scan_for_bots() -> Vec<BotConfigBundle> {
     let bfs = BOT_FOLDER_SETTINGS.lock().unwrap();
     let mut bots = Vec::new();
 
@@ -445,11 +446,6 @@ fn scan_for_bots_r() -> Vec<BotConfigBundle> {
     }
 
     bots
-}
-
-#[tauri::command]
-async fn scan_for_bots() -> Vec<BotConfigBundle> {
-    scan_for_bots_r()
 }
 
 fn get_scripts_from_directory(path: &str, has_rlbot: bool) -> Vec<ScriptConfigBundle> {
@@ -723,87 +719,72 @@ async fn pick_appearance_file(window: Window) -> Option<String> {
     x
 }
 
-#[tauri::command]
-async fn get_recommendations() -> Option<HashMap<String, Vec<HashMap<String, Vec<BotConfigBundle>>>>> {
-    type BotNames = Vec<String>;
-    type Recommendation = HashMap<String, BotNames>;
-    type AllRecommendations = HashMap<String, Vec<Recommendation>>;
-    let mut json: Option<AllRecommendations> = None;
+type BotNames = Vec<String>;
+type Recommendation = HashMap<String, BotNames>;
+type AllRecommendations = HashMap<String, Vec<Recommendation>>;
 
-    {
-        let bfs = BOT_FOLDER_SETTINGS.lock().unwrap();
+fn get_recommendations_json() -> Option<AllRecommendations> {
+    // Search for and load the json file
+    for path in BOT_FOLDER_SETTINGS.lock().unwrap().folders.keys() {
+        let pattern = Path::new(path).join("**/recommendations.json");
 
-        for path in bfs.folders.keys() {
-            let pattern = Path::new(path).join("**/recommendations.json");
-
-            for path2 in glob(pattern.to_str().unwrap()).unwrap().flatten() {
-                let raw_json = match read_to_string(&path2) {
-                    Ok(s) => s,
-                    Err(_) => {
-                        println!("Failed to read {}", path2.to_str().unwrap());
-                        continue;
-                    }
-                };
-
-                match serde_json::from_str(&raw_json) {
-                    Ok(j) => json = Some(j),
-                    Err(e) => {
-                        println!("Failed to parse file {}: {}", path2.to_str().unwrap(), e);
-                        continue;
-                    }
+        for path2 in glob(pattern.to_str().unwrap()).unwrap().flatten() {
+            let raw_json = match read_to_string(&path2) {
+                Ok(s) => s,
+                Err(_) => {
+                    println!("Failed to read {}", path2.to_str().unwrap());
+                    continue;
                 }
-            }
-        }
+            };
 
-        for path in bfs.files.keys() {
-            if path.ends_with("recommendations.json") {
-                let raw_json = match read_to_string(&path) {
-                    Ok(s) => s,
-                    Err(_) => {
-                        println!("Failed to read {}", path);
-                        continue;
-                    }
-                };
-
-                match serde_json::from_str(&raw_json) {
-                    Ok(j) => json = Some(j),
-                    Err(e) => {
-                        println!("Failed to parse file {}: {}", path, e);
-                        continue;
-                    }
+            match serde_json::from_str(&raw_json) {
+                Ok(j) => return Some(j),
+                Err(e) => {
+                    println!("Failed to parse file {}: {}", path2.to_str().unwrap(), e);
+                    continue;
                 }
             }
         }
     }
 
-    let name_path_pairs = {
-        let bfs = BOT_FOLDER_SETTINGS.lock().unwrap();
-        let mut bots = Vec::new();
+    None
+}
 
-        bots.par_extend(bfs.folders.par_iter().filter_map(|(path, props)| {
-            if props.visible {
-                let pattern = Path::new(path).join("**/*.cfg");
-                let paths = glob(pattern.to_str().unwrap()).unwrap().flatten().collect::<Vec<_>>();
+#[tauri::command]
+async fn get_recommendations() -> Option<HashMap<String, Vec<HashMap<String, Vec<BotConfigBundle>>>>> {
+    // If we found the json, return the corresponding BotConfigBundles for the bots
+    get_recommendations_json().map(|j| {
+        // Get a list of all the bots in (bot name, bot config file path) pairs
+        let name_path_pairs = {
+            let bfs = BOT_FOLDER_SETTINGS.lock().unwrap();
+            let mut bots = Vec::new();
 
-                Some(paths.par_iter().filter_map(|path| BotConfigBundle::mini_from_path(path.as_path()).ok()).collect::<Vec<_>>())
-            } else {
-                None
-            }
-        }).flatten());
-    
-        bots.par_extend(bfs.files.par_iter().filter_map(|(path, props)| {
-            if props.visible {
-                BotConfigBundle::mini_from_path(Path::new(path)).ok()
-            } else {
-                None
-            }
-        }));
-    
-        bots
-    };
+            bots.par_extend(bfs.folders.par_iter().filter_map(|(path, props)| {
+                if props.visible {
+                    let pattern = Path::new(path).join("**/*.cfg");
+                    let paths = glob(pattern.to_str().unwrap()).unwrap().flatten().collect::<Vec<_>>();
 
-    json.map(|j| {
+                    Some(paths.par_iter().filter_map(|path| BotConfigBundle::mini_from_path(path.as_path()).ok()).collect::<Vec<_>>())
+                } else {
+                    None
+                }
+            }).flatten());
+        
+            bots.par_extend(bfs.files.par_iter().filter_map(|(path, props)| {
+                if props.visible {
+                    BotConfigBundle::mini_from_path(Path::new(path)).ok()
+                } else {
+                    None
+                }
+            }));
+        
+            bots
+        };
+
+        // check if rlbot is installed in python
         let has_rlbot = check_has_rlbot();
+
+        // Load all of the bot config bundles
         let recommendations: Vec<HashMap<String, Vec<BotConfigBundle>>> = j.get("recommendations").unwrap().par_iter().map(|bots| {
             HashMap::from([(
                 "bots".to_string(),
