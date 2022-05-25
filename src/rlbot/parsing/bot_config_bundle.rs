@@ -130,7 +130,7 @@ pub struct BotConfigBundle {
 }
 
 impl BotConfigBundle {
-    pub fn from_path(config_path: &Path) -> Result<Self, String> {
+    pub fn from_path(config_path: &Path, has_rlbot: bool) -> Result<Self, String> {
         let mut config = Ini::new();
         config.load(config_path.to_str().unwrap())?;
 
@@ -205,7 +205,9 @@ impl BotConfigBundle {
             missing_python_packages,
             python_path,
         };
-        b.calculate_missing_packages();
+        if has_rlbot {
+            b.calculate_missing_packages();
+        }
         Ok(b)
     }
 }
@@ -330,7 +332,7 @@ pub struct ScriptConfigBundle {
 }
 
 impl ScriptConfigBundle {
-    pub fn from_path(config_path: &Path) -> Result<Self, String> {
+    pub fn from_path(config_path: &Path, has_rlbot: bool) -> Result<Self, String> {
         let mut config = Ini::new();
         config.load(config_path.to_str().unwrap())?;
 
@@ -384,7 +386,9 @@ impl ScriptConfigBundle {
             requirements_file,
             requires_tkinter,
         };
-        b.calculate_missing_packages();
+        if has_rlbot {
+            b.calculate_missing_packages();
+        }
         Ok(b)
     }
 }

@@ -7,6 +7,7 @@ use core::fmt;
 use std::{
     collections::{HashMap, HashSet},
     env,
+    ffi::OsStr,
     fs::{create_dir_all, read_to_string, write},
     io::{Cursor, Read},
     path::Path,
@@ -388,6 +389,10 @@ lazy_static! {
     static ref CAPTURE_COMMANDS: Arc<Mutex<Vec<Option<ChildStdout>>>> = Arc::new(Mutex::new(Vec::new()));
 }
 
+fn check_has_rlbot() -> bool {
+    get_command_status(&*PYTHON_PATH.lock().unwrap(), vec!["-c", "import rlbot"])
+}
+
 #[cfg(windows)]
 fn get_missing_packages_script_path() -> String {
     format!("{}\\RLBotGUIX\\get_missing_packages.py", env::var("LOCALAPPDATA").unwrap())
@@ -412,23 +417,25 @@ fn filter_hidden_bundles<T: Runnable + Clone>(bundles: HashSet<T>) -> Vec<T> {
     bundles.iter().filter(|b| !b.get_config_file_name().starts_with('_')).cloned().collect()
 }
 
-fn get_bots_from_directory(path: &str) -> Vec<BotConfigBundle> {
-    filter_hidden_bundles(scan_directory_for_bot_configs(path))
+fn get_bots_from_directory(path: &str, has_rlbot: bool) -> Vec<BotConfigBundle> {
+    filter_hidden_bundles(scan_directory_for_bot_configs(path, has_rlbot))
 }
 
 fn scan_for_bots_r() -> Vec<BotConfigBundle> {
     let bfs = BOT_FOLDER_SETTINGS.lock().unwrap();
     let mut bots = Vec::new();
 
+    let has_rlbot = check_has_rlbot();
+
     for (path, props) in bfs.folders.iter() {
         if props.visible {
-            bots.extend(get_bots_from_directory(&*path));
+            bots.extend(get_bots_from_directory(&*path, has_rlbot));
         }
     }
 
     for (path, props) in bfs.files.iter() {
         if props.visible {
-            if let Ok(bundle) = BotConfigBundle::from_path(Path::new(path)) {
+            if let Ok(bundle) = BotConfigBundle::from_path(Path::new(path), has_rlbot) {
                 bots.push(bundle);
             }
         }
@@ -442,8 +449,8 @@ async fn scan_for_bots() -> Vec<BotConfigBundle> {
     scan_for_bots_r()
 }
 
-fn get_scripts_from_directory(path: &str) -> Vec<ScriptConfigBundle> {
-    filter_hidden_bundles(scan_directory_for_script_configs(path))
+fn get_scripts_from_directory(path: &str, has_rlbot: bool) -> Vec<ScriptConfigBundle> {
+    filter_hidden_bundles(scan_directory_for_script_configs(path, has_rlbot))
 }
 
 #[tauri::command]
@@ -451,15 +458,17 @@ async fn scan_for_scripts() -> Vec<ScriptConfigBundle> {
     let bfs = BOT_FOLDER_SETTINGS.lock().unwrap();
     let mut scripts = Vec::with_capacity(bfs.folders.len() + bfs.files.len());
 
+    let has_rlbot = check_has_rlbot();
+
     for (path, props) in bfs.folders.iter() {
         if props.visible {
-            scripts.extend(get_scripts_from_directory(&*path));
+            scripts.extend(get_scripts_from_directory(&*path, has_rlbot));
         }
     }
 
     for (path, props) in bfs.files.iter() {
         if props.visible {
-            if let Ok(bundle) = ScriptConfigBundle::from_path(Path::new(path)) {
+            if let Ok(bundle) = ScriptConfigBundle::from_path(Path::new(path), has_rlbot) {
                 scripts.push(bundle);
             }
         }
@@ -764,7 +773,7 @@ async fn bootstrap_python_bot(bot_name: String, directory: &str) -> Result<Strin
         }
     }
 
-    let bundles = scan_directory_for_bot_configs(top_dir.to_str().unwrap());
+    let bundles = scan_directory_for_bot_configs(top_dir.to_str().unwrap(), false);
     let bundle = bundles.iter().next().unwrap();
     let config_file = bundle.path.clone().unwrap();
     let python_file = bundle.python_path.clone().unwrap();
@@ -786,7 +795,7 @@ async fn bootstrap_python_bot(bot_name: String, directory: &str) -> Result<Strin
 #[tauri::command]
 async fn begin_python_bot(bot_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
     match bootstrap_python_bot(bot_name, &ensure_bot_directory()).await {
-        Ok(config_file) => Ok(HashMap::from([("bot".to_string(), BotConfigBundle::from_path(Path::new(&config_file)).unwrap())])),
+        Ok(config_file) => Ok(HashMap::from([("bot".to_string(), BotConfigBundle::from_path(Path::new(&config_file), check_has_rlbot()).unwrap())])),
         Err(e) => Err(HashMap::from([("error".to_string(), e)])),
     }
 }
@@ -797,16 +806,9 @@ struct PackageResult {
     packages: Vec<String>,
 }
 
-fn ensure_pip(python: &String) -> i32 {
-    match Command::new(&python).args(["-m", "ensurepip"]).status() {
-        Ok(status) => status.code().unwrap_or(1),
-        Err(_) => 2,
-    }
-}
-
-fn spawn_capture_process_and_get_exit_code(command: String, args: &[&str]) -> i32 {
+fn spawn_capture_process_and_get_exit_code<S: AsRef<OsStr>>(command: S, args: &[&str]) -> i32 {
     let mut child = Command::new(command).args(args).stdout(Stdio::piped()).spawn().unwrap();
-    dbg!(&child);
+
     let capture_index = {
         let mut capture_commands = CAPTURE_COMMANDS.lock().unwrap();
         if let Some(index) = capture_commands.iter().position(|c| c.is_none()) {
@@ -817,11 +819,9 @@ fn spawn_capture_process_and_get_exit_code(command: String, args: &[&str]) -> i3
             capture_commands.len() - 1
         }
     };
-    dbg!(capture_index);
 
     let exit_code = child.wait().unwrap().code().unwrap_or(1);
-    dbg!(exit_code);
-    CAPTURE_COMMANDS.lock().unwrap()[capture_index] = dbg!(None);
+    CAPTURE_COMMANDS.lock().unwrap()[capture_index] = None;
     exit_code
 }
 
@@ -840,21 +840,15 @@ async fn install_package(package_string: String) -> PackageResult {
 
 #[tauri::command]
 async fn install_requirements(config_path: String) -> PackageResult {
-    let bundle = BotConfigBundle::from_path(Path::new(&config_path)).unwrap();
+    let bundle = BotConfigBundle::from_path(Path::new(&config_path), false).unwrap();
 
     if let Some(file) = bundle.get_requirements_file() {
         let python = PYTHON_PATH.lock().unwrap().to_string();
 
-        let mut exit_code = match Command::new(&python).args(["-m", "pip", "-m", "-U", "--no-warn-script-location", "-r", file]).status() {
-            Ok(status) => status.code().unwrap_or(1),
-            Err(_) => 2,
-        };
+        let mut exit_code = spawn_capture_process_and_get_exit_code(&python, &["-m", "pip", "-m", "-U", "--no-warn-script-location", "-r", file]);
 
         if exit_code == 0 {
-            exit_code = match Command::new(python).args(["-m", "pip", "install", "-U", "--no-warn-script-location", "-r", file]).status() {
-                Ok(status) => status.code().unwrap_or(1),
-                Err(_) => 2,
-            };
+            exit_code = spawn_capture_process_and_get_exit_code(python, &["-m", "pip", "install", "-U", "--no-warn-script-location", "-r", file]);
         }
 
         PackageResult {
@@ -869,6 +863,13 @@ async fn install_requirements(config_path: String) -> PackageResult {
     }
 }
 
+const INSTALL_BASIC_PACKAGES_ARGS: [&[&str]; 4] = [
+    &["-m", "ensurepip"],
+    &["-m", "pip", "install", "-U", "--no-warn-script-location", "pip"],
+    &["-m", "pip", "install", "-U", "--no-warn-script-location", "setuptools", "wheel"],
+    &["-m", "pip", "install", "-U", "--no-warn-script-location", "numpy", "scipy", "numba", "selenium", "rlbot"],
+];
+
 fn install_upgrade_basic_packages() -> PackageResult {
     let packages = vec![
         String::from("pip"),
@@ -882,32 +883,18 @@ fn install_upgrade_basic_packages() -> PackageResult {
     ];
 
     let python = PYTHON_PATH.lock().unwrap().to_string();
-    if let Ok(proc) = Command::new(&python).args(["-m", "ensurepip"]).status() {
-        if proc.success() {
-            if let Ok(proc) = Command::new(&python).args(["-m", "pip", "install", "-U", "--no-warn-script-location", "pip"]).status() {
-                if proc.success() {
-                    if let Ok(proc) = Command::new(&python)
-                        .args(["-m", "pip", "install", "-U", "--no-warn-script-location", "setuptools", "wheel"])
-                        .status()
-                    {
-                        if proc.success() {
-                            if let Ok(proc) = Command::new(&python)
-                                .args(["-m", "pip", "install", "-U", "--no-warn-script-location", "numpy", "scipy", "numba", "selenium", "rlbot"])
-                                .status()
-                            {
-                                return PackageResult {
-                                    exit_code: proc.code().unwrap_or(1),
-                                    packages,
-                                };
-                            }
-                        }
-                    }
-                }
-            }
+
+    let mut exit_code = 0;
+
+    for command in INSTALL_BASIC_PACKAGES_ARGS {
+        if exit_code != 0 {
+            break;
         }
+
+        exit_code = spawn_capture_process_and_get_exit_code(&python, command);
     }
 
-    PackageResult { exit_code: 2, packages }
+    PackageResult { exit_code, packages }
 }
 
 #[tauri::command]
@@ -968,7 +955,7 @@ fn main() {
                                 if out.is_empty() {
                                     None
                                 } else {
-                                    Some(dbg!(out))
+                                    Some(out)
                                 }
                             })
                             .collect();
@@ -976,7 +963,7 @@ fn main() {
 
                         if !out_strs.is_empty() {
                             CONSOLE_TEXT.lock().unwrap().extend_from_slice(&out_strs);
-                            main_window.emit("new-console-text", dbg!(out_strs)).unwrap();
+                            main_window.emit("new-console-text", out_strs).unwrap();
                         }
                     }
                 }
