@@ -25,6 +25,9 @@ pub const LOOKS_CONFIG_KEY: &str = "looks_config";
 // pub const SUPPORTS_EARLY_START_KEY: &str = "supports_early_start";
 // pub const MAXIMUM_TICK_RATE_PREFERENCE_KEY: &str = "maximum_tick_rate_preference";
 
+pub const BOT_CONFIG_PARAMS_HEADER: &str = "Bot Parameters";
+pub const EXECUTABLE_PATH_KEY: &str = "path";
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct DevInfo {
     pub developer: String,
@@ -215,34 +218,34 @@ impl BotConfigBundle {
         let mut config = Ini::new();
         config.load(config_path).unwrap();
 
-        let name= if let Some(the_name) = config.get(BOT_CONFIG_MODULE_HEADER, NAME_KEY) {
+        let name = if let Some(the_name) = config.get(BOT_CONFIG_MODULE_HEADER, NAME_KEY) {
             the_name
         } else {
             return Err("Bot name not found".to_string());
         };
-        
+
         let path = config_path.to_str().unwrap().to_string();
 
         let config_directory = config_path.parent().unwrap().to_str().unwrap().to_string();
 
         let looks_path = config.get(BOT_CONFIG_MODULE_HEADER, LOOKS_CONFIG_KEY).map(|path| format!("{}/{}", config_directory, path));
-        
+
         let valid_looks = match &looks_path {
             Some(path) => Path::new(path).exists(),
             None => false,
         };
-        
+
         if !valid_looks {
             return Err("Looks config not found".to_string());
         }
-        
+
         let python_path = config.get(BOT_CONFIG_MODULE_HEADER, PYTHON_FILE_KEY).map(|path| format!("{}/{}", config_directory, path));
-        
+
         let valid_path = match &python_path {
             Some(path) => Path::new(path).exists(),
             None => false,
         };
-        
+
         if !valid_path {
             return Err("Python file not found".to_string());
         }

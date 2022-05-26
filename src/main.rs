@@ -19,12 +19,12 @@ use std::{
     time::Duration,
 };
 
-use bot_management::bot_creation::{bootstrap_python_bot, bootstrap_python_hivemind, CREATED_BOTS_FOLDER};
+use bot_management::bot_creation::{bootstrap_python_bot, bootstrap_python_hivemind, bootstrap_rust_bot, CREATED_BOTS_FOLDER};
 use glob::glob;
 
 use custom_maps::find_all_custom_maps;
 use lazy_static::{initialize, lazy_static};
-use rayon::iter::{IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelIterator, ParallelExtend};
+use rayon::iter::{IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelExtend, ParallelIterator};
 use rlbot::parsing::{
     agent_config_parser::BotLooksConfig,
     bot_config_bundle::{BotConfigBundle, Clean, ScriptConfigBundle},
@@ -767,25 +767,28 @@ async fn get_recommendations() -> Option<HashMap<String, Vec<HashMap<String, Vec
             let bfs = BOT_FOLDER_SETTINGS.lock().unwrap();
             let mut bots = Vec::new();
 
-            bots.par_extend(bfs.folders.par_iter().filter_map(|(path, props)| {
-                if props.visible {
-                    let pattern = Path::new(path).join("**/*.cfg");
-                    let paths = glob(pattern.to_str().unwrap()).unwrap().flatten().collect::<Vec<_>>();
+            bots.par_extend(
+                bfs.folders
+                    .par_iter()
+                    .filter_map(|(path, props)| {
+                        if props.visible {
+                            let pattern = Path::new(path).join("**/*.cfg");
+                            let paths = glob(pattern.to_str().unwrap()).unwrap().flatten().collect::<Vec<_>>();
 
-                    Some(paths.par_iter().filter_map(|path| BotConfigBundle::mini_from_path(path.as_path()).ok()).collect::<Vec<_>>())
-                } else {
-                    None
-                }
-            }).flatten());
-        
-            bots.par_extend(bfs.files.par_iter().filter_map(|(path, props)| {
-                if props.visible {
-                    BotConfigBundle::mini_from_path(Path::new(path)).ok()
-                } else {
-                    None
-                }
-            }));
-        
+                            Some(paths.par_iter().filter_map(|path| BotConfigBundle::mini_from_path(path.as_path()).ok()).collect::<Vec<_>>())
+                        } else {
+                            None
+                        }
+                    })
+                    .flatten(),
+            );
+
+            bots.par_extend(
+                bfs.files
+                    .par_iter()
+                    .filter_map(|(path, props)| if props.visible { BotConfigBundle::mini_from_path(Path::new(path)).ok() } else { None }),
+            );
+
             bots
         };
 
@@ -793,24 +796,29 @@ async fn get_recommendations() -> Option<HashMap<String, Vec<HashMap<String, Vec
         let has_rlbot = check_has_rlbot();
 
         // Load all of the bot config bundles
-        let recommendations: Vec<HashMap<String, Vec<BotConfigBundle>>> = j.get("recommendations").unwrap().par_iter().map(|bots| {
-            HashMap::from([(
-                "bots".to_string(),
-                bots.get("bots")
-                    .unwrap()
-                    .par_iter()
-                    .filter_map(|bot_name| {
-                        for (name, path) in &name_path_pairs {
-                            if name == bot_name {
-                                return BotConfigBundle::from_path(Path::new(path), has_rlbot).ok()
+        let recommendations: Vec<HashMap<String, Vec<BotConfigBundle>>> = j
+            .get("recommendations")
+            .unwrap()
+            .par_iter()
+            .map(|bots| {
+                HashMap::from([(
+                    "bots".to_string(),
+                    bots.get("bots")
+                        .unwrap()
+                        .par_iter()
+                        .filter_map(|bot_name| {
+                            for (name, path) in &name_path_pairs {
+                                if name == bot_name {
+                                    return BotConfigBundle::from_path(Path::new(path), has_rlbot).ok();
+                                }
                             }
-                        }
 
-                        None
-                    })
-                    .collect(),
-            )])
-        }).collect();
+                            None
+                        })
+                        .collect(),
+                )])
+            })
+            .collect();
 
         HashMap::from([("recommendations".to_string(), recommendations)])
     })
@@ -854,6 +862,17 @@ async fn begin_python_bot(bot_name: String) -> Result<HashMap<String, BotConfigB
 #[tauri::command]
 async fn begin_python_hivemind(hive_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
     match bootstrap_python_hivemind(hive_name, &ensure_bot_directory()).await {
+        Ok(config_file) => Ok(HashMap::from([(
+            "bot".to_string(),
+            BotConfigBundle::from_path(Path::new(&config_file), check_has_rlbot()).unwrap(),
+        )])),
+        Err(e) => Err(HashMap::from([("error".to_string(), e)])),
+    }
+}
+
+#[tauri::command]
+async fn begin_rust_bot(bot_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
+    match bootstrap_rust_bot(bot_name, &ensure_bot_directory()).await {
         Ok(config_file) => Ok(HashMap::from([(
             "bot".to_string(),
             BotConfigBundle::from_path(Path::new(&config_file), check_has_rlbot()).unwrap(),
@@ -1080,6 +1099,7 @@ fn main() {
             pick_appearance_file,
             begin_python_bot,
             begin_python_hivemind,
+            begin_rust_bot,
             install_package,
             install_requirements,
             install_basic_packages,

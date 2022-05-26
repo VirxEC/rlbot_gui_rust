@@ -8,7 +8,7 @@ use configparser::ini::Ini;
 use regex::Regex;
 use sanitize_filename::sanitize;
 
-use crate::rlbot::parsing::bot_config_bundle::{BOT_CONFIG_MODULE_HEADER, NAME_KEY};
+use crate::rlbot::parsing::bot_config_bundle::{BOT_CONFIG_MODULE_HEADER, BOT_CONFIG_PARAMS_HEADER, EXECUTABLE_PATH_KEY, NAME_KEY};
 use crate::rlbot::parsing::directory_scanner::scan_directory_for_bot_configs;
 use crate::{ccprintln, BOT_FOLDER_SETTINGS};
 
@@ -114,4 +114,45 @@ pub async fn bootstrap_python_hivemind(hive_name: String, directory: &str) -> Re
     }
 
     Ok(config_file.to_string())
+}
+
+pub async fn bootstrap_rust_bot(bot_name: String, directory: &str) -> Result<String, String> {
+    let sanitized_name = sanitize(&bot_name);
+    let top_dir = Path::new(directory).join(CREATED_BOTS_FOLDER).join(&sanitized_name);
+
+    if top_dir.exists() {
+        return Err(format!("There is already a bot named {}, please choose a different name!", sanitized_name));
+    }
+
+    match reqwest::get("https://github.com/NicEastvillage/RLBotRustTemplateBot/archive/master.zip").await {
+        Ok(res) => {
+            zip_extract::extract(Cursor::new(&res.bytes().await.unwrap()), top_dir.as_path(), true).unwrap();
+        }
+        Err(e) => {
+            return Err(format!("Failed to download rust bot: {}", e));
+        }
+    }
+
+    let bundles = scan_directory_for_bot_configs(top_dir.to_str().unwrap(), false);
+    let bundle = bundles.iter().next().unwrap();
+    let config_file = bundle.path.clone().unwrap();
+
+    let mut config = Ini::new();
+    config.load(&config_file).unwrap();
+    config.set(BOT_CONFIG_MODULE_HEADER, NAME_KEY, Some(bot_name.clone()));
+    config.set(BOT_CONFIG_PARAMS_HEADER, EXECUTABLE_PATH_KEY, Some(format!("../target/debug/{}.exe", bot_name)));
+    config.write(&config_file).unwrap();
+
+    let cargo_toml_file = top_dir.join("Cargo.toml");
+    replace_all_regex_in_file(&cargo_toml_file, &Regex::new(r"name = .*$").unwrap(), format!("name = \"{}\"", bot_name));
+    replace_all_regex_in_file(&cargo_toml_file, &Regex::new(r"authors = .*$").unwrap(), "authors = []".to_string());
+
+    if open::that(top_dir.join("src").join("main.rs")).is_err() {
+        ccprintln(format!(
+            "You have no default program to open .rs files. Your new bot is located at {}",
+            top_dir.to_str().unwrap()
+        ));
+    }
+
+    Ok(config_file)
 }

@@ -650,7 +650,7 @@ export default {
 				invoke("begin_python_hivemind", { hiveName: bot_name }).then(this.botLoadHandler);
 			} else if (language === 'rust') {
 				this.showProgressSpinner = true;
-				// eel.begin_rust_bot(bot_name)(this.botLoadHandler);
+				invoke("begin_rust_bot", { botName: bot_name }).then(this.botLoadHandler);
 			}
 		},
 		prepareFolderSettingsDialog: function() {
