@@ -875,7 +875,11 @@ fn spawn_capture_process_and_get_exit_code<S: AsRef<OsStr>>(program: S, args: &[
         command.creation_flags(0x08000000);
     };
 
-    let mut child = command.args(args).stdout(Stdio::piped()).spawn().unwrap();
+    let mut child = if let Ok(the_child) = command.args(args).stdout(Stdio::piped()).spawn() {
+        the_child
+    } else {
+        return 2;
+    };
 
     let capture_index = {
         let mut capture_commands = CAPTURE_COMMANDS.lock().unwrap();
