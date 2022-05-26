@@ -105,7 +105,7 @@ pub fn to_base64(path: &str) -> Option<String> {
 
 pub trait Clean {
     fn cleaned(&self) -> Self;
-    fn pre_fetch(&self) -> Self;
+    fn pre_fetch(&self, has_rlbot: bool) -> Self;
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -255,16 +255,18 @@ impl Clean for BotConfigBundle {
     fn cleaned(&self) -> Self {
         let mut b = self.clone();
         b.logo = None;
-        b.missing_python_packages = Some(Vec::new());
+        b.missing_python_packages = None;
         b
     }
 
-    fn pre_fetch(&self) -> Self {
+    fn pre_fetch(&self, has_rlbot: bool) -> Self {
         let mut b = self.clone();
         if let Some(logo_path) = &b.logo_path {
             b.logo = to_base64(&**logo_path);
         }
-        b.calculate_missing_packages();
+        if b.missing_python_packages.is_none() && has_rlbot {
+            b.calculate_missing_packages();
+        }
         b
     }
 }
@@ -369,7 +371,7 @@ pub struct ScriptConfigBundle {
     pub info: DevInfo,
     pub logo: Option<String>,
     pub logo_path: Option<String>,
-    pub missing_python_packages: Vec<String>,
+    pub missing_python_packages: Option<Vec<String>>,
     config_file_name: String,
     config_directory: String,
     script_file: String,
@@ -414,7 +416,7 @@ impl ScriptConfigBundle {
 
         let info = DevInfo::from_config(config);
 
-        let missing_python_packages = Vec::new();
+        let missing_python_packages = Some(Vec::new());
         let logo_path = Some(ta_logo);
 
         let mut b = Self {
@@ -444,16 +446,18 @@ impl Clean for ScriptConfigBundle {
     fn cleaned(&self) -> Self {
         let mut b = self.clone();
         b.logo = None;
-        b.missing_python_packages = Vec::new();
+        b.missing_python_packages = None;
         b
     }
 
-    fn pre_fetch(&self) -> Self {
+    fn pre_fetch(&self, has_rlbot: bool) -> Self {
         let mut b = self.clone();
         if let Some(logo_path) = &b.logo_path {
             b.logo = to_base64(&**logo_path);
         }
-        b.calculate_missing_packages();
+        if b.missing_python_packages.is_none() && has_rlbot {
+            b.calculate_missing_packages();
+        }
         b
     }
 }
@@ -497,7 +501,7 @@ impl Runnable for ScriptConfigBundle {
 
     fn calculate_missing_packages(&mut self) {
         if self.use_virtual_environment() {
-            self.missing_python_packages = Vec::new();
+            self.missing_python_packages = Some(Vec::new());
             return;
         }
 
@@ -534,9 +538,9 @@ impl Runnable for ScriptConfigBundle {
                 Err(e) => ccprintln(format!("Failed to calculate missing packages: {}", e)),
             }
         } else if self.requires_tkinter && !get_command_status(&python, vec!["-c", "import tkinter"]) {
-            self.missing_python_packages = vec![String::from("tkinter")];
+            self.missing_python_packages = Some(vec![String::from("tkinter")]);
         } else {
-            self.missing_python_packages = Vec::new();
+            self.missing_python_packages = Some(Vec::new());
         }
     }
 }

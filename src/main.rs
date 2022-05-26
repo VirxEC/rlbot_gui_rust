@@ -295,8 +295,9 @@ impl MatchSettings {
     }
 
     fn with_logos(&self) -> Self {
+        let has_rlbot = check_has_rlbot();
         let mut new = self.clone();
-        new.scripts = pre_fetch(new.scripts);
+        new.scripts = pre_fetch(new.scripts, has_rlbot);
         new
     }
 }
@@ -569,8 +570,8 @@ async fn save_match_settings(settings: MatchSettings) {
     MATCH_SETTINGS.lock().unwrap().update_config(settings.cleaned_scripts());
 }
 
-fn pre_fetch<T: Clean>(items: Vec<T>) -> Vec<T> {
-    items.iter().map(|b| b.pre_fetch()).collect()
+fn pre_fetch<T: Clean>(items: Vec<T>, has_rlbot: bool) -> Vec<T> {
+    items.iter().map(|b| b.pre_fetch(has_rlbot)).collect()
 }
 
 #[tauri::command]
@@ -585,9 +586,11 @@ async fn get_team_settings() -> HashMap<String, Vec<BotConfigBundle>> {
     .unwrap_or_default();
     let orange_team = serde_json::from_str(&config.get("team_settings", "orange_team").unwrap_or_else(|| "[]".to_string())).unwrap_or_default();
 
+    let has_rlbot = check_has_rlbot();
+
     let mut bots = HashMap::new();
-    bots.insert("blue_team".to_string(), pre_fetch(blue_team));
-    bots.insert("orange_team".to_string(), pre_fetch(orange_team));
+    bots.insert("blue_team".to_string(), pre_fetch(blue_team, has_rlbot));
+    bots.insert("orange_team".to_string(), pre_fetch(orange_team, has_rlbot));
 
     bots
 }
@@ -917,7 +920,7 @@ async fn install_requirements(config_path: String) -> PackageResult {
     if let Some(file) = bundle.get_requirements_file() {
         let python = PYTHON_PATH.lock().unwrap().to_string();
 
-        let mut exit_code = spawn_capture_process_and_get_exit_code(&python, &["-m", "pip", "-m", "-U", "--no-warn-script-location", "-r", file]);
+        let mut exit_code = spawn_capture_process_and_get_exit_code(&python, &["-m", "pip", "install", "-U", "--no-warn-script-location", "-r", file]);
 
         if exit_code == 0 {
             exit_code = spawn_capture_process_and_get_exit_code(python, &["-m", "pip", "install", "-U", "--no-warn-script-location", "-r", file]);

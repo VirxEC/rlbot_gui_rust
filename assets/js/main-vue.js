@@ -197,7 +197,12 @@ export default {
 					<p class="mr-3">RLBot requires some basic Python packages to be installed in order to run.</p>
 					<p class="mr-3">Clicking apply will attempt to install and/or update these packages.</p>
 				</b-form>
-				<b-button variant="primary" class="mt-3" @click="applyPythonSetup()">Apply</b-button>
+
+				<div style="display:flex; align-items: flex-end">
+					<b-button variant="primary" class="mt-3" @click="applyPythonSetup()">Apply</b-button>
+					&nbsp;
+					<b-button variant="warning" class="mt-3" @click="partialPythonSetup()">Apply without configuring</b-button>
+				</div>
 			</b-modal>
 
 			<div>
@@ -493,6 +498,23 @@ export default {
 				});
 			});
 		},
+		partialPythonSetup: function() {
+			invoke("set_python_path", { path: this.python_path }).then(() => {
+				this.$bvModal.hide("python-setup");
+				this.botPool = STARTING_BOT_POOL;
+				this.scriptPool = [];
+				invoke("scan_for_bots").then(this.botsReceived);
+				invoke("scan_for_scripts").then(this.scriptsReceived);
+				invoke("get_team_settings").then(this.teamSettingsReceived);
+				invoke("get_language_support").then((support) => {
+					this.languageSupport = support;
+					this.noPython = !this.languageSupport.python;
+					this.hasRLBot = this.languageSupport.rlbotpython;
+					this.applyLanguageWarnings(this.botPool.concat(this.scriptPool));
+				});
+				invoke("get_recommendations").then(this.recommendationsReceived);
+			});
+		},
 		startMatch: async function (event) {
 			this.matchStarting = true;
 
@@ -779,6 +801,9 @@ export default {
 		onInstallationComplete: function (result) {
 			let message = result.exit_code === 0 ? 'Successfully installed ' : 'Failed to install ';
 			message += result.packages.join(", ");
+			if (result.exit_code != 0) {
+				message += " with exit code " + result.exit_code;
+			}
 			this.snackbarContent = message;
 			this.showSnackbar = true;
 			this.showProgressSpinner = false;
@@ -795,6 +820,7 @@ export default {
 					this.hasRLBot = this.languageSupport.rlbotpython;
 					this.applyLanguageWarnings(this.botPool.concat(this.scriptPool));
 				});
+				invoke("get_recommendations").then(this.recommendationsReceived);
 
 				// remove missing packages from other bots and maybe hide the yellow triangle
 				for (const runnable of this.allUsableRunnables()) if (runnable.missing_python_packages) {
