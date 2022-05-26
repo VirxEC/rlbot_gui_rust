@@ -644,7 +644,7 @@ fn has_chrome() -> bool {
 
 #[cfg(target_os = "macos")]
 fn has_chrome() -> bool {
-    get_command_status("/Applications/Google\\ Chrome.app/Contents/MacOS/Google\\ Chrome", vec!["--version"])
+    get_command_status("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", vec!["--version"])
 }
 
 #[cfg(target_os = "linux")]
@@ -988,13 +988,6 @@ fn main() {
 
     if !missing_packages_script_path.parent().unwrap().exists() {
         create_dir_all(&missing_packages_script_path).unwrap();
-    }
-
-    // macos is werid with overwriting files
-    #[cfg(target_os = "macos")]
-    if missing_packages_script_path.exists() {
-        use std::fs::remove_file;
-        remove_file(&missing_packages_script_path).unwrap();
     }
 
     write(missing_packages_script_path, include_str!("get_missing_packages.py")).unwrap();
