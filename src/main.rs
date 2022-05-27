@@ -19,7 +19,7 @@ use std::{
     time::Duration,
 };
 
-use bot_management::bot_creation::{bootstrap_python_bot, bootstrap_python_hivemind, bootstrap_rust_bot, CREATED_BOTS_FOLDER};
+use bot_management::bot_creation::{bootstrap_python_bot, bootstrap_python_hivemind, bootstrap_rust_bot, bootstrap_scratch_bot, CREATED_BOTS_FOLDER};
 use glob::glob;
 
 use custom_maps::find_all_custom_maps;
@@ -881,6 +881,17 @@ async fn begin_rust_bot(bot_name: String) -> Result<HashMap<String, BotConfigBun
     }
 }
 
+#[tauri::command]
+async fn begin_scratch_bot(bot_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
+    match bootstrap_scratch_bot(bot_name, &ensure_bot_directory()).await {
+        Ok(config_file) => Ok(HashMap::from([(
+            "bot".to_string(),
+            BotConfigBundle::from_path(Path::new(&config_file), check_has_rlbot()).unwrap(),
+        )])),
+        Err(e) => Err(HashMap::from([("error".to_string(), e)])),
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct PackageResult {
     exit_code: i32,
@@ -1100,6 +1111,7 @@ fn main() {
             begin_python_bot,
             begin_python_hivemind,
             begin_rust_bot,
+            begin_scratch_bot,
             install_package,
             install_requirements,
             install_basic_packages,

@@ -1,11 +1,13 @@
 use std::collections::hash_map::DefaultHasher;
-use std::fs::{write, File};
+use std::fs::{remove_file, rename, write, File};
 use std::hash::{Hash, Hasher};
 use std::io::Read;
 use std::{io::Cursor, path::Path};
 
 use configparser::ini::Ini;
-use regex::Regex;
+use fs_extra::dir::{move_dir, CopyOptions};
+use rand::Rng;
+use regex::{Regex, Replacer};
 use sanitize_filename::sanitize;
 
 use crate::rlbot::parsing::bot_config_bundle::{BOT_CONFIG_MODULE_HEADER, BOT_CONFIG_PARAMS_HEADER, EXECUTABLE_PATH_KEY, NAME_KEY};
@@ -53,7 +55,7 @@ pub async fn bootstrap_python_bot(bot_name: String, directory: &str) -> Result<S
     Ok(config_file)
 }
 
-fn replace_all_regex_in_file(file_path: &Path, regex: &Regex, replacement: String) {
+fn replace_all_regex_in_file<R: Replacer>(file_path: &Path, regex: &Regex, replacement: R) {
     let mut file = File::open(file_path).unwrap();
     let mut contents = String::new();
     file.read_to_string(&mut contents).unwrap();
@@ -155,4 +157,67 @@ pub async fn bootstrap_rust_bot(bot_name: String, directory: &str) -> Result<Str
     }
 
     Ok(config_file)
+}
+
+pub async fn bootstrap_scratch_bot(bot_name: String, directory: &str) -> Result<String, String> {
+    let sanitized_name = sanitize(&bot_name);
+    let top_dir = Path::new(directory).join(CREATED_BOTS_FOLDER).join(&sanitized_name);
+
+    if top_dir.exists() {
+        return Err(format!("There is already a bot named {}, please choose a different name!", sanitized_name));
+    }
+
+    match reqwest::get("https://github.com/RLBot/RLBotScratchInterface/archive/gui-friendly.zip").await {
+        Ok(res) => {
+            zip_extract::extract(Cursor::new(&res.bytes().await.unwrap()), top_dir.as_path(), true).unwrap();
+        }
+        Err(e) => {
+            return Err(format!("Failed to download scratch bot: {}", e));
+        }
+    }
+
+    // Choose appropriate file names based on the bot name
+    let code_dir = top_dir.join(&sanitized_name);
+    let sb3_filename = format!("{}.sb3", &sanitized_name);
+    let sb3_file = code_dir.join(&sb3_filename);
+    let config_filename = format!("{}.cfg", &sanitized_name);
+    let config_file = code_dir.join(&config_filename);
+
+    // replace_all(top_dir / 'rlbot.cfg', r'(participant_config_\d = ).*$',
+    //             r'\1' + os.path.join(sanitized_name, config_filename).replace('\\', '\\\\'))
+    replace_all_regex_in_file(
+        &top_dir.join("rlbot.cfg"),
+        &Regex::new(r"(?P<a>participant_config_\d = ).*$").unwrap(),
+        Regex::new(&format!(r"$a{}", Path::new(&sanitized_name).join(config_filename).to_str().unwrap().replace('\\', "\\\\")))
+            .unwrap()
+            .to_string(),
+    );
+
+    // We're assuming that the file structure / names in RLBotScratchInterface will not change.
+    // Semi-safe assumption because we're looking at a gui-specific git branch which ought to be stable.
+    let copy_options = CopyOptions {
+        copy_inside: true,
+        ..Default::default()
+    };
+    if let Err(e) = move_dir(dbg!(top_dir.join("scratch_bot")), dbg!(&code_dir), &copy_options) {
+        dbg!(&e);
+        return Err(format!("Failed to move scratch bot: {}", e));
+    }
+    rename(code_dir.join("my_scratch_bot.sb3"), sb3_file).unwrap();
+
+    let old_config_file = code_dir.join("my_scratch_bot.cfg");
+    let mut config = Ini::new();
+    config.load(&old_config_file).unwrap();
+    config.set(BOT_CONFIG_MODULE_HEADER, NAME_KEY, Some(bot_name.clone()));
+    config.set(BOT_CONFIG_PARAMS_HEADER, "sb3file", Some(sb3_filename));
+    let random_port = rand::thread_rng().gen_range(20000..65000);
+    config.set(BOT_CONFIG_PARAMS_HEADER, "port", Some(random_port.to_string()));
+    config.write(&config_file).unwrap();
+
+    // delete the old config file
+    remove_file(old_config_file).unwrap();
+
+    ccprintln(format!("Your new bot is located at {}", top_dir.to_str().unwrap()));
+
+    Ok(config_file.to_str().unwrap().to_string())
 }

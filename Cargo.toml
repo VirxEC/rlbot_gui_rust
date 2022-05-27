@@ -33,6 +33,7 @@ rayon = "1.5"
 open = "2.1"
 regex = "1.5"
 rand = "0.8"
+fs_extra = "1.2"
 
 [target.'cfg(windows)'.dependencies]
 registry = "1.2"

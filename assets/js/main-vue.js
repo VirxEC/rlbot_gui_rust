@@ -644,7 +644,7 @@ export default {
 				invoke("begin_python_bot", { botName: bot_name }).then(this.botLoadHandler);
 			} else if (language === 'scratch') {
 				this.showProgressSpinner = true;
-				// eel.begin_scratch_bot(bot_name)(this.botLoadHandler);
+				invoke("begin_scratch_bot", { botName: bot_name }).then(this.botLoadHandler);
 			} else if (language === 'python_hive') {
 				this.showProgressSpinner = true;
 				invoke("begin_python_hivemind", { hiveName: bot_name }).then(this.botLoadHandler);
