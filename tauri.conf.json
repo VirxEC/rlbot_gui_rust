@@ -4,8 +4,8 @@
     "version": "0.1.0"
   },
   "build": {
-    "distDir": "./assets",
-    "devPath": "./assets",
+    "distDir": "assets",
+    "devPath": "assets",
     "withGlobalTauri": true
   },
   "tauri": {

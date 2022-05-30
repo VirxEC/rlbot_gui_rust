@@ -302,22 +302,28 @@ impl MatchSettings {
     }
 }
 
+#[cfg(windows)]
 fn auto_detect_python() -> String {
-    if cfg!(target_os = "windows") {
-        match Path::new(&env::var_os("LOCALAPPDATA").unwrap()).join("RLBotGUIX\\Python37\\python.exe") {
-            path if path.exists() => path.to_str().unwrap().to_string(),
-            _ => match Path::new(&env::var_os("LOCALAPPDATA").unwrap()).join("RLBotGUIX\\venv\\python.exe") {
-                path if path.exists() => path.to_str().unwrap().to_string(),
-                _ => "python3.7".to_string(),
-            },
-        }
-    } else if cfg!(target_os = "macos") {
-        "python3.7".to_string()
-    } else {
-        match Path::new(&env::var_os("HOME").unwrap()).join(".RLBotGUI/env/bin/python") {
+    match Path::new(&env::var_os("LOCALAPPDATA").unwrap()).join("RLBotGUIX\\Python37\\python.exe") {
+        path if path.exists() => path.to_str().unwrap().to_string(),
+        _ => match Path::new(&env::var_os("LOCALAPPDATA").unwrap()).join("RLBotGUIX\\venv\\python.exe") {
             path if path.exists() => path.to_str().unwrap().to_string(),
             _ => "python3.7".to_string(),
-        }
+        },
+    }
+}
+
+
+#[cfg(target_os = "macos")]
+fn auto_detect_python() -> String {
+    "python3.7".to_string()
+}
+
+#[cfg(target_os = "linux")]
+fn auto_detect_python() -> String {
+    match Path::new(&env::var_os("HOME").unwrap()).join(".RLBotGUI/env/bin/python") {
+        path if path.exists() => path.to_str().unwrap().to_string(),
+        _ => "python3.7".to_string(),
     }
 }
 
@@ -386,7 +392,7 @@ lazy_static! {
         }
     });
     static ref CONSOLE_TEXT: Mutex<Vec<String>> = Mutex::new(vec!["Welcome to the RLBot Console!".to_string()]);
-    static ref CAPTURE_COMMANDS: Arc<Mutex<Vec<Option<ChildStdout>>>> = Arc::new(Mutex::new(Vec::new()));
+    static ref STDOUT_CAPTURE: Arc<Mutex<Vec<Option<ChildStdout>>>> = Arc::new(Mutex::new(Vec::new()));
 }
 
 pub fn ccprintln(text: String) {
@@ -407,7 +413,7 @@ fn get_missing_packages_script_path() -> PathBuf {
     PathBuf::from(format!("{}/Library/Application Support/rlbotgui/get_missing_packages.py", env::var("HOME").unwrap()))
 }
 
-#[cfg(all(not(windows), not(target_os = "macos")))]
+#[cfg(target_os = "linux")]
 fn get_missing_packages_script_path() -> PathBuf {
     PathBuf::from(format!("{}/.RLBotGUI/get_missing_packages.py", env::var("HOME").unwrap()))
 }
@@ -665,15 +671,31 @@ async fn get_language_support() -> HashMap<String, bool> {
     lang_support.insert("chrome".to_string(), has_chrome());
 
     let python_path = PYTHON_PATH.lock().unwrap().to_string();
-    let python_check = get_command_status(&*python_path, vec!["--version"]);
-    lang_support.insert("python".to_string(), python_check);
-    lang_support.insert("fullpython".to_string(), python_check && get_command_status(&*python_path, vec!["-c", "import tkinter"]));
-    lang_support.insert(
-        "rlbotpython".to_string(),
-        python_check && get_command_status(&*python_path, vec!["-c", "import rlbot; import numpy; import numba; import scipy; import selenium"]),
-    );
+    
+    if get_command_status(&python_path, vec!["--version"]) {
+        lang_support.insert("python".to_string(), true);
+        lang_support.insert("fullpython".to_string(), get_command_status(&*python_path, vec!["-c", "import tkinter"]));
+        lang_support.insert(
+            "rlbotpython".to_string(),
+            get_command_status(&python_path, vec!["-c", "import rlbot; import numpy; import numba; import scipy; import selenium"]),
+        );
+    } else {
+        lang_support.insert("python".to_string(), false);
+        lang_support.insert("fullpython".to_string(), false);
+        lang_support.insert("rlbotpython".to_string(), false);
+    }
 
     dbg!(lang_support)
+}
+
+#[tauri::command]
+async fn get_detected_python_path() -> Option<String> {
+    let python = auto_detect_python();
+    if get_command_status(&python, vec!["--version"]) {
+        Some(python)
+    } else {
+        None
+    }
 }
 
 #[tauri::command]
@@ -908,25 +930,27 @@ fn spawn_capture_process_and_get_exit_code<S: AsRef<OsStr>>(program: S, args: &[
         command.creation_flags(0x08000000);
     };
 
-    let mut child = if let Ok(the_child) = command.args(args).stdout(Stdio::piped()).spawn() {
+    let mut child = if let Ok(the_child) = command.args(args).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn() {
         the_child
     } else {
         return 2;
     };
 
-    let capture_index = {
-        let mut capture_commands = CAPTURE_COMMANDS.lock().unwrap();
-        if let Some(index) = capture_commands.iter().position(|c| c.is_none()) {
-            capture_commands[index] = Some(child.stdout.take().unwrap());
+    // todo: capture stderr
+
+    let stdout_index = {
+        let mut stdout_capture = STDOUT_CAPTURE.lock().unwrap();
+        if let Some(index) = stdout_capture.iter().position(|c| c.is_none()) {
+            stdout_capture[index] = Some(child.stdout.take().unwrap());
             index
         } else {
-            capture_commands.push(Some(child.stdout.take().unwrap()));
-            capture_commands.len() - 1
+            stdout_capture.push(Some(child.stdout.take().unwrap()));
+            stdout_capture.len() - 1
         }
     };
 
     let exit_code = child.wait().unwrap().code().unwrap_or(1);
-    CAPTURE_COMMANDS.lock().unwrap()[capture_index] = None;
+    STDOUT_CAPTURE.lock().unwrap()[stdout_index] = None;
     exit_code
 }
 
@@ -1018,7 +1042,7 @@ fn main() {
     initialize(&MATCH_SETTINGS);
     initialize(&PYTHON_PATH);
     initialize(&CONSOLE_TEXT);
-    initialize(&CAPTURE_COMMANDS);
+    initialize(&STDOUT_CAPTURE);
 
     let missing_packages_script_path = get_missing_packages_script_path();
     println!("get_missing_packages.py: {}", missing_packages_script_path.to_str().unwrap());
@@ -1033,10 +1057,10 @@ fn main() {
         .setup(|app| {
             let main_window = app.get_window("main").unwrap();
 
-            let capture_commands = Arc::clone(&CAPTURE_COMMANDS);
+            let stdout_capture = Arc::clone(&STDOUT_CAPTURE);
             thread::spawn(move || loop {
                 {
-                    let mut outs = capture_commands.lock().unwrap();
+                    let mut outs = stdout_capture.lock().unwrap();
 
                     while !outs.is_empty() && outs.last().unwrap().is_none() {
                         outs.pop();
@@ -1116,6 +1140,7 @@ fn main() {
             install_requirements,
             install_basic_packages,
             get_console_texts,
+            get_detected_python_path,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

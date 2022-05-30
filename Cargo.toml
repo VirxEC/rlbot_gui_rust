@@ -16,7 +16,7 @@ panic = "abort"
 lto = true
 
 [build-dependencies]
-tauri-build = { version = "1.0.0-rc.11", features = [] }
+tauri-build = { version = "1.0.0-rc.12", features = [] }
 
 [dependencies]
 sanitize-filename = "0.4"
@@ -46,7 +46,7 @@ version = "0.6"
 features = ["windows_dpi_awareness", "windows_visual_styles"]
 
 [dependencies.tauri]
-version = "1.0.0-rc.13"
+version = "1.0.0-rc.14"
 features = ["devtools"]
 
 [features]

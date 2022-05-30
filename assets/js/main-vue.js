@@ -181,7 +181,7 @@ export default {
 				<span style="flex-grow: 1"></span>
 
 				<b-button @click="noPython || !hasRLBot ? pythonSetup() : startMatch()" :variant="noPython || !hasRLBot ? 'warning' : 'success'" size="lg" :disabled="matchStarting" class="start-match-btn" style="margin-top: -10px;">
-					<span v-if="noPython">No Python install detected</span>
+					<span v-if="noPython">Invalid path to Python</span>
 					<span v-else-if="!hasRLBot">Basic packages not detected</span>
 					<span v-else-if="matchStarting">Starting match</span>
 					<span v-else-if="gameAlreadyLaunched">Start another match</span>
@@ -194,6 +194,8 @@ export default {
 				<b-form>
 					<p class="mr-3">Path to Python executable or command:</p>
 					<b-form-input id="python-exe-path" v-model="python_path" size="md" width="100%"></b-form-input>
+					<b-button v-if="noPython && rec_python" variant="success" class="mt-3" @click="python_path = rec_python"><b-icon icon="exclamation-triangle-fill"/>&nbsp;Insert recommended Python path</b-button>
+					<hr>
 					<p class="mr-3">RLBot requires some basic Python packages to be installed in order to run.</p>
 					<p class="mr-3">Clicking apply will attempt to install and/or update these packages.</p>
 				</b-form>
@@ -482,37 +484,51 @@ export default {
 			noPython: false,
 			hasRLBot: false,
 			python_path: "",
+			rec_python: null,
 		}
 	},
 
 	methods: {
 		pythonSetup: function(event)  {
+			invoke("get_detected_python_path").then((path) => this.rec_python = path);
 			this.$bvModal.show("python-setup")
+		},
+		quickReloadWarnings: function() {
+			this.botPool = STARTING_BOT_POOL;
+			this.scriptPool = [];
+			invoke("scan_for_bots").then(this.botsReceived);
+			invoke("scan_for_scripts").then(this.scriptsReceived);
+			invoke("get_team_settings").then(this.teamSettingsReceived);
+			invoke("get_language_support").then((support) => {
+				this.languageSupport = support;
+				this.noPython = !this.languageSupport.python;
+				this.hasRLBot = this.languageSupport.rlbotpython;
+				this.applyLanguageWarnings(this.botPool.concat(this.scriptPool));
+			});
+			invoke("get_recommendations").then(this.recommendationsReceived);
 		},
 		applyPythonSetup: function() {
 			this.showProgressSpinner = true;
 			invoke("set_python_path", { path: this.python_path }).then(() => {
+				this.$bvModal.hide("python-setup");
 				invoke("install_basic_packages").then((result) => {
-					this.$bvModal.hide("python-setup");
-					this.onInstallationComplete(result);
+					let message = result.exit_code === 0 ? 'Successfully installed ' : 'Failed to install ';
+					message += result.packages.join(", ");
+					if (result.exit_code != 0) {
+						message += " with exit code " + result.exit_code;
+					}
+					this.snackbarContent = message;
+					this.showSnackbar = true;
+					this.showProgressSpinner = false;
+					
+					this.quickReloadWarnings();
 				});
 			});
 		},
 		partialPythonSetup: function() {
 			invoke("set_python_path", { path: this.python_path }).then(() => {
 				this.$bvModal.hide("python-setup");
-				this.botPool = STARTING_BOT_POOL;
-				this.scriptPool = [];
-				invoke("scan_for_bots").then(this.botsReceived);
-				invoke("scan_for_scripts").then(this.scriptsReceived);
-				invoke("get_team_settings").then(this.teamSettingsReceived);
-				invoke("get_language_support").then((support) => {
-					this.languageSupport = support;
-					this.noPython = !this.languageSupport.python;
-					this.hasRLBot = this.languageSupport.rlbotpython;
-					this.applyLanguageWarnings(this.botPool.concat(this.scriptPool));
-				});
-				invoke("get_recommendations").then(this.recommendationsReceived);
+				this.quickReloadWarnings();
 			});
 		},
 		startMatch: async function (event) {
@@ -809,26 +825,7 @@ export default {
 			this.showProgressSpinner = false;
 			
 			if (result.exit_code === 0) {
-				this.botPool = STARTING_BOT_POOL;
-				this.scriptPool = [];
-				invoke("scan_for_bots").then(this.botsReceived);
-				invoke("scan_for_scripts").then(this.scriptsReceived);
-				invoke("get_team_settings").then(this.teamSettingsReceived);
-				invoke("get_language_support").then((support) => {
-					this.languageSupport = support;
-					this.noPython = !this.languageSupport.python;
-					this.hasRLBot = this.languageSupport.rlbotpython;
-					this.applyLanguageWarnings(this.botPool.concat(this.scriptPool));
-				});
-				invoke("get_recommendations").then(this.recommendationsReceived);
-
-				// remove missing packages from other bots and maybe hide the yellow triangle
-				for (const runnable of this.allUsableRunnables()) if (runnable.missing_python_packages) {
-					runnable.missing_python_packages = runnable.missing_python_packages.filter(pkg => !result.packages.includes(pkg));
-					if (runnable.missing_python_packages.length == 0 && runnable.warn == "pythonpkg") {
-						runnable.warn = null;
-					}
-				}
+				this.quickReloadWarnings();
 				this.$bvModal.hide('language-warning-modal');
 			}
 		},
