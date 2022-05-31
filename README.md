@@ -19,10 +19,12 @@ This hasn't been implemented, but it's easy to do.
 - Launching of the GUI without Python
 - Managing Python from within the GUI
 - Running RLBot with a custom Python executable
-- Reloading misssing python packages upon executable change/package install
+- Fast & smart reloading misssing python packages upon executable change/package install
 - Add new bots into their proper place in the bot list instead of the end
 - Easy Python pip fixing if something breaks; top right -> menu -> "Edit/Repair Python Settings"
 - Real-time non-blocking subprocess stdout capture redirected to built-in GUI console for debugging purposes
+- Defered bundle logo loading and missing python package checking
+- Concurrent loading that utilizes all threads
 - [Self-updating of the GUI: TODO](https://tauri.studio/v1/guides/distribution/updater#update-file-json-format)
 
 ## Installation
