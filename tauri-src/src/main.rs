@@ -1159,57 +1159,54 @@ fn main() {
 
             let stdout_capture = Arc::clone(&STDOUT_CAPTURE);
             thread::spawn(move || loop {
-                {
-                    let mut outs = stdout_capture.lock().unwrap();
+                thread::sleep(Duration::from_millis(100));
+                let mut outs = stdout_capture.lock().unwrap();
 
-                    while !outs.is_empty() && outs.last().unwrap().is_none() {
-                        outs.pop();
-                    }
-
-                    if !outs.is_empty() {
-                        let out_strs: Vec<String> = outs
-                            .par_iter_mut()
-                            .flatten()
-                            .filter_map(|s| {
-                                let mut out = String::new();
-                                loop {
-                                    let mut buf = [0];
-                                    match s.read(&mut buf[..]) {
-                                        Ok(0) => break,
-                                        Ok(_) => {
-                                            let string = String::from_utf8_lossy(&buf).to_string();
-                                            // TODO: include support for carriage returns
-                                            if &string == "\n" {
-                                                break;
-                                            }
-                                            out.push_str(&string);
-                                        }
-                                        Err(_) => break,
-                                    };
-                                }
-
-                                if out.is_empty() {
-                                    None
-                                } else {
-                                    Some(out)
-                                }
-                            })
-                            .collect();
-                        drop(outs);
-
-                        if !out_strs.is_empty() {
-                            let mut console_text = CONSOLE_TEXT.lock().unwrap();
-                            console_text.extend_from_slice(&out_strs);
-                            if console_text.len() > 1200 {
-                                let diff = console_text.len() - 1200;
-                                console_text.drain(..diff);
-                            }
-                            main_window.emit("new-console-text", out_strs).unwrap();
-                        }
-                    }
+                while !outs.is_empty() && outs.last().unwrap().is_none() {
+                    outs.pop();
                 }
 
-                thread::sleep(Duration::from_millis(100));
+                if !outs.is_empty() {
+                    let out_strs: Vec<String> = outs
+                        .par_iter_mut()
+                        .flatten()
+                        .filter_map(|s| {
+                            let mut out = String::new();
+                            loop {
+                                let mut buf = [0];
+                                match s.read(&mut buf[..]) {
+                                    Ok(0) => break,
+                                    Ok(_) => {
+                                        let string = String::from_utf8_lossy(&buf).to_string();
+                                        // TODO: include support for carriage returns
+                                        if &string == "\n" {
+                                            break;
+                                        }
+                                        out.push_str(&string);
+                                    }
+                                    Err(_) => break,
+                                };
+                            }
+
+                            if out.is_empty() {
+                                None
+                            } else {
+                                Some(out)
+                            }
+                        })
+                        .collect();
+                    drop(outs);
+
+                    if !out_strs.is_empty() {
+                        let mut console_text = CONSOLE_TEXT.lock().unwrap();
+                        console_text.extend_from_slice(&out_strs);
+                        if console_text.len() > 1200 {
+                            let diff = console_text.len() - 1200;
+                            console_text.drain(..diff);
+                        }
+                        main_window.emit("new-console-text", out_strs).unwrap();
+                    }
+                }
             });
             Ok(())
         })

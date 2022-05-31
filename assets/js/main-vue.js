@@ -485,6 +485,7 @@ export default {
 			hasRLBot: false,
 			python_path: "",
 			rec_python: null,
+			init: false,
 		}
 	},
 
@@ -933,7 +934,7 @@ export default {
 			this.$bvModal.hide('recommendations-modal');
 		},
 		startup: function() {
-			if (this.$route.path != "/") {
+			if (this.$route.path != "/" || this.init) {
 				return
 			}
 			invoke('get_folder_settings').then(this.folderSettingsReceived);
@@ -976,6 +977,7 @@ export default {
 			// 	this.downloadStatus = status;
 			// 	this.downloadProgressPercent = progress;
 			// }
+			this.init = true;
 		},
 		allUsableRunnables: function() {
 			let runnables = this.botPool.concat(this.scriptPool).concat(this.blueTeam).concat(this.orangeTeam).concat(this.matchSettings.scripts);
