@@ -1178,6 +1178,7 @@ fn main() {
                                         Ok(0) => break,
                                         Ok(_) => {
                                             let string = String::from_utf8_lossy(&buf).to_string();
+                                            // TODO: include support for carriage returns
                                             if &string == "\n" {
                                                 break;
                                             }

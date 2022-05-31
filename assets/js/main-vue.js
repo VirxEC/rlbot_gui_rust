@@ -194,6 +194,8 @@ export default {
 				<b-form>
 					<p class="mr-3">Path to Python executable or command:</p>
 					<b-form-input id="python-exe-path" v-model="python_path" size="md" width="100%"></b-form-input>
+					<b-button v-if="noPython && rec_python" variant="success" class="mt-3" @click="python_path = rec_python"><b-icon icon="exclamation-triangle-fill"/>&nbsp;Insert recommended Python path</b-button>
+					<hr>
 					<p class="mr-3">RLBot requires some basic Python packages to be installed in order to run.</p>
 					<p class="mr-3">Clicking apply will attempt to install and/or update these packages.</p>
 				</b-form>
