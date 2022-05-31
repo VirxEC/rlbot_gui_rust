@@ -99,16 +99,18 @@ fn get_file_extension(vec: &[u8]) -> Option<&'static str> {
 }
 
 pub fn to_base64(path: &str) -> Option<String> {
-    let mut file = fs::File::open(path).unwrap();
-    let mut vec = Vec::new();
-    let _ = file.read_to_end(&mut vec);
+    if let Ok(file) = &mut fs::File::open(path) {
+        let mut vec = Vec::new();
+        let _ = file.read_to_end(&mut vec);
 
-    get_file_extension(&vec).map(|extension| format!("data:image/{};base64,{}", extension, base64::encode(vec).replace("\r\n", "")))
+        get_file_extension(&vec).map(|extension| format!("data:image/{};base64,{}", extension, base64::encode(vec).replace("\r\n", "")))
+    } else {
+        None
+    }
 }
 
 pub trait Clean {
     fn cleaned(&self) -> Self;
-    fn pre_fetch(&self, has_rlbot: bool) -> Self;
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -122,7 +124,7 @@ pub struct BotConfigBundle {
     pub logo_path: Option<String>,
     pub logo: Option<String>,
     pub type_: String,
-    pub skill: Option<u8>,
+    pub warn: Option<String>,
     pub image: String,
     supports_standalone: Option<bool>,
     use_virtual_environment: Option<bool>,
@@ -133,7 +135,7 @@ pub struct BotConfigBundle {
 }
 
 impl BotConfigBundle {
-    pub fn from_path(config_path: &Path, has_rlbot: bool) -> Result<Self, String> {
+    pub fn minimal_from_path(config_path: &Path) -> Result<Self, String> {
         let mut config = Ini::new();
         config.load(config_path)?;
 
@@ -176,20 +178,20 @@ impl BotConfigBundle {
         let t_logo = config.get(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY).unwrap_or_else(|| String::from("logo.png"));
         let ta_logo = format!("{}/{}", config_directory, t_logo);
 
-        let logo = if Path::new(&ta_logo).exists() { to_base64(&ta_logo) } else { None };
+        let logo = None;
 
         let info = Some(DevInfo::from_config(config));
 
         let type_ = String::from("rlbot");
-        let skill = Some(1);
+        let warn = None;
         let image = String::from("imgs/rlbot.png");
-        let missing_python_packages = Some(Vec::new());
+        let missing_python_packages = None;
 
         let path = Some(path);
         let logo_path = Some(ta_logo);
         let config_directory = Some(config_directory);
 
-        let mut b = Self {
+        Ok(Self {
             name,
             looks_path,
             path,
@@ -199,7 +201,7 @@ impl BotConfigBundle {
             logo_path,
             logo,
             type_,
-            skill,
+            warn,
             image,
             supports_standalone,
             use_virtual_environment,
@@ -207,14 +209,10 @@ impl BotConfigBundle {
             requires_tkinter,
             missing_python_packages,
             python_path,
-        };
-        if has_rlbot {
-            b.calculate_missing_packages();
-        }
-        Ok(b)
+        })
     }
 
-    pub fn mini_from_path(config_path: &Path) -> Result<(String, String), String> {
+    pub fn name_from_path(config_path: &Path) -> Result<(String, String), String> {
         let mut config = Ini::new();
         config.load(config_path).unwrap();
 
@@ -258,18 +256,8 @@ impl Clean for BotConfigBundle {
     fn cleaned(&self) -> Self {
         let mut b = self.clone();
         b.logo = None;
+        b.warn = None;
         b.missing_python_packages = None;
-        b
-    }
-
-    fn pre_fetch(&self, has_rlbot: bool) -> Self {
-        let mut b = self.clone();
-        if let Some(logo_path) = &b.logo_path {
-            b.logo = to_base64(&**logo_path);
-        }
-        if b.missing_python_packages.is_none() && has_rlbot {
-            b.calculate_missing_packages();
-        }
         b
     }
 }
@@ -317,10 +305,9 @@ impl Runnable for BotConfigBundle {
         }
     }
 
-    fn calculate_missing_packages(&mut self) {
+    fn get_missing_packages(&self) -> Vec<String> {
         if self.use_virtual_environment() {
-            self.missing_python_packages = Some(Vec::new());
-            return;
+            return Vec::new();
         }
 
         let python = PYTHON_PATH.lock().unwrap().to_string();
@@ -352,15 +339,23 @@ impl Runnable for BotConfigBundle {
                 Ok(proc) => {
                     let output = std::str::from_utf8(proc.stdout.as_slice()).unwrap();
                     if let Ok(packages) = serde_json::from_str(output) {
-                        self.missing_python_packages = Some(packages);
+                        return packages;
                     }
                 }
                 Err(e) => ccprintln(format!("Failed to calculate missing packages: {}", e)),
             }
         } else if requires_tkinter && !get_command_status(&python, vec!["-c", "import tkinter"]) {
-            self.missing_python_packages = Some(vec![String::from("tkinter")]);
+            return vec![String::from("tkinter")];
+        }
+
+        Vec::new()
+    }
+
+    fn get_logo(&self) -> Option<String> {
+        if let Some(logo_path) = &self.logo_path {
+            to_base64(logo_path)
         } else {
-            self.missing_python_packages = Some(Vec::new());
+            None
         }
     }
 }
@@ -369,6 +364,7 @@ impl Runnable for BotConfigBundle {
 pub struct ScriptConfigBundle {
     pub name: Option<String>,
     pub type_: String,
+    pub warn: Option<String>,
     pub image: String,
     pub path: String,
     pub info: DevInfo,
@@ -384,12 +380,13 @@ pub struct ScriptConfigBundle {
 }
 
 impl ScriptConfigBundle {
-    pub fn from_path(config_path: &Path, has_rlbot: bool) -> Result<Self, String> {
+    pub fn minimal_from_path(config_path: &Path) -> Result<Self, String> {
         let mut config = Ini::new();
         config.load(config_path.to_str().unwrap())?;
 
         let name = config.get(BOT_CONFIG_MODULE_HEADER, NAME_KEY);
         let type_ = String::from("script");
+        let warn = None;
         let image = String::from("imgs/rlbot.png");
         let path = config_path.to_str().unwrap().to_string();
         let config_directory = config_path.parent().unwrap().to_str().unwrap().to_string();
@@ -415,16 +412,17 @@ impl ScriptConfigBundle {
 
         let t_logo = config.get(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY).unwrap_or_else(|| String::from("logo.png"));
         let ta_logo = format!("{}/{}", config_directory, t_logo);
-        let logo = if Path::new(&ta_logo).exists() { to_base64(&ta_logo) } else { None };
+        let logo = None;
 
         let info = DevInfo::from_config(config);
 
-        let missing_python_packages = Some(Vec::new());
+        let missing_python_packages = None;
         let logo_path = Some(ta_logo);
 
-        let mut b = Self {
+        Ok(Self {
             name,
             type_,
+            warn,
             image,
             path,
             info,
@@ -437,11 +435,7 @@ impl ScriptConfigBundle {
             use_virtual_environment,
             requirements_file,
             requires_tkinter,
-        };
-        if has_rlbot {
-            b.calculate_missing_packages();
-        }
-        Ok(b)
+        })
     }
 }
 
@@ -449,18 +443,8 @@ impl Clean for ScriptConfigBundle {
     fn cleaned(&self) -> Self {
         let mut b = self.clone();
         b.logo = None;
+        b.warn = None;
         b.missing_python_packages = None;
-        b
-    }
-
-    fn pre_fetch(&self, has_rlbot: bool) -> Self {
-        let mut b = self.clone();
-        if let Some(logo_path) = &b.logo_path {
-            b.logo = to_base64(&**logo_path);
-        }
-        if b.missing_python_packages.is_none() && has_rlbot {
-            b.calculate_missing_packages();
-        }
         b
     }
 }
@@ -502,10 +486,9 @@ impl Runnable for ScriptConfigBundle {
         }
     }
 
-    fn calculate_missing_packages(&mut self) {
+    fn get_missing_packages(&self) -> Vec<String> {
         if self.use_virtual_environment() {
-            self.missing_python_packages = Some(Vec::new());
-            return;
+            return Vec::new();
         }
 
         let python = PYTHON_PATH.lock().unwrap().to_string();
@@ -535,15 +518,23 @@ impl Runnable for ScriptConfigBundle {
                 Ok(proc) => {
                     let output = std::str::from_utf8(proc.stdout.as_slice()).unwrap();
                     if let Ok(packages) = serde_json::from_str(output) {
-                        self.missing_python_packages = packages;
+                        return packages;
                     }
                 }
                 Err(e) => ccprintln(format!("Failed to calculate missing packages: {}", e)),
             }
         } else if self.requires_tkinter && !get_command_status(&python, vec!["-c", "import tkinter"]) {
-            self.missing_python_packages = Some(vec![String::from("tkinter")]);
+            return vec![String::from("tkinter")];
+        }
+
+        Vec::new()
+    }
+
+    fn get_logo(&self) -> Option<String> {
+        if let Some(logo_path) = &self.logo_path {
+            to_base64(logo_path)
         } else {
-            self.missing_python_packages = Some(Vec::new());
+            None
         }
     }
 }

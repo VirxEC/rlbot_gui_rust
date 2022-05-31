@@ -4,8 +4,8 @@
     "version": "0.1.0"
   },
   "build": {
-    "distDir": "assets",
-    "devPath": "assets",
+    "distDir": "../assets",
+    "devPath": "http://localhost:5500/",
     "withGlobalTauri": true
   },
   "tauri": {
@@ -14,8 +14,8 @@
       "targets": "all",
       "identifier": "org.rlbot.gui",
       "icon": [
-        "icons/icon.png",
-        "icons/icon.ico"
+        "../icons/icon.png",
+        "../icons/icon.ico"
       ],
       "resources": [],
       "externalBin": [],

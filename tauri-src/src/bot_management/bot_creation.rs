@@ -33,7 +33,7 @@ pub async fn bootstrap_python_bot(bot_name: String, directory: &str) -> Result<S
         }
     }
 
-    let bundles = scan_directory_for_bot_configs(top_dir.to_str().unwrap(), false);
+    let bundles = scan_directory_for_bot_configs(top_dir.to_str().unwrap());
     let bundle = bundles.iter().next().unwrap();
     let config_file = bundle.path.clone().unwrap();
     let python_file = bundle.python_path.clone().unwrap();
@@ -135,7 +135,7 @@ pub async fn bootstrap_rust_bot(bot_name: String, directory: &str) -> Result<Str
         }
     }
 
-    let bundles = scan_directory_for_bot_configs(top_dir.to_str().unwrap(), false);
+    let bundles = scan_directory_for_bot_configs(top_dir.to_str().unwrap());
     let bundle = bundles.iter().next().unwrap();
     let config_file = bundle.path.clone().unwrap();
 

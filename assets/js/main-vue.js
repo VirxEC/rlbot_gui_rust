@@ -194,8 +194,6 @@ export default {
 				<b-form>
 					<p class="mr-3">Path to Python executable or command:</p>
 					<b-form-input id="python-exe-path" v-model="python_path" size="md" width="100%"></b-form-input>
-					<b-button v-if="noPython && rec_python" variant="success" class="mt-3" @click="python_path = rec_python"><b-icon icon="exclamation-triangle-fill"/>&nbsp;Insert recommended Python path</b-button>
-					<hr>
 					<p class="mr-3">RLBot requires some basic Python packages to be installed in order to run.</p>
 					<p class="mr-3">Clicking apply will attempt to install and/or update these packages.</p>
 				</b-form>
@@ -494,18 +492,56 @@ export default {
 			this.$bvModal.show("python-setup")
 		},
 		quickReloadWarnings: function() {
-			this.botPool = STARTING_BOT_POOL;
-			this.scriptPool = [];
-			invoke("scan_for_bots").then(this.botsReceived);
-			invoke("scan_for_scripts").then(this.scriptsReceived);
-			invoke("get_team_settings").then(this.teamSettingsReceived);
-			invoke("get_language_support").then((support) => {
+			invoke("get_language_support").then(support => {
 				this.languageSupport = support;
 				this.noPython = !this.languageSupport.python;
 				this.hasRLBot = this.languageSupport.rlbotpython;
-				this.applyLanguageWarnings(this.botPool.concat(this.scriptPool));
 			});
-			invoke("get_recommendations").then(this.recommendationsReceived);
+
+			for (let i = STARTING_BOT_POOL.length; i < this.botPool.length; i++) {
+				this.botPool[i].missing_python_packages = null;
+			}
+
+			invoke("get_missing_bot_packages", { bots: this.botPool.slice(STARTING_BOT_POOL.length) }).then(bots => {
+				bots.forEach(packageInfo => {
+					let index = packageInfo.index + STARTING_BOT_POOL.length;
+					this.botPool[index].warn = packageInfo.warn;
+					this.botPool[index].missing_python_packages = packageInfo.missing_packages;
+				});
+			});
+
+			for (let i = 0; i < this.blueTeam.length; i++) {
+				this.blueTeam[i].missing_python_packages = null;
+			}
+
+			invoke("get_missing_bot_packages", { bots: this.blueTeam }).then(bots => {
+				bots.forEach(packageInfo => {
+					this.blueTeam[packageInfo.index].warn = packageInfo.warn;
+					this.blueTeam[packageInfo.index].missing_python_packages = packageInfo.missing_packages;
+				});
+			});
+
+			for (let i = 0; i < this.orangeTeam.length; i++) {
+				this.orangeTeam[i].missing_python_packages = null;
+			}
+
+			invoke("get_missing_bot_packages", { bots: this.orangeTeam }).then(bots => {
+				bots.forEach(packageInfo => {
+					this.orangeTeam[packageInfo.index].warn = packageInfo.warn;
+					this.orangeTeam[packageInfo.index].missing_python_packages = packageInfo.missing_packages;
+				});
+			});
+
+			for (let i = 0; i < this.scriptPool.length; i++) {
+				this.scriptPool[i].missing_python_packages = null;
+			}
+
+			invoke("get_missing_script_packages", { scripts: this.scriptPool }).then(scripts => {
+				scripts.forEach(packageInfo => {
+					this.scriptPool[packageInfo.index].warn = packageInfo.warn;
+					this.scriptPool[packageInfo.index].missing_python_packages = packageInfo.missing_packages;
+				});
+			});
 		},
 		applyPythonSetup: function() {
 			this.showProgressSpinner = true;
@@ -694,15 +730,29 @@ export default {
 		botsReceived: function (bots) {
 			const freshBots = bots.filter( (bot) =>
 					!this.botPool.find( (element) => element.path === bot.path ));
-			freshBots.forEach((bot) => bot.warn = false);
+			freshBots.forEach((bot) => bot.warn = null);
 
 			this.applyLanguageWarnings(freshBots);
-			const firstFour = this.botPool.slice(0, 4);
-			this.botPool = this.botPool.slice(4, this.botPool.length).concat(freshBots);
-			this.botPool = this.botPool.sort((a, b) => a.name.localeCompare(b.name));
-			this.botPool = firstFour.concat(this.botPool);
+			let botPool = this.botPool.slice(STARTING_BOT_POOL.length).concat(freshBots);
+			botPool = botPool.sort((a, b) => a.name.localeCompare(b.name));
+			this.botPool = STARTING_BOT_POOL.concat(botPool);
 			this.distinguishDuplicateBots(this.botPool);
 			this.showProgressSpinner = false;
+
+			invoke("get_missing_bot_packages", { bots: this.botPool.slice(STARTING_BOT_POOL.length) }).then(botPackageInfos => {
+				botPackageInfos.forEach(botPackageInfo => {
+					let index = botPackageInfo.index + STARTING_BOT_POOL.length;
+					this.botPool[index].warn = botPackageInfo.warn;
+					this.botPool[index].missing_python_packages = botPackageInfo.missing_packages;
+				});
+			});
+
+			invoke("get_missing_bot_logos", { bots: this.botPool.slice(STARTING_BOT_POOL.length) }).then(botLogos => {
+				botLogos.forEach(botLogo => {
+					let index = botLogo.index + STARTING_BOT_POOL.length;
+					this.botPool[index].logo = botLogo.logo;
+				});
+			});
 		},
 
 		scriptsReceived: function (scripts) {
@@ -714,8 +764,20 @@ export default {
 			this.scriptPool = this.scriptPool.concat(freshScripts).sort((a, b) => a.name.localeCompare(b.name));
 			this.distinguishDuplicateBots(this.scriptPool);
 			this.showProgressSpinner = false;
-		},
 
+			invoke("get_missing_script_packages", { scripts: this.scriptPool }).then(scriptPackageInfos => {
+				scriptPackageInfos.forEach(scriptPackageInfo => {
+					this.scriptPool[scriptPackageInfo.index].warn = scriptPackageInfo.warn;
+					this.scriptPool[scriptPackageInfo.index].missing_python_packages = scriptPackageInfo.missing_packages;
+				});
+			});
+
+			invoke("get_missing_script_logos", { scripts: this.scriptPool }).then(scriptLogos => {
+				scriptLogos.forEach(scriptLogo => {
+					this.scriptPool[scriptLogo.index].logo = scriptLogo.logo;
+				});
+			});
+		},
 		applyLanguageWarnings: function (bots) {
 			if (this.languageSupport) {
 				bots.forEach((bot) => {
@@ -730,9 +792,6 @@ export default {
 						if (!this.languageSupport.node && language.match(/(java|type|coffee)script|js|ts|node/)) {
 							bot.warn = 'node';
 						}
-					}
-					if (bot.missing_python_packages && bot.missing_python_packages.length > 0) {
-						bot.warn = 'pythonpkg';
 					}
 				});
 			}
@@ -780,6 +839,33 @@ export default {
 				this.blueTeam = teamSettings.blue_team;
 				this.orangeTeam = teamSettings.orange_team;
 			}
+
+			invoke("get_missing_bot_packages", { bots: this.blueTeam }).then(botPackageInfos => {
+				botPackageInfos.forEach(botPackageInfo => {
+					this.blueTeam[botPackageInfo.index].warn = botPackageInfo.warn;
+					this.blueTeam[botPackageInfo.index].missing_python_packages = botPackageInfo.missing_packages;
+				});
+			});
+
+			invoke("get_missing_bot_packages", { bots: this.orangeTeam }).then(botPackageInfos => {
+				botPackageInfos.forEach(botPackageInfo => {
+					this.orangeTeam[botPackageInfo.index].warn = botPackageInfo.warn;
+					this.orangeTeam[botPackageInfo.index].missing_python_packages = botPackageInfo.missing_packages;
+				});
+			});
+
+			invoke("get_missing_bot_logos", { bots: this.blueTeam }).then(botLogos => {
+				botLogos.forEach(botLogo => {
+					this.blueTeam[botLogo.index].logo = botLogo.logo;
+				});
+			});
+
+			invoke("get_missing_bot_logos", { bots: this.orangeTeam }).then(botLogos => {
+				botLogos.forEach(botLogo => {
+					this.orangeTeam[botLogo.index].logo = botLogo.logo;
+				});
+			});
+			
 			this.distinguishDuplicateBots(this.blueTeam.concat(this.orangeTeam));
 			this.applyLanguageWarnings(this.blueTeam.concat(this.orangeTeam));
 		},
@@ -825,6 +911,7 @@ export default {
 			this.showProgressSpinner = false;
 			
 			if (result.exit_code === 0) {
+				console.log("hello world");
 				this.quickReloadWarnings();
 				this.$bvModal.hide('language-warning-modal');
 			}

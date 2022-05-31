@@ -24,7 +24,7 @@ use glob::glob;
 
 use custom_maps::find_all_custom_maps;
 use lazy_static::{initialize, lazy_static};
-use rayon::iter::{IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelExtend, ParallelIterator};
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelExtend, ParallelIterator};
 use rlbot::parsing::{
     agent_config_parser::BotLooksConfig,
     bot_config_bundle::{BotConfigBundle, Clean, ScriptConfigBundle},
@@ -293,13 +293,6 @@ impl MatchSettings {
         new.scripts = clean(new.scripts);
         new
     }
-
-    fn with_logos(&self) -> Self {
-        let has_rlbot = check_has_rlbot();
-        let mut new = self.clone();
-        new.scripts = pre_fetch(new.scripts, has_rlbot);
-        new
-    }
 }
 
 #[cfg(windows)]
@@ -312,7 +305,6 @@ fn auto_detect_python() -> String {
         },
     }
 }
-
 
 #[cfg(target_os = "macos")]
 fn auto_detect_python() -> String {
@@ -432,8 +424,8 @@ fn filter_hidden_bundles<T: Runnable + Clone>(bundles: HashSet<T>) -> Vec<T> {
     bundles.iter().filter(|b| !b.get_config_file_name().starts_with('_')).cloned().collect()
 }
 
-fn get_bots_from_directory(path: &str, has_rlbot: bool) -> Vec<BotConfigBundle> {
-    filter_hidden_bundles(scan_directory_for_bot_configs(path, has_rlbot))
+fn get_bots_from_directory(path: &str) -> Vec<BotConfigBundle> {
+    filter_hidden_bundles(scan_directory_for_bot_configs(path))
 }
 
 #[tauri::command]
@@ -441,17 +433,15 @@ async fn scan_for_bots() -> Vec<BotConfigBundle> {
     let bfs = BOT_FOLDER_SETTINGS.lock().unwrap();
     let mut bots = Vec::new();
 
-    let has_rlbot = check_has_rlbot();
-
     for (path, props) in bfs.folders.iter() {
         if props.visible {
-            bots.extend(get_bots_from_directory(&*path, has_rlbot));
+            bots.extend(get_bots_from_directory(&*path));
         }
     }
 
     for (path, props) in bfs.files.iter() {
         if props.visible {
-            if let Ok(bundle) = BotConfigBundle::from_path(Path::new(path), has_rlbot) {
+            if let Ok(bundle) = BotConfigBundle::minimal_from_path(Path::new(path)) {
                 bots.push(bundle);
             }
         }
@@ -460,8 +450,8 @@ async fn scan_for_bots() -> Vec<BotConfigBundle> {
     bots
 }
 
-fn get_scripts_from_directory(path: &str, has_rlbot: bool) -> Vec<ScriptConfigBundle> {
-    filter_hidden_bundles(scan_directory_for_script_configs(path, has_rlbot))
+fn get_scripts_from_directory(path: &str) -> Vec<ScriptConfigBundle> {
+    filter_hidden_bundles(scan_directory_for_script_configs(path))
 }
 
 #[tauri::command]
@@ -469,17 +459,15 @@ async fn scan_for_scripts() -> Vec<ScriptConfigBundle> {
     let bfs = BOT_FOLDER_SETTINGS.lock().unwrap();
     let mut scripts = Vec::with_capacity(bfs.folders.len() + bfs.files.len());
 
-    let has_rlbot = check_has_rlbot();
-
     for (path, props) in bfs.folders.iter() {
         if props.visible {
-            scripts.extend(get_scripts_from_directory(&*path, has_rlbot));
+            scripts.extend(get_scripts_from_directory(&*path));
         }
     }
 
     for (path, props) in bfs.files.iter() {
         if props.visible {
-            if let Ok(bundle) = ScriptConfigBundle::from_path(Path::new(path), has_rlbot) {
+            if let Ok(bundle) = ScriptConfigBundle::minimal_from_path(Path::new(path)) {
                 scripts.push(bundle);
             }
         }
@@ -568,16 +556,12 @@ async fn get_match_options() -> MatchOptions {
 
 #[tauri::command]
 async fn get_match_settings() -> MatchSettings {
-    MATCH_SETTINGS.lock().unwrap().clone().with_logos()
+    MATCH_SETTINGS.lock().unwrap().clone()
 }
 
 #[tauri::command]
 async fn save_match_settings(settings: MatchSettings) {
     MATCH_SETTINGS.lock().unwrap().update_config(settings.cleaned_scripts());
-}
-
-fn pre_fetch<T: Clean>(items: Vec<T>, has_rlbot: bool) -> Vec<T> {
-    items.iter().map(|b| b.pre_fetch(has_rlbot)).collect()
 }
 
 #[tauri::command]
@@ -592,11 +576,9 @@ async fn get_team_settings() -> HashMap<String, Vec<BotConfigBundle>> {
     .unwrap_or_default();
     let orange_team = serde_json::from_str(&config.get("team_settings", "orange_team").unwrap_or_else(|| "[]".to_string())).unwrap_or_default();
 
-    let has_rlbot = check_has_rlbot();
-
     let mut bots = HashMap::new();
-    bots.insert("blue_team".to_string(), pre_fetch(blue_team, has_rlbot));
-    bots.insert("orange_team".to_string(), pre_fetch(orange_team, has_rlbot));
+    bots.insert("blue_team".to_string(), blue_team);
+    bots.insert("orange_team".to_string(), orange_team);
 
     bots
 }
@@ -671,7 +653,7 @@ async fn get_language_support() -> HashMap<String, bool> {
     lang_support.insert("chrome".to_string(), has_chrome());
 
     let python_path = PYTHON_PATH.lock().unwrap().to_string();
-    
+
     if get_command_status(&python_path, vec!["--version"]) {
         lang_support.insert("python".to_string(), true);
         lang_support.insert("fullpython".to_string(), get_command_status(&*python_path, vec!["-c", "import tkinter"]));
@@ -797,7 +779,7 @@ async fn get_recommendations() -> Option<HashMap<String, Vec<HashMap<String, Vec
                             let pattern = Path::new(path).join("**/*.cfg");
                             let paths = glob(pattern.to_str().unwrap()).unwrap().flatten().collect::<Vec<_>>();
 
-                            Some(paths.par_iter().filter_map(|path| BotConfigBundle::mini_from_path(path.as_path()).ok()).collect::<Vec<_>>())
+                            Some(paths.par_iter().filter_map(|path| BotConfigBundle::name_from_path(path.as_path()).ok()).collect::<Vec<_>>())
                         } else {
                             None
                         }
@@ -808,13 +790,12 @@ async fn get_recommendations() -> Option<HashMap<String, Vec<HashMap<String, Vec
             bots.par_extend(
                 bfs.files
                     .par_iter()
-                    .filter_map(|(path, props)| if props.visible { BotConfigBundle::mini_from_path(Path::new(path)).ok() } else { None }),
+                    .filter_map(|(path, props)| if props.visible { BotConfigBundle::name_from_path(Path::new(path)).ok() } else { None }),
             );
 
             bots
         };
 
-        // check if rlbot is installed in python
         let has_rlbot = check_has_rlbot();
 
         // Load all of the bot config bundles
@@ -831,7 +812,19 @@ async fn get_recommendations() -> Option<HashMap<String, Vec<HashMap<String, Vec
                         .filter_map(|bot_name| {
                             for (name, path) in &name_path_pairs {
                                 if name == bot_name {
-                                    return BotConfigBundle::from_path(Path::new(path), has_rlbot).ok();
+                                    let mut b = BotConfigBundle::minimal_from_path(Path::new(path)).ok();
+                                    if let Some(ib) = b.as_mut() {
+                                        ib.logo = ib.get_logo();
+
+                                        if has_rlbot {
+                                            let missing_packages = ib.get_missing_packages();
+                                            if !missing_packages.is_empty() {
+                                                ib.warn = Some("pythonpkg".to_string());
+                                            }
+                                            ib.missing_python_packages = Some(missing_packages);
+                                        }
+                                    }
+                                    return b;
                                 }
                             }
 
@@ -873,10 +866,7 @@ fn ensure_bot_directory() -> String {
 #[tauri::command]
 async fn begin_python_bot(bot_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
     match bootstrap_python_bot(bot_name, &ensure_bot_directory()).await {
-        Ok(config_file) => Ok(HashMap::from([(
-            "bot".to_string(),
-            BotConfigBundle::from_path(Path::new(&config_file), check_has_rlbot()).unwrap(),
-        )])),
+        Ok(config_file) => Ok(HashMap::from([("bot".to_string(), BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap())])),
         Err(e) => Err(HashMap::from([("error".to_string(), e)])),
     }
 }
@@ -884,10 +874,7 @@ async fn begin_python_bot(bot_name: String) -> Result<HashMap<String, BotConfigB
 #[tauri::command]
 async fn begin_python_hivemind(hive_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
     match bootstrap_python_hivemind(hive_name, &ensure_bot_directory()).await {
-        Ok(config_file) => Ok(HashMap::from([(
-            "bot".to_string(),
-            BotConfigBundle::from_path(Path::new(&config_file), check_has_rlbot()).unwrap(),
-        )])),
+        Ok(config_file) => Ok(HashMap::from([("bot".to_string(), BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap())])),
         Err(e) => Err(HashMap::from([("error".to_string(), e)])),
     }
 }
@@ -895,10 +882,7 @@ async fn begin_python_hivemind(hive_name: String) -> Result<HashMap<String, BotC
 #[tauri::command]
 async fn begin_rust_bot(bot_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
     match bootstrap_rust_bot(bot_name, &ensure_bot_directory()).await {
-        Ok(config_file) => Ok(HashMap::from([(
-            "bot".to_string(),
-            BotConfigBundle::from_path(Path::new(&config_file), check_has_rlbot()).unwrap(),
-        )])),
+        Ok(config_file) => Ok(HashMap::from([("bot".to_string(), BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap())])),
         Err(e) => Err(HashMap::from([("error".to_string(), e)])),
     }
 }
@@ -906,10 +890,7 @@ async fn begin_rust_bot(bot_name: String) -> Result<HashMap<String, BotConfigBun
 #[tauri::command]
 async fn begin_scratch_bot(bot_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
     match bootstrap_scratch_bot(bot_name, &ensure_bot_directory()).await {
-        Ok(config_file) => Ok(HashMap::from([(
-            "bot".to_string(),
-            BotConfigBundle::from_path(Path::new(&config_file), check_has_rlbot()).unwrap(),
-        )])),
+        Ok(config_file) => Ok(HashMap::from([("bot".to_string(), BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap())])),
         Err(e) => Err(HashMap::from([("error".to_string(), e)])),
     }
 }
@@ -969,20 +950,16 @@ async fn install_package(package_string: String) -> PackageResult {
 
 #[tauri::command]
 async fn install_requirements(config_path: String) -> PackageResult {
-    let bundle = BotConfigBundle::from_path(Path::new(&config_path), false).unwrap();
+    let bundle = BotConfigBundle::minimal_from_path(Path::new(&config_path)).unwrap();
 
     if let Some(file) = bundle.get_requirements_file() {
+        let packages = bundle.get_missing_packages();
         let python = PYTHON_PATH.lock().unwrap().to_string();
-
-        let mut exit_code = spawn_capture_process_and_get_exit_code(&python, &["-m", "pip", "install", "-U", "--no-warn-script-location", "-r", file]);
-
-        if exit_code == 0 {
-            exit_code = spawn_capture_process_and_get_exit_code(python, &["-m", "pip", "install", "-U", "--no-warn-script-location", "-r", file]);
-        }
+        let exit_code = spawn_capture_process_and_get_exit_code(&python, &["-m", "pip", "install", "-U", "--no-warn-script-location", "-r", file]);
 
         PackageResult {
             exit_code,
-            packages: vec![file.to_owned()], // to do - list the actual packages installed,
+            packages,
         }
     } else {
         PackageResult {
@@ -1034,6 +1011,129 @@ async fn install_basic_packages() -> PackageResult {
 #[tauri::command]
 async fn get_console_texts() -> Vec<String> {
     CONSOLE_TEXT.lock().unwrap().clone()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct MissingPackagesUpdate {
+    pub index: usize,
+    pub warn: Option<String>,
+    pub missing_packages: Option<Vec<String>>,
+}
+
+#[tauri::command]
+async fn get_missing_bot_packages(bots: Vec<BotConfigBundle>) -> Vec<MissingPackagesUpdate> {
+    if check_has_rlbot() {
+        bots.par_iter()
+            .enumerate()
+            .filter_map(|(index, bot)| {
+                if bot.type_ == *"rlbot" {
+                    let mut warn = bot.warn.clone();
+                    let mut missing_packages = bot.missing_python_packages.clone();
+
+                    if let Some(missing_packages) = &missing_packages {
+                        if warn == Some("pythonpkg".to_string()) && missing_packages.is_empty() {
+                            warn = None;
+                        }
+                    } else {
+                        let bot_missing_packages = bot.get_missing_packages();
+
+                        if !bot_missing_packages.is_empty() {
+                            warn = Some("pythonpkg".to_string());
+                        } else {
+                            warn = None;
+                        }
+
+                        missing_packages = Some(bot_missing_packages);
+                    }
+
+                    if warn != bot.warn || missing_packages != bot.missing_python_packages {
+                        return Some(MissingPackagesUpdate { index, warn, missing_packages });
+                    }
+                }
+
+                None
+            })
+            .collect()
+    } else {
+        Vec::new()
+    }
+}
+
+#[tauri::command]
+async fn get_missing_script_packages(scripts: Vec<ScriptConfigBundle>) -> Vec<MissingPackagesUpdate> {
+    if check_has_rlbot() {
+        scripts
+            .par_iter()
+            .enumerate()
+            .filter_map(|(index, script)| {
+                let mut warn = script.warn.clone();
+                let mut missing_packages = script.missing_python_packages.clone();
+
+                if let Some(missing_packages) = &missing_packages {
+                    if warn == Some("pythonpkg".to_string()) && missing_packages.is_empty() {
+                        warn = None;
+                    }
+                } else {
+                    let script_missing_packages = script.get_missing_packages();
+
+                    if !script_missing_packages.is_empty() {
+                        warn = Some("pythonpkg".to_string());
+                    } else {
+                        warn = None;
+                    }
+
+                    missing_packages = Some(script_missing_packages);
+                }
+
+                if warn != script.warn || missing_packages != script.missing_python_packages {
+                    Some(MissingPackagesUpdate { index, warn, missing_packages })
+                } else {
+                    None
+                }
+            })
+            .collect()
+    } else {
+        Vec::new()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct LogoUpdate {
+    pub index: usize,
+    pub logo: String,
+}
+
+#[tauri::command]
+async fn get_missing_bot_logos(bots: Vec<BotConfigBundle>) -> Vec<LogoUpdate> {
+    bots.par_iter()
+        .enumerate()
+        .filter_map(|(index, bot)| {
+            if bot.type_ == *"rlbot" && bot.logo.is_none() {
+                if let Some(logo) = bot.get_logo() {
+                    return Some(LogoUpdate { index, logo });
+                }
+            }
+
+            None
+        })
+        .collect()
+}
+
+#[tauri::command]
+async fn get_missing_script_logos(scripts: Vec<ScriptConfigBundle>) -> Vec<LogoUpdate> {
+    scripts
+        .par_iter()
+        .enumerate()
+        .filter_map(|(index, script)| {
+            if script.logo.is_none() {
+                if let Some(logo) = script.get_logo() {
+                    return Some(LogoUpdate { index, logo });
+                }
+            }
+
+            None
+        })
+        .collect()
 }
 
 fn main() {
@@ -1141,6 +1241,10 @@ fn main() {
             install_basic_packages,
             get_console_texts,
             get_detected_python_path,
+            get_missing_bot_packages,
+            get_missing_script_packages,
+            get_missing_bot_logos,
+            get_missing_script_logos,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
