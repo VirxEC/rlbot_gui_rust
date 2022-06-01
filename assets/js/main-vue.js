@@ -508,7 +508,7 @@ export default {
 			this.$bvModal.hide("python-setup");
 		},
 		pythonSetup: function(event)  {
-			invoke("get_detected_python_path").then(path => this.rec_python = null);
+			invoke("get_detected_python_path").then(path => this.rec_python = path);
 			this.$bvModal.show("python-setup");
 		},
 		quickReloadWarnings: function() {
