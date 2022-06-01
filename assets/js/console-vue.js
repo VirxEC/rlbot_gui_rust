@@ -18,8 +18,8 @@ export default {
 	</b-navbar>
 	<b-container fluid>
 		<b-card no-body class="bot-pool p-1">
-			<span v-for="text in consoleTexts.slice().reverse()">
-				{{ text }}<br>
+			<span :class="text.err ? 'text-danger' : ''" v-for="text in consoleTexts.slice().reverse()">
+				{{ text.text }}<br>
 			</span>
 		</b-card>
 	</b-container>
@@ -30,8 +30,15 @@ export default {
 		return {
 			consoleTexts: [],
 			newTextListener: listen('new-console-text', event => {
-				console.log(event.payload);
-				this.consoleTexts.push(...event.payload);
+				event.payload.forEach(update => {
+					if (update.replace_last) {
+						this.consoleTexts.pop();
+					}
+					
+					console.log(update.content.text);
+					this.consoleTexts.push(update.content);
+				});
+
 				if (this.consoleTexts.length > 1200) {
 					this.consoleTexts = this.consoleTexts.slice(0, this.consoleTexts.length - 1200);
 				}

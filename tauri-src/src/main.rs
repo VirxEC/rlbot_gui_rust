@@ -12,11 +12,11 @@ use std::{
     fs::{create_dir_all, read_to_string, write},
     io::Read,
     path::{Path, PathBuf},
-    process::{ChildStdout, Command, Stdio},
+    process::{ChildStderr, ChildStdout, Command, Stdio},
     str::FromStr,
     sync::Arc,
     thread,
-    time::Duration,
+    time::Duration, ops::Not,
 };
 
 use bot_management::bot_creation::{bootstrap_python_bot, bootstrap_python_hivemind, bootstrap_rust_bot, bootstrap_scratch_bot, CREATED_BOTS_FOLDER};
@@ -372,6 +372,18 @@ lazy_static! {
     };
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+struct ConsoleText {
+    pub text: String,
+    pub err: bool,
+}
+
+impl ConsoleText {
+    pub const fn from(text: String, err: bool) -> ConsoleText {
+        ConsoleText { text, err }
+    }
+}
+
 lazy_static! {
     static ref BOT_FOLDER_SETTINGS: Mutex<BotFolderSettings> = Mutex::new(BotFolderSettings::from_path(&*CONFIG_PATH.lock().unwrap()));
     static ref MATCH_SETTINGS: Mutex<MatchSettings> = Mutex::new(MatchSettings::from_path(&*CONFIG_PATH.lock().unwrap()));
@@ -383,12 +395,13 @@ lazy_static! {
             None => auto_detect_python(),
         }
     });
-    static ref CONSOLE_TEXT: Mutex<Vec<String>> = Mutex::new(vec!["Welcome to the RLBot Console!".to_string()]);
+    static ref CONSOLE_TEXT: Mutex<Vec<ConsoleText>> = Mutex::new(vec![ConsoleText::from("Welcome to the RLBot Console!".to_string(), false)]);
     static ref STDOUT_CAPTURE: Arc<Mutex<Vec<Option<ChildStdout>>>> = Arc::new(Mutex::new(Vec::new()));
+    static ref STDERR_CAPTURE: Arc<Mutex<Vec<Option<ChildStderr>>>> = Arc::new(Mutex::new(Vec::new()));
 }
 
 pub fn ccprintln(text: String) {
-    CONSOLE_TEXT.lock().unwrap().push(text);
+    CONSOLE_TEXT.lock().unwrap().push(ConsoleText::from(text, false));
 }
 
 fn check_has_rlbot() -> bool {
@@ -917,8 +930,6 @@ fn spawn_capture_process_and_get_exit_code<S: AsRef<OsStr>>(program: S, args: &[
         return 2;
     };
 
-    // todo: capture stderr
-
     let stdout_index = {
         let mut stdout_capture = STDOUT_CAPTURE.lock().unwrap();
         if let Some(index) = stdout_capture.iter().position(|c| c.is_none()) {
@@ -930,8 +941,20 @@ fn spawn_capture_process_and_get_exit_code<S: AsRef<OsStr>>(program: S, args: &[
         }
     };
 
+    let stderr_index = {
+        let mut stderr_capture = STDERR_CAPTURE.lock().unwrap();
+        if let Some(index) = stderr_capture.iter().position(|c| c.is_none()) {
+            stderr_capture[index] = Some(child.stderr.take().unwrap());
+            index
+        } else {
+            stderr_capture.push(Some(child.stderr.take().unwrap()));
+            stderr_capture.len() - 1
+        }
+    };
+
     let exit_code = child.wait().unwrap().code().unwrap_or(1);
     STDOUT_CAPTURE.lock().unwrap()[stdout_index] = None;
+    STDERR_CAPTURE.lock().unwrap()[stderr_index] = None;
     exit_code
 }
 
@@ -957,10 +980,7 @@ async fn install_requirements(config_path: String) -> PackageResult {
         let python = PYTHON_PATH.lock().unwrap().to_string();
         let exit_code = spawn_capture_process_and_get_exit_code(&python, &["-m", "pip", "install", "-U", "--no-warn-script-location", "-r", file]);
 
-        PackageResult {
-            exit_code,
-            packages,
-        }
+        PackageResult { exit_code, packages }
     } else {
         PackageResult {
             exit_code: 1,
@@ -1009,7 +1029,7 @@ async fn install_basic_packages() -> PackageResult {
 }
 
 #[tauri::command]
-async fn get_console_texts() -> Vec<String> {
+async fn get_console_texts() -> Vec<ConsoleText> {
     CONSOLE_TEXT.lock().unwrap().clone()
 }
 
@@ -1136,6 +1156,21 @@ async fn get_missing_script_logos(scripts: Vec<ScriptConfigBundle>) -> Vec<LogoU
         .collect()
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ConsoleTextUpdate {
+    pub content: ConsoleText,
+    pub replace_last: bool,
+}
+
+impl ConsoleTextUpdate {
+    fn from(text: String, err: bool, replace_last: bool) -> Self {
+        ConsoleTextUpdate {
+            content: ConsoleText::from(text, err),
+            replace_last,
+        }
+    }
+}
+
 fn main() {
     initialize(&CONFIG_PATH);
     initialize(&BOT_FOLDER_SETTINGS);
@@ -1143,6 +1178,7 @@ fn main() {
     initialize(&PYTHON_PATH);
     initialize(&CONSOLE_TEXT);
     initialize(&STDOUT_CAPTURE);
+    initialize(&STDERR_CAPTURE);
 
     let missing_packages_script_path = get_missing_packages_script_path();
     println!("get_missing_packages.py: {}", missing_packages_script_path.to_str().unwrap());
@@ -1155,11 +1191,10 @@ fn main() {
 
     tauri::Builder::default()
         .setup(|app| {
-            let main_window = app.get_window("main").unwrap();
-
+            let main_window_out = app.get_window("main").unwrap();
             let stdout_capture = Arc::clone(&STDOUT_CAPTURE);
             thread::spawn(move || loop {
-                thread::sleep(Duration::from_millis(100));
+                thread::sleep(Duration::from_micros(10));
                 let mut outs = stdout_capture.lock().unwrap();
 
                 while !outs.is_empty() && outs.last().unwrap().is_none() {
@@ -1167,47 +1202,108 @@ fn main() {
                 }
 
                 if !outs.is_empty() {
-                    let out_strs: Vec<String> = outs
+                    let out_strs: Vec<ConsoleTextUpdate> = outs
                         .par_iter_mut()
                         .flatten()
                         .filter_map(|s| {
                             let mut out = String::new();
+                            let mut replace_last = false;
+
                             loop {
                                 let mut buf = [0];
                                 match s.read(&mut buf[..]) {
-                                    Ok(0) => break,
+                                    Ok(0) | Err(_) => break,
                                     Ok(_) => {
                                         let string = String::from_utf8_lossy(&buf).to_string();
-                                        // TODO: include support for carriage returns
                                         if &string == "\n" {
+                                            break;
+                                        } else if &string == "\r" {
+                                            replace_last = true;
                                             break;
                                         }
                                         out.push_str(&string);
                                     }
-                                    Err(_) => break,
                                 };
                             }
 
-                            if out.is_empty() {
-                                None
-                            } else {
-                                Some(out)
-                            }
+                            out.is_empty().not().then(|| ConsoleTextUpdate::from(out, false, replace_last))
                         })
                         .collect();
                     drop(outs);
 
                     if !out_strs.is_empty() {
                         let mut console_text = CONSOLE_TEXT.lock().unwrap();
-                        console_text.extend_from_slice(&out_strs);
+                        for out_str in &out_strs {
+                            if out_str.replace_last {
+                                console_text.pop();
+                            }
+                            console_text.push(out_str.content.clone());
+                        }
+
                         if console_text.len() > 1200 {
                             let diff = console_text.len() - 1200;
                             console_text.drain(..diff);
                         }
-                        main_window.emit("new-console-text", out_strs).unwrap();
+
+                        main_window_out.emit("new-console-text", out_strs).unwrap();
                     }
                 }
             });
+
+            let main_window_err = app.get_window("main").unwrap();
+            let stderr_capture = Arc::clone(&STDERR_CAPTURE);
+            thread::spawn(move || loop {
+                thread::sleep(Duration::from_micros(10));
+                let mut errs = stderr_capture.lock().unwrap();
+
+                while !errs.is_empty() && errs.last().unwrap().is_none() {
+                    errs.pop();
+                }
+
+                if !errs.is_empty() {
+                    let err_strs: Vec<ConsoleTextUpdate> = errs
+                        .par_iter_mut()
+                        .flatten()
+                        .filter_map(|s| {
+                            let mut err = String::new();
+                            let mut replace_last = false;
+
+                            loop {
+                                let mut buf = [0];
+                                match s.read(&mut buf[..]) {
+                                    Ok(0) | Err(_) => break,
+                                    Ok(_) => {
+                                        let string = String::from_utf8_lossy(&buf).to_string();
+                                        if &string == "\n" {
+                                            break;
+                                        } else if &string == "\r" {
+                                            replace_last = true;
+                                            break;
+                                        }
+                                        err.push_str(&string);
+                                    }
+                                };
+                            }
+
+                            err.is_empty().not().then(|| ConsoleTextUpdate::from(err, true, replace_last))
+                        })
+                        .collect();
+                    drop(errs);
+
+                    if !err_strs.is_empty() {
+                        let mut console_text = CONSOLE_TEXT.lock().unwrap();
+                        for err_str in &err_strs {
+                            console_text.push(err_str.content.clone());
+                        }
+                        if console_text.len() > 1200 {
+                            let diff = console_text.len() - 1200;
+                            console_text.drain(..diff);
+                        }
+                        main_window_err.emit("new-console-text", err_strs).unwrap();
+                    }
+                }
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
