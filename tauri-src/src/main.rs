@@ -9,8 +9,8 @@ use std::{
     collections::{HashMap, HashSet},
     env,
     ffi::OsStr,
-    fs::{create_dir_all, read_to_string, write},
-    io::Read,
+    fs::{create_dir_all, read_to_string, write, File},
+    io::{copy, Cursor, Read},
     ops::Not,
     path::{Path, PathBuf},
     process::{ChildStderr, ChildStdout, Command, Stdio},
@@ -298,11 +298,13 @@ impl MatchSettings {
 
 #[cfg(windows)]
 fn auto_detect_python() -> String {
-    match Path::new(&env::var_os("LOCALAPPDATA").unwrap()).join("RLBotGUIX\\Python37\\python.exe") {
+    let content_folder = get_content_folder();
+
+    match content_folder.join("Python37\\python.exe") {
         path if path.exists() => path.to_str().unwrap().to_string(),
-        _ => match Path::new(&env::var_os("LOCALAPPDATA").unwrap()).join("RLBotGUIX\\venv\\python.exe") {
+        _ => match content_folder.join("venv\\python.exe") {
             path if path.exists() => path.to_str().unwrap().to_string(),
-            _ => "python3.7".to_string(),
+            _ => "python".to_string(),
         },
     }
 }
@@ -314,7 +316,7 @@ fn auto_detect_python() -> String {
 
 #[cfg(target_os = "linux")]
 fn auto_detect_python() -> String {
-    match Path::new(&env::var_os("HOME").unwrap()).join(".RLBotGUI/env/bin/python") {
+    match get_content_folder().join("env/bin/python") {
         path if path.exists() => path.to_str().unwrap().to_string(),
         _ => "python3.7".to_string(),
     }
@@ -322,14 +324,7 @@ fn auto_detect_python() -> String {
 
 lazy_static! {
     static ref CONFIG_PATH: Mutex<String> = {
-        let path = if cfg!(target_os = "windows") {
-            Path::new(&env::var_os("LOCALAPPDATA").unwrap()).join("RLBotGUIX\\config.ini")
-        } else if cfg!(target_os = "macos") {
-            Path::new(&env::var_os("HOME").unwrap()).join("Library/Application Support/rlbotgui/config.ini")
-        } else {
-            Path::new(&env::var_os("HOME").unwrap()).join(".config/rlbotgui/config.ini")
-        };
-
+        let path = get_content_folder().join("config.ini");
         println!("Config path: {}", path.to_str().unwrap());
 
         if !path.exists() {
@@ -413,18 +408,22 @@ fn check_has_rlbot() -> bool {
 }
 
 #[cfg(windows)]
-fn get_missing_packages_script_path() -> PathBuf {
-    PathBuf::from(format!("{}\\RLBotGUIX\\get_missing_packages.py", env::var("LOCALAPPDATA").unwrap()))
+fn get_content_folder() -> PathBuf {
+    PathBuf::from(format!("{}\\RLBotGUIX", env::var("LOCALAPPDATA").unwrap()))
 }
 
 #[cfg(target_os = "macos")]
-fn get_missing_packages_script_path() -> PathBuf {
-    PathBuf::from(format!("{}/Library/Application Support/rlbotgui/get_missing_packages.py", env::var("HOME").unwrap()))
+fn get_content_folder() -> PathBuf {
+    PathBuf::from(format!("{}/Library/Application Support/rlbotgui", env::var("HOME").unwrap()))
 }
 
 #[cfg(target_os = "linux")]
+fn get_content_folder() -> PathBuf {
+    PathBuf::from(format!("{}/.RLBotGUI", env::var("HOME").unwrap()))
+}
+
 fn get_missing_packages_script_path() -> PathBuf {
-    PathBuf::from(format!("{}/.RLBotGUI/get_missing_packages.py", env::var("HOME").unwrap()))
+    get_content_folder().join("get_missing_packages.py")
 }
 
 #[tauri::command]
@@ -856,19 +855,6 @@ async fn get_recommendations() -> Option<HashMap<String, Vec<HashMap<String, Vec
     })
 }
 
-fn get_content_folder() -> String {
-    let current_folder = env::current_dir().unwrap().to_str().unwrap().to_string();
-
-    if current_folder.contains("RLBotGUI") {
-        current_folder
-    } else {
-        match env::var_os("LOCALAPPDATA") {
-            Some(path) => Path::new(&path).join("RLBotGUIX").to_str().unwrap().to_string(),
-            None => current_folder,
-        }
-    }
-}
-
 fn ensure_bot_directory() -> String {
     let bot_directory = get_content_folder();
     let bot_directory_path = Path::new(&bot_directory).join(CREATED_BOTS_FOLDER);
@@ -877,7 +863,7 @@ fn ensure_bot_directory() -> String {
         create_dir_all(&bot_directory_path).unwrap();
     }
 
-    bot_directory
+    bot_directory.to_str().unwrap().to_string()
 }
 
 #[tauri::command]
@@ -1207,6 +1193,48 @@ fn is_windows() -> bool {
     cfg!(windows)
 }
 
+#[tauri::command]
+async fn install_python() -> Option<u8> {
+    // https://www.python.org/ftp/python/3.7.9/python-3.7.9-amd64.exe
+    // download the above file to python-3.7.9-amd64.exe
+
+    let file_path = get_content_folder().join("python-3.7.9-amd64.exe");
+
+    if !file_path.exists() {
+        let response = reqwest::get("https://www.python.org/ftp/python/3.7.9/python-3.7.9-amd64.exe").await.ok()?;
+        let mut file = File::create(&file_path).ok()?;
+        let mut content = Cursor::new(response.bytes().await.ok()?);
+        copy(&mut content, &mut file).ok()?;
+    }
+
+    // only installs for the current user (requires no admin privileges)
+    // adds the Python version to PATH
+    // Launches the installer in a simplified mode for a one-button install
+    let mut process = Command::new(file_path)
+        .args([
+            "InstallLauncherAllUsers=0",
+            "SimpleInstall=1",
+            "PrependPath=1",
+            "SimpleInstallDescription='Install Python 3.7.9 for the current user to use with RLBot'",
+        ])
+        .spawn()
+        .ok()?;
+    process.wait().ok()?;
+
+    // Windows actually doesn't have a python3.7.exe command, just python.exe (no matter what)
+    // but there is a pip3.7.exe
+    // Since we added Python to PATH, we can use where to find the path to pip3.7.exe
+    // we can then use that to find the path to the right python.exe and use that
+    let new_python_path = {
+        let output = Command::new("where").arg("pip3.7").output().ok()?;
+        let stdout = String::from_utf8(output.stdout).ok()?;
+        Path::new(stdout.lines().next()?).parent().unwrap().parent().unwrap().join("python.exe")
+    };
+    *PYTHON_PATH.lock().unwrap() = new_python_path.to_str().unwrap().to_string();
+
+    Some(0)
+}
+
 fn main() {
     initialize(&CONFIG_PATH);
     initialize(&BOT_FOLDER_SETTINGS);
@@ -1394,6 +1422,7 @@ fn main() {
             get_missing_bot_logos,
             get_missing_script_logos,
             is_windows,
+            install_python,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

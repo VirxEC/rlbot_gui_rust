@@ -25,6 +25,7 @@ This hasn't been implemented, but it's easy to do.
 - Real-time non-blocking subprocess stdout capture redirected to built-in GUI console for debugging purposes
 - Defered bundle logo loading and missing python package checking
 - Concurrent loading that utilizes all threads
+- In-GUI Python installation for Windows users
 - [Self-updating of the GUI: TODO](https://tauri.studio/v1/guides/distribution/updater#update-file-json-format)
 
 ## Installation
