@@ -11,12 +11,13 @@ use std::{
     ffi::OsStr,
     fs::{create_dir_all, read_to_string, write},
     io::Read,
+    ops::Not,
     path::{Path, PathBuf},
     process::{ChildStderr, ChildStdout, Command, Stdio},
     str::FromStr,
     sync::Arc,
     thread,
-    time::Duration, ops::Not,
+    time::Duration,
 };
 
 use bot_management::bot_creation::{bootstrap_python_bot, bootstrap_python_hivemind, bootstrap_rust_bot, bootstrap_scratch_bot, CREATED_BOTS_FOLDER};
@@ -24,7 +25,7 @@ use glob::glob;
 
 use custom_maps::find_all_custom_maps;
 use lazy_static::{initialize, lazy_static};
-use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, IntoParallelRefMutIterator, ParallelExtend, ParallelIterator};
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelExtend, ParallelIterator};
 use rlbot::parsing::{
     agent_config_parser::BotLooksConfig,
     bot_config_bundle::{BotConfigBundle, Clean, ScriptConfigBundle},
@@ -395,7 +396,10 @@ lazy_static! {
             None => auto_detect_python(),
         }
     });
-    static ref CONSOLE_TEXT: Mutex<Vec<ConsoleText>> = Mutex::new(vec![ConsoleText::from("Welcome to the RLBot Console!".to_string(), false)]);
+    static ref CONSOLE_TEXT: Mutex<Vec<ConsoleText>> = Mutex::new(vec![
+        ConsoleText::from("Welcome to the RLBot Console!".to_string(), false),
+        ConsoleText::from("".to_string(), false)
+    ]);
     static ref STDOUT_CAPTURE: Arc<Mutex<Vec<Option<ChildStdout>>>> = Arc::new(Mutex::new(Vec::new()));
     static ref STDERR_CAPTURE: Arc<Mutex<Vec<Option<ChildStderr>>>> = Arc::new(Mutex::new(Vec::new()));
 }
@@ -1075,7 +1079,20 @@ async fn get_missing_bot_packages(bots: Vec<BotConfigBundle>) -> Vec<MissingPack
             })
             .collect()
     } else {
-        Vec::new()
+        bots.par_iter()
+            .enumerate()
+            .filter_map(|(index, bot)| {
+                if bot.type_ == *"rlbot" && (bot.warn.is_some() || bot.missing_python_packages.is_some()) {
+                    Some(MissingPackagesUpdate {
+                        index,
+                        warn: None,
+                        missing_packages: None,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 }
 
@@ -1113,7 +1130,21 @@ async fn get_missing_script_packages(scripts: Vec<ScriptConfigBundle>) -> Vec<Mi
             })
             .collect()
     } else {
-        Vec::new()
+        scripts
+            .par_iter()
+            .enumerate()
+            .filter_map(|(index, script)| {
+                if script.warn.is_some() || script.missing_python_packages.is_some() {
+                    Some(MissingPackagesUpdate {
+                        index,
+                        warn: None,
+                        missing_packages: None,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 }
 
@@ -1171,6 +1202,11 @@ impl ConsoleTextUpdate {
     }
 }
 
+#[tauri::command]
+fn is_windows() -> bool {
+    cfg!(windows)
+}
+
 fn main() {
     initialize(&CONFIG_PATH);
     initialize(&BOT_FOLDER_SETTINGS);
@@ -1193,113 +1229,131 @@ fn main() {
         .setup(|app| {
             let main_window_out = app.get_window("main").unwrap();
             let stdout_capture = Arc::clone(&STDOUT_CAPTURE);
-            thread::spawn(move || loop {
-                thread::sleep(Duration::from_micros(10));
-                let mut outs = stdout_capture.lock().unwrap();
+            thread::spawn(move || {
+                let mut next_replace_last = false;
+                loop {
+                    thread::sleep(Duration::from_micros(10));
+                    let mut outs = stdout_capture.lock().unwrap();
 
-                while !outs.is_empty() && outs.last().unwrap().is_none() {
-                    outs.pop();
-                }
+                    while !outs.is_empty() && outs.last().unwrap().is_none() {
+                        outs.pop();
+                    }
 
-                if !outs.is_empty() {
-                    let out_strs: Vec<ConsoleTextUpdate> = outs
-                        .par_iter_mut()
-                        .flatten()
-                        .filter_map(|s| {
-                            let mut out = String::new();
-                            let mut replace_last = false;
+                    if !outs.is_empty() {
+                        let out_strs: Vec<ConsoleTextUpdate> = outs
+                            .iter_mut()
+                            .flatten()
+                            .filter_map(|s| {
+                                let mut text = String::new();
+                                let mut will_replace_last = next_replace_last;
+                                next_replace_last = false;
 
-                            loop {
-                                let mut buf = [0];
-                                match s.read(&mut buf[..]) {
-                                    Ok(0) | Err(_) => break,
-                                    Ok(_) => {
-                                        let string = String::from_utf8_lossy(&buf).to_string();
-                                        if &string == "\n" {
-                                            break;
-                                        } else if &string == "\r" {
-                                            replace_last = true;
-                                            break;
+                                loop {
+                                    let mut buf = [0];
+                                    match s.read(&mut buf[..]) {
+                                        Ok(0) | Err(_) => break,
+                                        Ok(_) => {
+                                            let string = String::from_utf8_lossy(&buf).to_string();
+                                            if &string == "\n" {
+                                                if text.is_empty() && will_replace_last {
+                                                    will_replace_last = false;
+                                                    continue;
+                                                }
+
+                                                break;
+                                            } else if &string == "\r" {
+                                                next_replace_last = true;
+                                                break;
+                                            }
+                                            text.push_str(&string);
                                         }
-                                        out.push_str(&string);
-                                    }
-                                };
+                                    };
+                                }
+
+                                text.is_empty().not().then(|| ConsoleTextUpdate::from(text, false, will_replace_last))
+                            })
+                            .collect();
+                        drop(outs);
+
+                        if !out_strs.is_empty() {
+                            let mut console_text = CONSOLE_TEXT.lock().unwrap();
+                            for out_str in &out_strs {
+                                if out_str.replace_last {
+                                    console_text.pop();
+                                }
+                                console_text.push(out_str.content.clone());
                             }
 
-                            out.is_empty().not().then(|| ConsoleTextUpdate::from(out, false, replace_last))
-                        })
-                        .collect();
-                    drop(outs);
-
-                    if !out_strs.is_empty() {
-                        let mut console_text = CONSOLE_TEXT.lock().unwrap();
-                        for out_str in &out_strs {
-                            if out_str.replace_last {
-                                console_text.pop();
+                            if console_text.len() > 1200 {
+                                let diff = console_text.len() - 1200;
+                                console_text.drain(..diff);
                             }
-                            console_text.push(out_str.content.clone());
-                        }
 
-                        if console_text.len() > 1200 {
-                            let diff = console_text.len() - 1200;
-                            console_text.drain(..diff);
+                            main_window_out.emit("new-console-text", out_strs).unwrap();
                         }
-
-                        main_window_out.emit("new-console-text", out_strs).unwrap();
                     }
                 }
             });
 
             let main_window_err = app.get_window("main").unwrap();
             let stderr_capture = Arc::clone(&STDERR_CAPTURE);
-            thread::spawn(move || loop {
-                thread::sleep(Duration::from_micros(10));
-                let mut errs = stderr_capture.lock().unwrap();
+            thread::spawn(move || {
+                let mut next_replace_last = false;
+                loop {
+                    thread::sleep(Duration::from_micros(10));
+                    let mut errs = stderr_capture.lock().unwrap();
 
-                while !errs.is_empty() && errs.last().unwrap().is_none() {
-                    errs.pop();
-                }
+                    while !errs.is_empty() && errs.last().unwrap().is_none() {
+                        errs.pop();
+                    }
 
-                if !errs.is_empty() {
-                    let err_strs: Vec<ConsoleTextUpdate> = errs
-                        .par_iter_mut()
-                        .flatten()
-                        .filter_map(|s| {
-                            let mut err = String::new();
-                            let mut replace_last = false;
+                    if !errs.is_empty() {
+                        let err_strs: Vec<ConsoleTextUpdate> = errs
+                            .iter_mut()
+                            .flatten()
+                            .filter_map(|s| {
+                                let mut text = String::new();
+                                let mut will_replace_last = next_replace_last;
+                                next_replace_last = false;
 
-                            loop {
-                                let mut buf = [0];
-                                match s.read(&mut buf[..]) {
-                                    Ok(0) | Err(_) => break,
-                                    Ok(_) => {
-                                        let string = String::from_utf8_lossy(&buf).to_string();
-                                        if &string == "\n" {
-                                            break;
-                                        } else if &string == "\r" {
-                                            replace_last = true;
-                                            break;
+                                loop {
+                                    let mut buf = [0];
+                                    match s.read(&mut buf[..]) {
+                                        Ok(0) | Err(_) => break,
+                                        Ok(_) => {
+                                            let string = String::from_utf8_lossy(&buf).to_string();
+                                            if &string == "\n" {
+                                                if text.is_empty() && will_replace_last {
+                                                    will_replace_last = false;
+                                                    continue;
+                                                }
+
+                                                break;
+                                            } else if &string == "\r" {
+                                                next_replace_last = true;
+                                                break;
+                                            }
+                                            text.push_str(&string);
                                         }
-                                        err.push_str(&string);
-                                    }
-                                };
+                                    };
+                                }
+
+                                text.is_empty().not().then(|| ConsoleTextUpdate::from(text, true, will_replace_last))
+                            })
+                            .collect();
+                        drop(errs);
+
+                        if !err_strs.is_empty() {
+                            let mut console_text = CONSOLE_TEXT.lock().unwrap();
+                            for err_str in &err_strs {
+                                console_text.push(err_str.content.clone());
                             }
-
-                            err.is_empty().not().then(|| ConsoleTextUpdate::from(err, true, replace_last))
-                        })
-                        .collect();
-                    drop(errs);
-
-                    if !err_strs.is_empty() {
-                        let mut console_text = CONSOLE_TEXT.lock().unwrap();
-                        for err_str in &err_strs {
-                            console_text.push(err_str.content.clone());
+                            if console_text.len() > 1200 {
+                                let diff = console_text.len() - 1200;
+                                console_text.drain(..diff);
+                            }
+                            main_window_err.emit("new-console-text", err_strs).unwrap();
                         }
-                        if console_text.len() > 1200 {
-                            let diff = console_text.len() - 1200;
-                            console_text.drain(..diff);
-                        }
-                        main_window_err.emit("new-console-text", err_strs).unwrap();
                     }
                 }
             });
@@ -1339,6 +1393,7 @@ fn main() {
             get_missing_script_packages,
             get_missing_bot_logos,
             get_missing_script_logos,
+            is_windows,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

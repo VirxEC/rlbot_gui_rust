@@ -35,7 +35,7 @@ export default {
 						this.consoleTexts.pop();
 					}
 					
-					console.log(update.content.text);
+					console.log(update);
 					this.consoleTexts.push(update.content);
 				});
 
