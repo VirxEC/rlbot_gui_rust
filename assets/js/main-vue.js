@@ -489,6 +489,10 @@ export default {
 			rec_python: null,
 			is_windows: false,
 			init: false,
+			updateDownloadProgressPercent: listen("update-download-progress", event => {
+				this.downloadProgressPercent = event.payload.percent;
+				this.downloadStatus = event.payload.status;
+			}),
 		}
 	},
 

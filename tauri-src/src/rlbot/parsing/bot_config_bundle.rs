@@ -45,7 +45,12 @@ impl DevInfo {
         let fun_fact = config.get(BOT_CONFIG_DETAILS_HEADER, "fun_fact").unwrap_or_default();
         let github = config.get(BOT_CONFIG_DETAILS_HEADER, "github").unwrap_or_default();
         let language = config.get(BOT_CONFIG_DETAILS_HEADER, "language").unwrap_or_default();
-        let tags = config.get(BOT_CONFIG_DETAILS_HEADER, "tags").unwrap_or_default().split(", ").map(|s| s.to_string()).collect();
+        let tags = config
+            .get(BOT_CONFIG_DETAILS_HEADER, "tags")
+            .unwrap_or_default()
+            .split(", ")
+            .map(|s| s.to_string())
+            .collect();
 
         Self {
             developer,

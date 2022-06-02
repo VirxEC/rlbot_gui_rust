@@ -1206,7 +1206,7 @@ async fn install_python() -> Option<u8> {
 async fn download_bot_pack(window: Window) {
     let botpack_location = get_content_folder().join(BOTPACK_FOLDER).to_str().unwrap().to_string();
     let botpack_status = download_repo(&window, BOTPACK_REPO_OWNER, BOTPACK_REPO_NAME, &botpack_location, true).await;
-    
+
     if dbg!(botpack_status) == BotpackStatus::Success {
         // Configure the folder settings
         BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(botpack_location);
