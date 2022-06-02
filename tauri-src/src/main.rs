@@ -20,7 +20,10 @@ use std::{
     time::Duration,
 };
 
-use bot_management::bot_creation::{bootstrap_python_bot, bootstrap_python_hivemind, bootstrap_rust_bot, bootstrap_scratch_bot, CREATED_BOTS_FOLDER};
+use bot_management::{
+    bot_creation::{bootstrap_python_bot, bootstrap_python_hivemind, bootstrap_rust_bot, bootstrap_scratch_bot, CREATED_BOTS_FOLDER},
+    downloader::download_repo,
+};
 use glob::glob;
 
 use custom_maps::find_all_custom_maps;
@@ -34,11 +37,19 @@ use rlbot::parsing::{
 use rlbot::{agents::runnable::Runnable, parsing::match_settings_config_parser::*};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
-use tauri::Manager;
+use tauri::{Manager, Window};
 
 use configparser::ini::Ini;
 
 use rlbot::parsing::directory_scanner::scan_directory_for_bot_configs;
+
+const BOTPACK_FOLDER: &str = "RLBotPackDeletable";
+const MAPPACK_FOLDER: &str = "RLBotMapPackDeletable";
+const MAPPACK_REPO: (&str, &str) = ("azeemba", "RLBotMapPack");
+const OLD_BOTPACK_FOLDER: &str = "RLBotPack";
+const BOTPACK_REPO_OWNER: &str = "RLBot";
+const BOTPACK_REPO_NAME: &str = "RLBotPack";
+const BOTPACK_REPO_BRANCH: &str = "master"; // can't change with the new release system
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BotFolder {
@@ -504,9 +515,6 @@ async fn pick_bot_folder() {
 
     BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(path.to_str().unwrap().to_string());
 }
-
-#[cfg(target_os = "macos")]
-use tauri::Window;
 
 #[cfg(target_os = "macos")]
 #[tauri::command]
@@ -1235,6 +1243,13 @@ async fn install_python() -> Option<u8> {
     Some(0)
 }
 
+#[tauri::command]
+async fn download_bot_pack(window: Window) {
+    let botpack_location = get_content_folder().join(BOTPACK_FOLDER);
+    let botpack_status = download_repo(&window, BOTPACK_REPO_OWNER, BOTPACK_REPO_NAME, botpack_location.to_str().unwrap(), true).await;
+    dbg!(botpack_status);
+}
+
 fn main() {
     initialize(&CONFIG_PATH);
     initialize(&BOT_FOLDER_SETTINGS);
@@ -1423,6 +1438,7 @@ fn main() {
             get_missing_script_logos,
             is_windows,
             install_python,
+            download_bot_pack,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

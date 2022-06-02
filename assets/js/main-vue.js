@@ -7,6 +7,7 @@ import TeamCard from './team-card-vue.js'
 import LauncherPreferenceModal from './launcher-preference-vue.js'
 
 const invoke = window.__TAURI__.invoke;
+const listen = window.__TAURI__.event.listen;
 
 const HUMAN = {'name': 'Human', 'type_': 'human', 'image': 'imgs/human.png'};
 const STARTING_BOT_POOL = [
@@ -675,7 +676,7 @@ export default {
 			this.$bvModal.show('download-modal');
 			this.downloadStatus = "Starting";
 			this.downloadProgressPercent = 0;
-			// eel.download_bot_pack()(this.botPackUpdated.bind(this, 'Downloaded Bot Pack!'));
+			invoke("download_bot_pack").then(() => this.botPackUpdated("Downloaded the bot pack!"));
 		},
 		updateBotPack: function() {
 			this.showBotpackUpdateSnackbar = false;
