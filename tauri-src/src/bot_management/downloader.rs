@@ -5,7 +5,12 @@ use std::{
     path::Path,
 };
 
+use configparser::ini::Ini;
+use rand::Rng;
+use reqwest::{header::USER_AGENT, Client, IntoUrl};
 use tauri::Window;
+
+use crate::{ccprintln, get_config_path};
 
 const RELEASE_TAG: &str = "latest_botpack_release_tag";
 const FOLDER_SUFFIX: &str = "master";
@@ -36,8 +41,10 @@ fn remove_empty_folders(dir: &Path) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-async fn get_json_from_url(url: &str) -> Result<serde_json::Value, Box<dyn Error>> {
-    Ok(reqwest::get(url).await?.json::<serde_json::Value>().await?)
+async fn get_json_from_url(client: &Client, url: &str) -> Result<serde_json::Value, Box<dyn Error>> {
+    // get random string
+    let user_agent: [char; 8] = rand::thread_rng().gen();
+    Ok(client.get(url).header(USER_AGENT, user_agent.iter().collect::<String>()).send().await?.json().await?)
 }
 
 /// Returns Size of the repository in bytes, or None if the API call fails.
@@ -45,20 +52,26 @@ async fn get_json_from_url(url: &str) -> Result<serde_json::Value, Box<dyn Error
 /// Call GitHub API to get an estimate size of a GitHub repository.
 ///
 /// * `repo_full_name` Full name of a repository. Example: 'RLBot/RLBotPack'
-async fn get_repo_size(repo_full_name: &str) -> Result<u64, Box<dyn Error>> {
-    let data = get_json_from_url(&format!("https://api.github.com/repos/{}", repo_full_name)).await?;
+async fn get_repo_size(client: &Client, repo_full_name: &str) -> Result<u64, Box<dyn Error>> {
+    let data = get_json_from_url(client, &format!("https://api.github.com/repos/{}", repo_full_name)).await?;
     Ok(data["size"].as_u64().unwrap() * 1000)
 }
 
-async fn download_and_extract_zip<T: AsRef<Path>>(download_url: T, local_folder_path: T, local_folder_subname: T, clobber: bool) -> BotpackStatus {
+async fn download_and_extract_zip<T: IntoUrl, J: AsRef<Path>>(
+    client: &Client,
+    download_url: T,
+    local_folder_path: J,
+    local_folder_subname: Option<J>,
+    clobber: bool,
+) -> BotpackStatus {
     // download and extract the zip
     let local_folder_path = local_folder_path.as_ref();
 
-    if clobber && local_folder_path.exists() {
-        remove_dir(local_folder_path).unwrap();
+    if clobber && local_folder_path.exists() && fs_extra::dir::remove(local_folder_path).is_err() {
+        return BotpackStatus::Skipped;
     }
 
-    match reqwest::get("https://github.com/RLBot/RLBotPythonExample/archive/master.zip").await {
+    match client.get(download_url).send().await {
         Ok(res) => {
             zip_extract::extract(Cursor::new(&res.bytes().await.unwrap()), local_folder_path, false).unwrap();
             BotpackStatus::Success
@@ -143,18 +156,42 @@ async fn download_and_extract_zip<T: AsRef<Path>>(download_url: T, local_folder_
 //         return success
 
 pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, checkout_folder: &str, update_tag_settings: bool) -> BotpackStatus {
-    // let repo_full_name = format!("{}/{}", repo_owner, repo_name);
+    let client = reqwest::Client::new();
+    let repo_full_name = format!("{}/{}", repo_owner, repo_name);
 
-    let latest_release = get_json_from_url(&format!("https://api.github.com/repos/{}/{}/releases/latest", repo_owner, repo_name))
-        .await
-        .unwrap();
     let status = download_and_extract_zip(
-        latest_release["zipball_url"].as_str().unwrap(),
+        &client,
+        &format!("https://github.com/{}/archive/refs/heads/master.zip", repo_full_name),
         checkout_folder,
-        &format!("{}-{}", repo_name, FOLDER_SUFFIX),
+        Some(&format!("{}-{}", repo_name, FOLDER_SUFFIX)),
         true,
     )
     .await;
+
+    if status == BotpackStatus::Success && update_tag_settings {
+        let latest_release_tag_name = match get_json_from_url(&client, &format!("https://api.github.com/repos/{}/releases/latest", repo_full_name)).await {
+            Ok(release) => release["tag_name"].as_str().unwrap().to_string(),
+            Err(e) => {
+                ccprintln(format!("{}", e));
+                return BotpackStatus::Skipped;
+            }
+        };
+
+        let config_path = get_config_path();
+        let mut config = Ini::new();
+
+        if let Err(e) = config.load(&config_path) {
+            ccprintln(e);
+            return BotpackStatus::Success;
+        }
+
+        config.set("bot_folder_settings", "incr", Some(latest_release_tag_name));
+
+        if let Err(e) = config.write(config_path) {
+            ccprintln(e.to_string());
+            return BotpackStatus::Success;
+        }
+    }
 
     status
 }
