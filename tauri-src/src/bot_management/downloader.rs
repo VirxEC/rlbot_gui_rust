@@ -48,6 +48,16 @@ async fn get_json_from_url(client: &Client, url: &str) -> Result<serde_json::Val
     Ok(client.get(url).header(USER_AGENT, user_agent.iter().collect::<String>()).send().await?.json().await?)
 }
 
+/// Returns Size of the repository in bytes, or None if the API call fails.
+///
+/// Call GitHub API to get an estimate size of a GitHub repository.
+///
+/// * `repo_full_name` Full name of a repository. Example: 'RLBot/RLBotPack'
+async fn get_repo_size(client: &Client, repo_full_name: &str) -> Result<u64, Box<dyn Error>> {
+    let data = get_json_from_url(client, &format!("https://api.github.com/repos/{}", repo_full_name)).await?;
+    Ok(data["size"].as_u64().unwrap() * 1000)
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 struct ProgressBarUpdate {
     pub percent: f32,
@@ -60,12 +70,12 @@ impl ProgressBarUpdate {
     }
 }
 
-async fn download_and_extract_zip<T: IntoUrl, J: AsRef<Path>>(window: &Window, client: &Client, download_url: T, local_folder_path: J, clobber: bool) -> BotpackStatus {
+async fn download_and_extract_zip<T: IntoUrl, J: AsRef<Path>>(window: &Window, client: &Client, download_url: T, local_folder_path: J, clobber: bool, repo_full_name: &str) -> BotpackStatus {
     // download and extract the zip
     let local_folder_path = local_folder_path.as_ref();
 
     if let Ok(res) = client.get(download_url).send().await {
-        let total_size = res.content_length().unwrap_or(180_000_000) as f32;
+        let total_size = get_repo_size(client, repo_full_name).await.unwrap_or(190_000_000) as f32 * 0.62;
         let mut stream = res.bytes_stream();
         let mut bytes = Vec::new();
         let mut last_update = Instant::now();
@@ -94,7 +104,7 @@ async fn download_and_extract_zip<T: IntoUrl, J: AsRef<Path>>(window: &Window, c
         if let Err(e) = window.emit("update-download-progress", ProgressBarUpdate::new(100., "Extracting zip...".to_string())) {
             ccprintln(format!("Error when updating progress bar: {}", e));
         }
-
+        
         zip_extract::extract(Cursor::new(bytes), local_folder_path, false).unwrap();
         BotpackStatus::Success
     } else {
@@ -112,6 +122,7 @@ pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, c
         &format!("https://github.com/{}/archive/refs/heads/master.zip", repo_full_name),
         checkout_folder,
         true,
+        &repo_full_name,
     )
     .await;
 
