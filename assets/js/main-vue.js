@@ -688,7 +688,7 @@ export default {
 			this.$bvModal.show('download-modal');
 			this.downloadStatus = "Starting";
 			this.downloadProgressPercent = 0;
-			// eel.update_bot_pack()(this.botPackUpdated.bind(this, 'Updated Bot Pack!'));
+			invoke("update_bot_pack").then(() => this.botPackUpdated("Updated the bot pack!"));
 		},
 		updateMapPack: function() {
 			this.showBotpackUpdateSnackbar = false;

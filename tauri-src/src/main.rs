@@ -22,7 +22,7 @@ use std::{
 
 use bot_management::{
     bot_creation::{bootstrap_python_bot, bootstrap_python_hivemind, bootstrap_rust_bot, bootstrap_scratch_bot, CREATED_BOTS_FOLDER},
-    downloader::{download_repo, BotpackStatus},
+    downloader,
 };
 use glob::glob;
 
@@ -1205,9 +1205,20 @@ async fn install_python() -> Option<u8> {
 #[tauri::command]
 async fn download_bot_pack(window: Window) {
     let botpack_location = get_content_folder().join(BOTPACK_FOLDER).to_str().unwrap().to_string();
-    let botpack_status = download_repo(&window, BOTPACK_REPO_OWNER, BOTPACK_REPO_NAME, &botpack_location, true).await;
+    let botpack_status = downloader::download_repo(&window, BOTPACK_REPO_OWNER, BOTPACK_REPO_NAME, &botpack_location, true).await;
 
-    if dbg!(botpack_status) == BotpackStatus::Success {
+    if dbg!(botpack_status) == downloader::BotpackStatus::Success {
+        // Configure the folder settings
+        BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(botpack_location);
+    }
+}
+
+#[tauri::command]
+async fn update_bot_pack(window: Window) {
+    let botpack_location = get_content_folder().join(BOTPACK_FOLDER).to_str().unwrap().to_string();
+    let botpack_status = downloader::update_bot_pack(&window, BOTPACK_REPO_OWNER, BOTPACK_REPO_NAME, &botpack_location).await;
+
+    if dbg!(botpack_status) == downloader::BotpackStatus::Success {
         // Configure the folder settings
         BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(botpack_location);
     }
@@ -1353,7 +1364,7 @@ fn main() {
                         errs.pop();
                     }
 
-                    if !errs.is_empty() {
+                       if !errs.is_empty() {
                         let err_strs: Vec<ConsoleTextUpdate> = errs
                             .iter_mut()
                             .flatten()
@@ -1442,6 +1453,7 @@ fn main() {
             is_windows,
             install_python,
             download_bot_pack,
+            update_bot_pack,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
