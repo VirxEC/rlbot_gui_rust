@@ -46,10 +46,8 @@ use rlbot::parsing::directory_scanner::scan_directory_for_bot_configs;
 const BOTPACK_FOLDER: &str = "RLBotPackDeletable";
 const MAPPACK_FOLDER: &str = "RLBotMapPackDeletable";
 const MAPPACK_REPO: (&str, &str) = ("azeemba", "RLBotMapPack");
-const OLD_BOTPACK_FOLDER: &str = "RLBotPack";
 const BOTPACK_REPO_OWNER: &str = "RLBot";
 const BOTPACK_REPO_NAME: &str = "RLBotPack";
-const BOTPACK_REPO_BRANCH: &str = "master"; // can't change with the new release system
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BotFolder {
@@ -370,6 +368,16 @@ lazy_static! {
 
 pub fn ccprintln(text: String) {
     CONSOLE_TEXT.lock().unwrap().push(ConsoleText::from(text, false));
+}
+
+pub fn ccprintlnr(text: String) {
+    let mut ct = CONSOLE_TEXT.lock().unwrap();
+    ct.pop();
+    ct.push(ConsoleText::from(text, false));
+}
+
+pub fn ccprintlne(text: String) {
+    CONSOLE_TEXT.lock().unwrap().push(ConsoleText::from(text, true));
 }
 
 fn check_has_rlbot() -> bool {
@@ -1364,7 +1372,7 @@ fn main() {
                         errs.pop();
                     }
 
-                       if !errs.is_empty() {
+                    if !errs.is_empty() {
                         let err_strs: Vec<ConsoleTextUpdate> = errs
                             .iter_mut()
                             .flatten()

@@ -14,6 +14,8 @@ use crate::rlbot::parsing::bot_config_bundle::{BOT_CONFIG_MODULE_HEADER, BOT_CON
 use crate::rlbot::parsing::directory_scanner::scan_directory_for_bot_configs;
 use crate::{ccprintln, BOT_FOLDER_SETTINGS};
 
+use super::zip_extract_fixed;
+
 pub const CREATED_BOTS_FOLDER: &str = "MyBots";
 
 pub async fn bootstrap_python_bot(bot_name: String, directory: &str) -> Result<String, String> {
@@ -26,7 +28,7 @@ pub async fn bootstrap_python_bot(bot_name: String, directory: &str) -> Result<S
 
     match reqwest::get("https://github.com/RLBot/RLBotPythonExample/archive/master.zip").await {
         Ok(res) => {
-            zip_extract::extract(Cursor::new(&res.bytes().await.unwrap()), top_dir.as_path(), true).unwrap();
+            zip_extract_fixed::extract(Cursor::new(&res.bytes().await.unwrap()), top_dir.as_path(), true).unwrap();
         }
         Err(e) => {
             return Err(format!("Failed to download python bot: {}", e));
@@ -73,7 +75,7 @@ pub async fn bootstrap_python_hivemind(hive_name: String, directory: &str) -> Re
 
     match reqwest::get("https://github.com/RLBot/RLBotPythonHivemindExample/archive/master.zip").await {
         Ok(res) => {
-            zip_extract::extract(Cursor::new(&res.bytes().await.unwrap()), top_dir.as_path(), true).unwrap();
+            zip_extract_fixed::extract(Cursor::new(&res.bytes().await.unwrap()), top_dir.as_path(), true).unwrap();
         }
         Err(e) => {
             return Err(format!("Failed to download python hivemind: {}", e));
@@ -128,7 +130,7 @@ pub async fn bootstrap_rust_bot(bot_name: String, directory: &str) -> Result<Str
 
     match reqwest::get("https://github.com/NicEastvillage/RLBotRustTemplateBot/archive/master.zip").await {
         Ok(res) => {
-            zip_extract::extract(Cursor::new(&res.bytes().await.unwrap()), top_dir.as_path(), true).unwrap();
+            zip_extract_fixed::extract(Cursor::new(&res.bytes().await.unwrap()), top_dir.as_path(), true).unwrap();
         }
         Err(e) => {
             return Err(format!("Failed to download rust bot: {}", e));
@@ -169,7 +171,7 @@ pub async fn bootstrap_scratch_bot(bot_name: String, directory: &str) -> Result<
 
     match reqwest::get("https://github.com/RLBot/RLBotScratchInterface/archive/gui-friendly.zip").await {
         Ok(res) => {
-            zip_extract::extract(Cursor::new(&res.bytes().await.unwrap()), top_dir.as_path(), true).unwrap();
+            zip_extract_fixed::extract(Cursor::new(&res.bytes().await.unwrap()), top_dir.as_path(), true).unwrap();
         }
         Err(e) => {
             return Err(format!("Failed to download scratch bot: {}", e));
