@@ -679,7 +679,7 @@ export default {
 			this.$bvModal.show('download-modal');
 			this.downloadStatus = "Starting";
 			this.downloadProgressPercent = 0;
-			invoke("download_bot_pack").then(() => this.botPackUpdated("Downloaded the bot pack!"));
+			invoke("download_bot_pack").then(this.botPackUpdated);
 		},
 		updateBotPack: function() {
 			this.showBotpackUpdateSnackbar = false;
@@ -687,7 +687,7 @@ export default {
 			this.$bvModal.show('download-modal');
 			this.downloadStatus = "Starting";
 			this.downloadProgressPercent = 0;
-			invoke("update_bot_pack").then(() => this.botPackUpdated("Updated the bot pack!"));
+			invoke("update_bot_pack").then(this.botPackUpdated);
 		},
 		updateMapPack: function() {
 			this.showBotpackUpdateSnackbar = false;

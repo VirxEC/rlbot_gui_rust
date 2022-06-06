@@ -748,7 +748,6 @@ impl<T> AllRecommendations<T> {
     }
 }
 
-
 fn get_recommendations_json() -> Option<AllRecommendations<String>> {
     // Search for and load the json file
     for path in BOT_FOLDER_SETTINGS.lock().unwrap().folders.keys() {
@@ -826,7 +825,7 @@ async fn get_recommendations() -> Option<AllRecommendations<BotConfigBundle>> {
                             }
                             bundle.missing_python_packages = Some(missing_packages);
                         }
-                        
+
                         return bundle;
                     }
                 }
@@ -1218,24 +1217,45 @@ async fn install_python() -> Option<u8> {
 }
 
 #[tauri::command]
-async fn download_bot_pack(window: Window) {
+async fn download_bot_pack(window: Window) -> String {
     let botpack_location = get_content_folder().join(BOTPACK_FOLDER).to_str().unwrap().to_string();
-    let botpack_status = downloader::download_repo(&window, BOTPACK_REPO_OWNER, BOTPACK_REPO_NAME, &botpack_location, true).await;
+    let (botpack_status, message) = downloader::download_repo(&window, BOTPACK_REPO_OWNER, BOTPACK_REPO_NAME, &botpack_location, true).await;
 
-    if dbg!(botpack_status) == downloader::BotpackStatus::Success {
+    if botpack_status == downloader::BotpackStatus::Success {
         // Configure the folder settings
         BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(botpack_location);
     }
+
+    message
 }
 
 #[tauri::command]
-async fn update_bot_pack(window: Window) {
+async fn update_bot_pack(window: Window) -> String {
     let botpack_location = get_content_folder().join(BOTPACK_FOLDER).to_str().unwrap().to_string();
-    let botpack_status = downloader::update_bot_pack(&window, BOTPACK_REPO_OWNER, BOTPACK_REPO_NAME, &botpack_location).await;
+    let (botpack_status, message) = downloader::update_bot_pack(&window, BOTPACK_REPO_OWNER, BOTPACK_REPO_NAME, &botpack_location).await;
 
-    if dbg!(botpack_status) == downloader::BotpackStatus::Success {
-        // Configure the folder settings
-        BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(botpack_location);
+    match botpack_status {
+        downloader::BotpackStatus::Success => {
+            // Configure the folder settings
+            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(botpack_location);
+            message.unwrap()
+        }
+        downloader::BotpackStatus::RequiresFullDownload => {
+            // We need to download the botpack
+            // the most likely cause is the botpack not existing in the first place
+            let (botpack_status, message) = downloader::download_repo(&window, BOTPACK_REPO_OWNER, BOTPACK_REPO_NAME, &botpack_location, true).await;
+
+            if botpack_status == downloader::BotpackStatus::Success {
+                // Configure the folder settings
+                BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(botpack_location);
+            }
+
+            message
+        }
+        downloader::BotpackStatus::Skipped => {
+            // The message is pre-curated for us
+            message.unwrap()
+        }
     }
 }
 
