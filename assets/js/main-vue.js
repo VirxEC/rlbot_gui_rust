@@ -476,7 +476,6 @@ export default {
 				files: {},
 				folders: {}
 			},
-			isBotpackUpToDate: true,
 			downloadProgressPercent: 0,
 			downloadStatus: '',
 			showBotpackUpdateSnackbar: false,
@@ -911,7 +910,6 @@ export default {
 
 		botpackUpdateChecked: function (isBotpackUpToDate) {
 			this.showBotpackUpdateSnackbar = !isBotpackUpToDate;
-			this.isBotpackUpToDate = isBotpackUpToDate;
 		},
 
 		botPackUpdated: function (message) {
@@ -922,7 +920,6 @@ export default {
 			invoke("get_recommendations").then(this.recommendationsReceived);
 			invoke("get_match_options").then(this.matchOptionsReceived);
 			this.$refs.botPool.setDefaultCategory();
-			this.isBotpackUpToDate = true;
 		},
 
 		onInstallationComplete: function (result) {
@@ -972,7 +969,7 @@ export default {
 				this.applyLanguageWarnings(this.botPool.concat(this.scriptPool));
 			});
 
-			// eel.is_botpack_up_to_date()(this.botpackUpdateChecked);
+			invoke("is_botpack_up_to_date").then(this.botpackUpdateChecked);
 			invoke("get_recommendations").then(this.recommendationsReceived);
 
 			invoke("is_windows").then(is_windows => this.is_windows = is_windows);

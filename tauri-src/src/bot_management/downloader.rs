@@ -15,10 +15,9 @@ use tauri::Window;
 
 use futures_util::StreamExt;
 
-use crate::{bot_management::zip_extract_fixed, ccprintln, ccprintlne, get_config_path, ccprintlnr};
+use crate::{bot_management::zip_extract_fixed, ccprintln, ccprintlne, ccprintlnr, get_config_path};
 
 const FOLDER_SUFFIX: &str = "master";
-const MAPPACK_DIR: &str = "RLBotMapPack-master";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BotpackStatus {
@@ -176,6 +175,23 @@ fn get_url_from_tag(repo_full_name: &str, tag: u32) -> String {
     format!("https://github.com/{}/releases/download/incr-{}/incremental.zip", repo_full_name, tag)
 }
 
+pub async fn is_botpack_up_to_date(repo_full_name: &str) -> bool {
+    let current_tag_name = match get_current_tag_name() {
+        Some(tag) => tag,
+        None => return true,
+    };
+
+    let latest_release_tag = match get_json_from_url(&Client::new(), &format!("https://api.github.com/repos/{}/releases/latest", repo_full_name)).await {
+        Ok(release) => release["tag_name"].as_str().unwrap().replace("incr-", "").parse::<u32>().unwrap(),
+        Err(e) => {
+            ccprintlne(format!("{}", e));
+            return true;
+        }
+    };
+
+    latest_release_tag == current_tag_name
+}
+
 pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str, checkout_folder: &str) -> BotpackStatus {
     let client = Client::new();
     let repo_full_name = format!("{}/{}", repo_owner, repo_name);
@@ -188,7 +204,7 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
     let latest_release_tag = match get_json_from_url(&client, &format!("https://api.github.com/repos/{}/releases/latest", repo_full_name)).await {
         Ok(release) => release["tag_name"].as_str().unwrap().replace("incr-", "").parse::<u32>().unwrap(),
         Err(e) => {
-            ccprintln(format!("{}", e));
+            ccprintlne(format!("{}", e));
             return BotpackStatus::Skipped;
         }
     };
@@ -199,15 +215,15 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
     }
 
     let total_patches = latest_release_tag - current_tag_name;
-    
+
     if total_patches > 50 {
         return BotpackStatus::RequiresFullDownload;
     }
-    
+
     let master_folder = format!("{}-{}", repo_name, FOLDER_SUFFIX);
     let local_folder_path = Path::new(checkout_folder).join(master_folder);
-    
-    let mut tag = current_tag_name+1;
+
+    let mut tag = current_tag_name + 1;
     let mut next_download = Some(client.get(get_url_from_tag(&repo_full_name, tag)).send());
 
     let config_path = get_config_path();

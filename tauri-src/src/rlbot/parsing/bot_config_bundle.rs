@@ -118,7 +118,7 @@ pub trait Clean {
     fn cleaned(&self) -> Self;
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
 pub struct BotConfigBundle {
     pub name: Option<String>,
     pub looks_path: Option<String>,

@@ -722,11 +722,34 @@ async fn pick_appearance_file(window: Window) -> Option<String> {
     x
 }
 
-type BotNames = Vec<String>;
-type Recommendation = HashMap<String, BotNames>;
-type AllRecommendations = HashMap<String, Vec<Recommendation>>;
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct Recommendation<T> {
+    bots: Vec<T>,
+}
 
-fn get_recommendations_json() -> Option<AllRecommendations> {
+impl<T> Recommendation<T> {
+    fn change_generic<F>(&self, f: &dyn Fn(&T) -> F) -> Recommendation<F> {
+        Recommendation {
+            bots: self.bots.iter().map(f).collect(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct AllRecommendations<T> {
+    recommendations: Vec<Recommendation<T>>,
+}
+
+impl<T> AllRecommendations<T> {
+    fn change_generic<F>(&self, f: &dyn Fn(&T) -> F) -> AllRecommendations<F> {
+        AllRecommendations {
+            recommendations: self.recommendations.iter().map(|i| i.change_generic(f)).collect(),
+        }
+    }
+}
+
+
+fn get_recommendations_json() -> Option<AllRecommendations<String>> {
     // Search for and load the json file
     for path in BOT_FOLDER_SETTINGS.lock().unwrap().folders.keys() {
         let pattern = Path::new(path).join("**/recommendations.json");
@@ -754,7 +777,7 @@ fn get_recommendations_json() -> Option<AllRecommendations> {
 }
 
 #[tauri::command]
-async fn get_recommendations() -> Option<HashMap<String, Vec<HashMap<String, Vec<BotConfigBundle>>>>> {
+async fn get_recommendations() -> Option<AllRecommendations<BotConfigBundle>> {
     // If we found the json, return the corresponding BotConfigBundles for the bots
     get_recommendations_json().map(|j| {
         // Get a list of all the bots in (bot name, bot config file path) pairs
@@ -790,43 +813,27 @@ async fn get_recommendations() -> Option<HashMap<String, Vec<HashMap<String, Vec
         let has_rlbot = check_has_rlbot();
 
         // Load all of the bot config bundles
-        let recommendations: Vec<HashMap<String, Vec<BotConfigBundle>>> = j
-            .get("recommendations")
-            .unwrap()
-            .par_iter()
-            .map(|bots| {
-                HashMap::from([(
-                    "bots".to_string(),
-                    bots.get("bots")
-                        .unwrap()
-                        .par_iter()
-                        .filter_map(|bot_name| {
-                            for (name, path) in &name_path_pairs {
-                                if name == bot_name {
-                                    let mut b = BotConfigBundle::minimal_from_path(Path::new(path)).ok();
-                                    if let Some(ib) = b.as_mut() {
-                                        ib.logo = ib.get_logo();
+        j.change_generic(&|bot_name| {
+            for (name, path) in &name_path_pairs {
+                if name == bot_name {
+                    if let Ok(mut bundle) = BotConfigBundle::minimal_from_path(Path::new(path)) {
+                        bundle.logo = bundle.get_logo();
 
-                                        if has_rlbot {
-                                            let missing_packages = ib.get_missing_packages();
-                                            if !missing_packages.is_empty() {
-                                                ib.warn = Some("pythonpkg".to_string());
-                                            }
-                                            ib.missing_python_packages = Some(missing_packages);
-                                        }
-                                    }
-                                    return b;
-                                }
+                        if has_rlbot {
+                            let missing_packages = bundle.get_missing_packages();
+                            if !missing_packages.is_empty() {
+                                bundle.warn = Some("pythonpkg".to_string());
                             }
+                            bundle.missing_python_packages = Some(missing_packages);
+                        }
+                        
+                        return bundle;
+                    }
+                }
+            }
 
-                            None
-                        })
-                        .collect(),
-                )])
-            })
-            .collect();
-
-        HashMap::from([("recommendations".to_string(), recommendations)])
+            BotConfigBundle::default()
+        })
     })
 }
 
@@ -1232,6 +1239,12 @@ async fn update_bot_pack(window: Window) {
     }
 }
 
+#[tauri::command]
+async fn is_botpack_up_to_date() -> bool {
+    let repo_full_name = format!("{}/{}", BOTPACK_REPO_OWNER, BOTPACK_REPO_NAME);
+    bot_management::downloader::is_botpack_up_to_date(&repo_full_name).await
+}
+
 fn main() {
     initialize(&BOT_FOLDER_SETTINGS);
     initialize(&MATCH_SETTINGS);
@@ -1462,6 +1475,7 @@ fn main() {
             install_python,
             download_bot_pack,
             update_bot_pack,
+            is_botpack_up_to_date,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
