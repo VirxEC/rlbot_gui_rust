@@ -22,11 +22,11 @@ This hasn't been implemented, but it's easy to do.
 - Fast & smart reloading misssing python packages upon executable change/package install
 - Add new bots into their proper place in the bot list instead of the end
 - Easy Python pip fixing if something breaks; top right -> menu -> "Edit/Repair Python Settings"
-- Real-time non-blocking subprocess stdout capture redirected to built-in GUI console for debugging purposes
+- Real-time non-blocking subprocess stdout & stderr capture redirected to built-in GUI console for debugging purposes
 - Defered bundle logo loading and missing python package checking
 - Concurrent loading that utilizes all threads
 - In-GUI Python installation for Windows users
-- Better error messages when download or upgrading the botpack
+- Better error messages when downloading or upgrading the botpack
 - [Self-updating of the GUI: TODO](https://tauri.studio/v1/guides/distribution/updater#update-file-json-format)
 
 ## Installation
