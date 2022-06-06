@@ -26,6 +26,7 @@ This hasn't been implemented, but it's easy to do.
 - Defered bundle logo loading and missing python package checking
 - Concurrent loading that utilizes all threads
 - In-GUI Python installation for Windows users
+- Better error messages when download or upgrading the botpack
 - [Self-updating of the GUI: TODO](https://tauri.studio/v1/guides/distribution/updater#update-file-json-format)
 
 ## Installation
