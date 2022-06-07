@@ -75,11 +75,18 @@ export default {
 	
 						this.startup();
 					});
+				} else {
+					this.showProgressSpinner = false;
 				}
 			});
 		},
 		applyPythonSetup: function () {
 			this.showProgressSpinner = true;
+
+			if (this.rec_python && !this.python_path) {
+				this.python_path = this.rec_python;
+			}
+
 			invoke("set_python_path", { path: this.python_path }).then(() => {
 				invoke("install_basic_packages").then((result) => {
 					let message = result.exit_code === 0 ? 'Successfully installed ' : 'Failed to install ';
@@ -116,7 +123,7 @@ export default {
 		},
 		startup_inner: function() {
 			invoke("get_python_path").then(path => this.python_path = path);
-			invoke("get_detected_python_path").then(path => this.rec_python = path);
+			invoke("get_detected_python_path").then(path => {console.log(path);this.rec_python = path});
 
 			invoke("is_windows").then(is_windows => this.is_windows = is_windows);
 		}

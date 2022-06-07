@@ -308,22 +308,18 @@ impl MatchSettings {
 #[cfg(windows)]
 fn auto_detect_python() -> Option<String> {
     let content_folder = get_content_folder();
-    
+
     match content_folder.join("Python37\\python.exe") {
         path if path.exists() => Some(path.to_str().unwrap().to_string()),
-        _ => match content_folder.join("venv\\python.exe") {
+        _ => match content_folder.join("venv\\Scripts\\python.exe") {
             path if path.exists() => Some(path.to_str().unwrap().to_string()),
             _ => {
                 // Windows actually doesn't have a python3.7.exe command, just python.exe (no matter what)
                 // but there is a pip3.7.exe and stuff
                 // we can then use that to find the path to the right python.exe and use that
                 for pip in ["pip3.7", "pip3.8", "pip3.9", "pip3.6", "pip3"] {
-                    let output = Command::new("where").arg(pip).output().ok()?;
-                    let stdout = String::from_utf8(output.stdout).ok()?;
-
-                    let python_path = Path::new(stdout.lines().next()?).parent().unwrap().parent().unwrap().join("python.exe");
-                    if python_path.exists() {
-                        return Some(python_path.to_str().unwrap().to_string());
+                    if let Ok(value) = get_python_from_pip(pip) {
+                        return Some(value);
                     }
                 }
 
@@ -332,9 +328,27 @@ fn auto_detect_python() -> Option<String> {
                 } else {
                     None
                 }
-            },
+            }
         },
     }
+}
+
+#[cfg(windows)]
+use std::error::Error;
+
+#[cfg(windows)]
+fn get_python_from_pip(pip: &str) -> Result<String, Box<dyn Error>> {
+    let output = Command::new("where").arg(pip).output()?;
+    let stdout = String::from_utf8(output.stdout)?;
+
+    if let Some(first_line) = stdout.lines().next() {
+        let python_path = Path::new(first_line).parent().unwrap().parent().unwrap().join("python.exe");
+        if python_path.exists() {
+            return Ok(python_path.to_str().unwrap().to_string());
+        }
+    }
+
+    Err("Could not find python.exe".into())
 }
 
 #[cfg(target_os = "macos")]
@@ -344,7 +358,7 @@ fn auto_detect_python() -> Option<String> {
             return Some(python.to_string());
         }
     }
-    
+
     None
 }
 
@@ -360,7 +374,7 @@ fn auto_detect_python() -> Option<String> {
             }
 
             None
-        },
+        }
     }
 }
 
