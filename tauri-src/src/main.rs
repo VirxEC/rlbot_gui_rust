@@ -1266,13 +1266,6 @@ async fn is_botpack_up_to_date() -> bool {
 }
 
 fn main() {
-    initialize(&BOT_FOLDER_SETTINGS);
-    initialize(&MATCH_SETTINGS);
-    initialize(&PYTHON_PATH);
-    initialize(&CONSOLE_TEXT);
-    initialize(&STDOUT_CAPTURE);
-    initialize(&STDERR_CAPTURE);
-
     let config_path = get_config_path();
     println!("Config path: {}", config_path.to_str().unwrap());
 
@@ -1322,6 +1315,13 @@ fn main() {
     }
 
     write(missing_packages_script_path, include_str!("get_missing_packages.py")).unwrap();
+    
+    initialize(&BOT_FOLDER_SETTINGS);
+    initialize(&MATCH_SETTINGS);
+    initialize(&PYTHON_PATH);
+    initialize(&CONSOLE_TEXT);
+    initialize(&STDOUT_CAPTURE);
+    initialize(&STDERR_CAPTURE);
 
     tauri::Builder::default()
         .setup(|app| {

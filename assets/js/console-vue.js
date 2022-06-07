@@ -11,7 +11,7 @@ export default {
 			<span class="rlbot-brand" style="flex: 1">RLBot Console</span>
 		</b-navbar-brand>
 		<b-navbar-nav class="ml-auto">
-			<b-button @click="$router.replace('/')" variant="dark" class="ml-2">
+			<b-button @click="$router.back()" variant="dark" class="ml-2">
 				Hide
 			</b-button>
 		</b-navbar-nav>

@@ -30,7 +30,7 @@ export default {
 
 		<b-navbar-nav class="ml-auto">
 			<b-spinner v-if="showProgressSpinner" variant="success" label="Spinning" class="mr-2"></b-spinner>
-			<b-button @click="$router.replace('/console')" variant="dark" class="ml-2">
+			<b-button @click="$router.push('/console')" variant="dark" class="ml-2">
 				Console
 			</b-button>
 			<span id="sandbox-button-wrapper">
@@ -181,10 +181,8 @@ export default {
 
 				<span style="flex-grow: 1"></span>
 
-				<b-button @click="noPython || !hasRLBot ? pythonSetup() : startMatch()" :variant="noPython || !hasRLBot ? 'warning' : 'success'" size="lg" :disabled="matchStarting" class="start-match-btn" style="margin-top: -10px;">
-					<span v-if="noPython">Invalid path to Python</span>
-					<span v-else-if="!hasRLBot">Basic packages not detected</span>
-					<span v-else-if="matchStarting">Starting match</span>
+				<b-button @click="startMatch()" variant="success" size="lg" :disabled="matchStarting" class="start-match-btn" style="margin-top: -10px;">
+					<span v-if="matchStarting">Starting match</span>
 					<span v-else-if="gameAlreadyLaunched">Start another match</span>
 					<span v-else>Launch Rocket League<br>and start match</span>
 				</b-button>
@@ -195,11 +193,10 @@ export default {
 				<b-form>
 					<p class="mr-3">Path to Python executable or command:</p>
 					<b-form-input id="python-exe-path" v-model="python_path" size="md" width="100%"></b-form-input>
-					<b-button v-if="noPython && rec_python" variant="success" class="mt-3" @click="python_path = rec_python"><b-icon icon="exclamation-triangle-fill"/>&nbsp;Insert recommended Python path</b-button>
-					<b-button v-if="noPython && !rec_python && is_windows" variant="success" class="mt-3" @click="installPython()"><b-icon icon="exclamation-triangle-fill"/>&nbsp;Download & Install Python</b-button>
+					<b-button v-if="rec_python && python_path != rec_python" variant="success" class="mt-3" @click="python_path = rec_python"><b-icon icon="exclamation-triangle-fill"/>&nbsp;Insert recommended Python path</b-button>
 					<hr>
-					<p class="mr-3">RLBot requires some basic Python packages to be installed in order to run.</p>
-					<p class="mr-3">Clicking apply will attempt to install and/or update these packages.</p>
+					<p class="mr-3">RLBot <b>requires</b> some basic Python packages to be installed in order to run. <b>You will be redicted if the information you enter doesn't end up working.</b></p>
+					<p class="mr-3">Clicking "Apply" will attempt to <b>install, repair, and/or update</b> these packages.</p>
 				</b-form>
 
 				<div style="display:flex; align-items: flex-end">
@@ -482,11 +479,8 @@ export default {
 			appearancePath: '',
 			recommendations: null,
 			downloadModalTitle: "Downloading Bot Pack",
-			noPython: false,
-			hasRLBot: false,
 			python_path: "",
 			rec_python: null,
-			is_windows: false,
 			init: false,
 			updateDownloadProgressPercent: listen("update-download-progress", event => {
 				this.downloadProgressPercent = event.payload.percent;
@@ -496,30 +490,20 @@ export default {
 	},
 
 	methods: {
-		installPython: function() {
-			this.showProgressSpinner = true;
-			invoke("install_python").then(result => {
-				invoke("get_python_path").then(path => {
-					this.python_path = path;
-					
-					this.snackbarContent = result != null ? "Successfully installed Python to your system" : "Uh-oh! An error happened somewhere!";
-					this.showSnackbar = true;
-					this.showProgressSpinner = false;
-					
-					this.quickReloadWarnings();
-				});
-			});
-			this.$bvModal.hide("python-setup");
-		},
 		pythonSetup: function(event)  {
 			invoke("get_detected_python_path").then(path => this.rec_python = path);
 			this.$bvModal.show("python-setup");
 		},
 		quickReloadWarnings: function() {
 			invoke("get_language_support").then(support => {
-				this.languageSupport = support;
-				this.noPython = !this.languageSupport.python;
-				this.hasRLBot = this.languageSupport.rlbotpython;
+				let noPython = !support.python;
+				let hasRLBot = support.rlbotpython;
+	
+				if (noPython || !hasRLBot) {
+					this.init = false;
+					this.$router.replace('/python-config')
+					return
+				}
 			});
 
 			for (let i = STARTING_BOT_POOL.length; i < this.botPool.length; i++) {
@@ -933,7 +917,6 @@ export default {
 			this.showProgressSpinner = false;
 			
 			if (result.exit_code === 0) {
-				console.log("hello world");
 				this.quickReloadWarnings();
 				this.$bvModal.hide('language-warning-modal');
 			}
@@ -953,9 +936,26 @@ export default {
 			this.$bvModal.hide('recommendations-modal');
 		},
 		startup: function() {
-			if (this.$route.path != "/" || this.init) {
+			if (this.$route.path != "/") {
 				return
 			}
+
+			invoke("get_language_support").then(support => {
+				let noPython = !support.python;
+				let hasRLBot = support.rlbotpython;
+	
+				if (noPython || !hasRLBot) {
+					this.init = false;
+					this.$router.replace('/python-config')
+					return
+				}
+	
+				if (!this.init) {
+					this.startup_inner()
+				}
+			});
+		},
+		startup_inner: function() {
 			invoke('get_folder_settings').then(this.folderSettingsReceived);
 			invoke("get_match_options").then(this.matchOptionsReceived);
 			invoke("get_match_settings").then(this.matchSettingsReceived);
@@ -964,15 +964,11 @@ export default {
 
 			invoke("get_language_support").then(support => {
 				this.languageSupport = support;
-				this.noPython = !this.languageSupport.python;
-				this.hasRLBot = this.languageSupport.rlbotpython;
 				this.applyLanguageWarnings(this.botPool.concat(this.scriptPool));
 			});
 
 			invoke("is_botpack_up_to_date").then(this.botpackUpdateChecked);
 			invoke("get_recommendations").then(this.recommendationsReceived);
-
-			invoke("is_windows").then(is_windows => this.is_windows = is_windows);
 
 			// eel.expose(noRLBotFlagPopup)
 			// function noRLBotFlagPopup(title, text){

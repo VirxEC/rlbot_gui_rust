@@ -2,12 +2,14 @@ import Main from './main-vue.js'
 import Sandbox from './sandbox-vue.js'
 import Story from './story-mode.js'
 import Console from './console-vue.js'
+import PythonConfig from './python-config-vue.js'
 
 const routes = [
     { path: '/', component: Main },
     { path: '/console', component: Console },
     { path: '/sandbox', component: Sandbox },
-    { path: '/story', component: Story }
+    { path: '/story', component: Story },
+    { path: '/python-config', component: PythonConfig },
 ];
 
 const router = new VueRouter({
