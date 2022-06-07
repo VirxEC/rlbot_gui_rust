@@ -306,28 +306,61 @@ impl MatchSettings {
 }
 
 #[cfg(windows)]
-fn auto_detect_python() -> String {
+fn auto_detect_python() -> Option<String> {
     let content_folder = get_content_folder();
-
+    
     match content_folder.join("Python37\\python.exe") {
-        path if path.exists() => path.to_str().unwrap().to_string(),
+        path if path.exists() => Some(path.to_str().unwrap().to_string()),
         _ => match content_folder.join("venv\\python.exe") {
-            path if path.exists() => path.to_str().unwrap().to_string(),
-            _ => "python".to_string(),
+            path if path.exists() => Some(path.to_str().unwrap().to_string()),
+            _ => {
+                // Windows actually doesn't have a python3.7.exe command, just python.exe (no matter what)
+                // but there is a pip3.7.exe and stuff
+                // we can then use that to find the path to the right python.exe and use that
+                for pip in ["pip3.7", "pip3.8", "pip3.9", "pip3.6", "pip3"] {
+                    let output = Command::new("where").arg(pip).output().ok()?;
+                    let stdout = String::from_utf8(output.stdout).ok()?;
+
+                    let python_path = Path::new(stdout.lines().next()?).parent().unwrap().parent().unwrap().join("python.exe");
+                    if python_path.exists() {
+                        return Some(python_path.to_str().unwrap().to_string());
+                    }
+                }
+
+                if get_command_status("python", vec!["--version"]) {
+                    Some("python".to_string())
+                } else {
+                    None
+                }
+            },
         },
     }
 }
 
 #[cfg(target_os = "macos")]
-fn auto_detect_python() -> String {
-    "python3.7".to_string()
+fn auto_detect_python() -> Option<String> {
+    for python in ["python3.7", "python3.8", "python3.9", "python3.6", "python3"] {
+        if get_command_status(python, vec!["--version"]) {
+            return Some(python.to_string());
+        }
+    }
+    
+    None
 }
 
 #[cfg(target_os = "linux")]
-fn auto_detect_python() -> String {
+fn auto_detect_python() -> Option<String> {
     match get_content_folder().join("env/bin/python") {
-        path if path.exists() => path.to_str().unwrap().to_string(),
-        _ => "python3.7".to_string(),
+        path if path.exists() => Some(path.to_str().unwrap().to_string()),
+        _ => {
+            for python in ["python3.7", "python3.8", "python3.9", "python3.6", "python3"] {
+                if get_command_status(python, vec!["--version"]) {
+                    return Some(python.to_string());
+                }
+            }
+
+            None
+        },
     }
 }
 
@@ -355,7 +388,7 @@ lazy_static! {
         config.load(get_config_path()).unwrap();
         match config.get("python_config", "path") {
             Some(path) => path,
-            None => auto_detect_python(),
+            None => auto_detect_python().unwrap_or_default(),
         }
     });
     static ref CONSOLE_TEXT: Mutex<Vec<ConsoleText>> = Mutex::new(vec![
@@ -669,12 +702,7 @@ async fn check_rlbot_python() -> HashMap<String, bool> {
 
 #[tauri::command]
 async fn get_detected_python_path() -> Option<String> {
-    let python = auto_detect_python();
-    if get_command_status(&python, vec!["--version"]) {
-        Some(python)
-    } else {
-        None
-    }
+    auto_detect_python()
 }
 
 #[tauri::command]
@@ -1308,7 +1336,7 @@ fn main() {
         conf.set("mutator_settings", "gravity", Some(GRAVITY_MUTATOR_TYPES[0].to_string()));
         conf.set("mutator_settings", "demolish", Some(DEMOLISH_MUTATOR_TYPES[0].to_string()));
         conf.set("mutator_settings", "respawn_time", Some(RESPAWN_TIME_MUTATOR_TYPES[0].to_string()));
-        conf.set("python_config", "path", Some(auto_detect_python()));
+        conf.set("python_config", "path", Some(auto_detect_python().unwrap_or_default()));
 
         conf.write(&config_path).unwrap();
     }
