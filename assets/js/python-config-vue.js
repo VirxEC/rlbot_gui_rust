@@ -22,18 +22,15 @@ export default {
 				<b-form>
 					<p class="mr-3">Path to Python executable or command:</p>
 					<b-form-input :placeholder="rec_python ? 'Confused? Click the button just below!' : ''" id="python-exe-path" v-model="python_path" size="md" width="100%"></b-form-input>
-					<b-button v-if="rec_python" variant="success" class="mt-3" @click="python_path = rec_python"><b-icon icon="exclamation-triangle-fill"/>&nbsp;Insert recommended Python path</b-button>
+					<b-button v-if="rec_python && rec_python != python_path" variant="success" class="mt-3" @click="partialPythonSetup()"><b-icon icon="exclamation-triangle-fill"/>&nbsp;Use recommended Python path</b-button>
 					<b-button v-if="noPython && !rec_python && is_windows" variant="success" class="mt-3" @click="installPython()"><b-icon icon="exclamation-triangle-fill"/>&nbsp;Download & Install Python</b-button>
 					<hr>
 					<p class="mr-3">RLBot <b>requires</b> some basic Python packages to be installed in order to run <b>that you do not have.</b></p>
 					<p class="mr-3">Clicking "Apply" will attempt to <b>install, repair, and/or update</b> these packages.</p>
+					<div style="display:flex; align-items: flex-end">
+						<b-button variant="primary" class="mt-3" @click="applyPythonSetup()">Apply</b-button>
+					</div>
 				</b-form>
-
-				<div style="display:flex; align-items: flex-end">
-					<b-button variant="primary" class="mt-3" @click="applyPythonSetup()">Apply</b-button>
-					&nbsp;
-					<b-button v-if="noPython && !hasRLBot" variant="warning" class="mt-3" @click="partialPythonSetup()">Apply without configuring</b-button>
-				</div>
 			</b-card>
 
 			<b-toast id="snackbar-toast" v-model="showSnackbar" toaster="b-toaster-bottom-center" body-class="d-none">
@@ -62,17 +59,28 @@ export default {
 		installPython: function() {
 			this.showProgressSpinner = true;
 			invoke("install_python").then(result => {
-				this.snackbarContent = result != null ? "Successfully installed Python to your system" : "Uh-oh! An error happened somewhere!";
+				this.snackbarContent = result != null ? "Successfully installed Python to your system, installing required packages" : "Uh-oh! An error happened somewhere!";
 				this.showSnackbar = true;
-				this.showProgressSpinner = false;
-				
-				this.startup();
+
+				if (result != null) {
+					invoke("install_basic_packages").then((result) => {
+						let message = result.exit_code === 0 ? 'Successfully installed ' : 'Failed to install ';
+						message += result.packages.join(", ");
+						if (result.exit_code != 0) {
+							message += " with exit code " + result.exit_code;
+						}
+						this.snackbarContent = message;
+						this.showSnackbar = true;
+						this.showProgressSpinner = false;
+	
+						this.startup();
+					});
+				}
 			});
 		},
 		applyPythonSetup: function () {
 			this.showProgressSpinner = true;
 			invoke("set_python_path", { path: this.python_path }).then(() => {
-				this.$bvModal.hide("python-setup");
 				invoke("install_basic_packages").then((result) => {
 					let message = result.exit_code === 0 ? 'Successfully installed ' : 'Failed to install ';
 					message += result.packages.join(", ");
@@ -88,13 +96,13 @@ export default {
 			});
 		},
 		partialPythonSetup: function () {
+			this.python_path = this.rec_python;
 			invoke("set_python_path", { path: this.python_path }).then(() => {
-				this.$bvModal.hide("python-setup");
 				this.startup();
 			});
 		},
 		startup: function() {
-			invoke("get_language_support").then(support => {
+			invoke("check_rlbot_python").then(support => {
 				this.noPython = !support.python;
 				this.hasRLBot = support.rlbotpython;
 

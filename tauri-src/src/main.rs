@@ -642,23 +642,29 @@ async fn get_language_support() -> HashMap<String, bool> {
     lang_support.insert("java".to_string(), get_command_status("java", vec!["-version"]));
     lang_support.insert("node".to_string(), get_command_status("node", vec!["--version"]));
     lang_support.insert("chrome".to_string(), has_chrome());
+    lang_support.insert("fullpython".to_string(), get_command_status(&PYTHON_PATH.lock().unwrap(), vec!["-c", "import tkinter"]));
+
+    dbg!(lang_support)
+}
+
+#[tauri::command]
+async fn check_rlbot_python() -> HashMap<String, bool> {
+    let mut python_support = HashMap::new();
 
     let python_path = PYTHON_PATH.lock().unwrap().to_string();
 
     if get_command_status(&python_path, vec!["--version"]) {
-        lang_support.insert("python".to_string(), true);
-        lang_support.insert("fullpython".to_string(), get_command_status(&*python_path, vec!["-c", "import tkinter"]));
-        lang_support.insert(
+        python_support.insert("python".to_string(), true);
+        python_support.insert(
             "rlbotpython".to_string(),
             get_command_status(&python_path, vec!["-c", "import rlbot; import numpy; import numba; import scipy; import selenium"]),
         );
     } else {
-        lang_support.insert("python".to_string(), false);
-        lang_support.insert("fullpython".to_string(), false);
-        lang_support.insert("rlbotpython".to_string(), false);
+        python_support.insert("python".to_string(), false);
+        python_support.insert("rlbotpython".to_string(), false);
     }
 
-    dbg!(lang_support)
+    dbg!(python_support)
 }
 
 #[tauri::command]
@@ -1219,42 +1225,42 @@ async fn install_python() -> Option<u8> {
 #[tauri::command]
 async fn download_bot_pack(window: Window) -> String {
     let botpack_location = get_content_folder().join(BOTPACK_FOLDER).to_str().unwrap().to_string();
-    let (botpack_status, message) = downloader::download_repo(&window, BOTPACK_REPO_OWNER, BOTPACK_REPO_NAME, &botpack_location, true).await;
+    let botpack_status = downloader::download_repo(&window, BOTPACK_REPO_OWNER, BOTPACK_REPO_NAME, &botpack_location, true).await;
 
-    if botpack_status == downloader::BotpackStatus::Success {
-        // Configure the folder settings
-        BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(botpack_location);
+    match botpack_status {
+        downloader::BotpackStatus::Success(message) => {
+            // Configure the folder settings
+            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(botpack_location);
+            message
+        }
+        downloader::BotpackStatus::Skipped(message) => message,
+        _ => unreachable!(),
     }
-
-    message
 }
 
 #[tauri::command]
 async fn update_bot_pack(window: Window) -> String {
     let botpack_location = get_content_folder().join(BOTPACK_FOLDER).to_str().unwrap().to_string();
-    let (botpack_status, message) = downloader::update_bot_pack(&window, BOTPACK_REPO_OWNER, BOTPACK_REPO_NAME, &botpack_location).await;
+    let botpack_status = downloader::update_bot_pack(&window, BOTPACK_REPO_OWNER, BOTPACK_REPO_NAME, &botpack_location).await;
 
     match botpack_status {
-        downloader::BotpackStatus::Success => {
+        downloader::BotpackStatus::Skipped(message) => message,
+        downloader::BotpackStatus::Success(message) => {
             // Configure the folder settings
             BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(botpack_location);
-            message.unwrap()
+            message
         }
         downloader::BotpackStatus::RequiresFullDownload => {
             // We need to download the botpack
             // the most likely cause is the botpack not existing in the first place
-            let (botpack_status, message) = downloader::download_repo(&window, BOTPACK_REPO_OWNER, BOTPACK_REPO_NAME, &botpack_location, true).await;
-
-            if botpack_status == downloader::BotpackStatus::Success {
-                // Configure the folder settings
-                BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(botpack_location);
+            match downloader::download_repo(&window, BOTPACK_REPO_OWNER, BOTPACK_REPO_NAME, &botpack_location, true).await {
+                downloader::BotpackStatus::Success(message) => {
+                    BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(botpack_location);
+                    message
+                }
+                downloader::BotpackStatus::Skipped(message) => message,
+                _ => unreachable!(),
             }
-
-            message
-        }
-        downloader::BotpackStatus::Skipped => {
-            // The message is pre-curated for us
-            message.unwrap()
         }
     }
 }
@@ -1315,7 +1321,7 @@ fn main() {
     }
 
     write(missing_packages_script_path, include_str!("get_missing_packages.py")).unwrap();
-    
+
     initialize(&BOT_FOLDER_SETTINGS);
     initialize(&MATCH_SETTINGS);
     initialize(&PYTHON_PATH);
@@ -1496,6 +1502,7 @@ fn main() {
             download_bot_pack,
             update_bot_pack,
             is_botpack_up_to_date,
+            check_rlbot_python,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

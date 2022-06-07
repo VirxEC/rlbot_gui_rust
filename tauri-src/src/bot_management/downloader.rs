@@ -19,11 +19,11 @@ use crate::{bot_management::zip_extract_fixed, ccprintln, ccprintlne, ccprintlnr
 
 const FOLDER_SUFFIX: &str = "master";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BotpackStatus {
     RequiresFullDownload,
-    Skipped,
-    Success,
+    Skipped(String),
+    Success(String),
 }
 
 fn remove_empty_folders<T: AsRef<Path>>(dir: T) -> Result<(), Box<dyn Error>> {
@@ -116,7 +116,7 @@ async fn download_and_extract_repo_zip<T: IntoUrl, J: AsRef<Path>>(
     Ok(())
 }
 
-pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, checkout_folder: &str, update_tag_settings: bool) -> (BotpackStatus, String) {
+pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, checkout_folder: &str, update_tag_settings: bool) -> BotpackStatus {
     let client = Client::new();
     let repo_full_name = format!("{}/{}", repo_owner, repo_name);
 
@@ -135,7 +135,7 @@ pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, c
             Ok(release) => release["tag_name"].as_str().unwrap().to_string(),
             Err(e) => {
                 ccprintlne(e.to_string());
-                return (BotpackStatus::Success, "Downloaded the bot pack, but failed to get the latest release tag.".to_string());
+                return BotpackStatus::Success("Downloaded the bot pack, but failed to get the latest release tag.".to_string());
             }
         };
 
@@ -144,22 +144,22 @@ pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, c
 
         if let Err(e) = config.load(&config_path) {
             ccprintlne(e);
-            return (BotpackStatus::Success, "Downloaded the bot pack, but failed to load GUI's config.".to_string());
+            return BotpackStatus::Success("Downloaded the bot pack, but failed to load GUI's config.".to_string());
         }
 
         config.set("bot_folder_settings", "incr", Some(latest_release_tag_name));
 
         if let Err(e) = config.write(config_path) {
             ccprintlne(e.to_string());
-            return (BotpackStatus::Success, "Downloaded the bot pack, but failed to write GUI's config.".to_string());
+            return BotpackStatus::Success("Downloaded the bot pack, but failed to write GUI's config.".to_string());
         }
     }
 
     match status {
-        Ok(_) => (BotpackStatus::Success, "Downloaded the bot pack!".to_string()),
+        Ok(_) => BotpackStatus::Success("Downloaded the bot pack!".to_string()),
         Err(e) => {
             ccprintlne(e.to_string());
-            (BotpackStatus::Skipped, "Failed to download the bot pack...".to_string())
+            BotpackStatus::Skipped("Failed to download the bot pack...".to_string())
         }
     }
 }
@@ -193,39 +193,39 @@ pub async fn is_botpack_up_to_date(repo_full_name: &str) -> bool {
     latest_release_tag == current_tag_name
 }
 
-pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str, checkout_folder: &str) -> (BotpackStatus, Option<String>) {
+pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str, checkout_folder: &str) -> BotpackStatus {
     let client = Client::new();
     let repo_full_name = format!("{}/{}", repo_owner, repo_name);
 
     let current_tag_name = match get_current_tag_name() {
         Some(tag) => tag,
-        None => return (BotpackStatus::RequiresFullDownload, None),
+        None => return BotpackStatus::RequiresFullDownload,
     };
 
     let latest_release_tag = match get_json_from_url(&client, &format!("https://api.github.com/repos/{}/releases/latest", repo_full_name)).await {
         Ok(release) => release["tag_name"].as_str().unwrap().replace("incr-", "").parse::<u32>().unwrap(),
         Err(e) => {
             ccprintlne(format!("{}", e));
-            return (BotpackStatus::Skipped, Some("Failed to get the latest release tag.".to_string()));
+            return BotpackStatus::Skipped("Failed to get the latest release tag.".to_string());
         }
     };
 
     if latest_release_tag == current_tag_name {
         ccprintln("The botpack is already up-to-date!".to_string());
-        return (BotpackStatus::Skipped, Some("The botpack is already up-to-date!".to_string()));
+        return BotpackStatus::Skipped("The botpack is already up-to-date!".to_string());
     }
 
     let total_patches = latest_release_tag - current_tag_name;
 
     if total_patches > 50 {
-        return (BotpackStatus::RequiresFullDownload, None);
+        return BotpackStatus::RequiresFullDownload;
     }
 
     let master_folder = format!("{}-{}", repo_name, FOLDER_SUFFIX);
     let local_folder_path = Path::new(checkout_folder).join(master_folder);
 
     if !local_folder_path.exists() {
-        return (BotpackStatus::RequiresFullDownload, None);
+        return BotpackStatus::RequiresFullDownload;
     }
 
     let mut tag = current_tag_name + 1;
@@ -235,7 +235,7 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
     let mut config = Ini::new();
     if let Err(e) = config.load(&config_path) {
         ccprintlne(format!("Failed to open GUI config: {}", e));
-        return (BotpackStatus::Skipped, Some("Failed to open GUI config.".to_string()));
+        return BotpackStatus::Skipped("Failed to open GUI config.".to_string());
     }
 
     let tag_deleted_files_path = local_folder_path.join(".deleted");
@@ -330,8 +330,8 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
     }
 
     if tag - 1 == latest_release_tag {
-        (BotpackStatus::Success, Some("Updated the botpack!".to_string()))
+        BotpackStatus::Success("Updated the botpack!".to_string())
     } else {
-        (BotpackStatus::Skipped, Some("Failed to update the botpack...".to_string()))
+        BotpackStatus::Skipped("Failed to update the botpack...".to_string())
     }
 }
