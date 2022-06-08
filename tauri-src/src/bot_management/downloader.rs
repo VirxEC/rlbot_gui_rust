@@ -1,8 +1,9 @@
 use std::{
+    collections::{HashMap, HashSet},
     error::Error,
     fs::{read_dir, remove_dir, remove_file, File},
-    io::{BufRead, BufReader, Cursor},
-    path::Path,
+    io::{BufRead, BufReader, Cursor, Read, Write},
+    path::{Path, PathBuf},
     time::Instant,
 };
 
@@ -333,5 +334,149 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
         BotpackStatus::Success("Updated the botpack!".to_string())
     } else {
         BotpackStatus::Skipped("Failed to update the botpack...".to_string())
+    }
+}
+
+pub struct MapPackUpdater {
+    full_path: PathBuf,
+    repo_owner: String,
+    repo_name: String,
+    client: Client,
+}
+
+impl MapPackUpdater {
+    pub fn new<T: AsRef<Path>>(location: T, repo_owner: String, repo_name: String) -> Self {
+        Self {
+            full_path: location.as_ref().join(format!("{}-{}", &repo_name, "main")),
+            repo_owner,
+            repo_name,
+            client: Client::new(),
+        }
+    }
+
+    /// For a map pack, gets you the index.json data
+    pub fn get_map_index(&self) -> Option<serde_json::Value> {
+        let index_path = self.full_path.join("index.json");
+
+        if index_path.exists() {
+            let mut file = File::open(index_path).unwrap();
+            let mut contents = String::new();
+            file.read_to_string(&mut contents).unwrap();
+            return Some(serde_json::from_str(&contents).unwrap());
+        }
+
+        None
+    }
+
+    /// Compares the old_index with current index and for any
+    /// maps that have updated the revision, we grab them
+    /// from the latest revision
+    pub async fn needs_update(&self) -> BotpackStatus {
+        let index = match self.get_map_index() {
+            Some(index) => index,
+            None => return BotpackStatus::RequiresFullDownload,
+        };
+
+        let revision = index["revision"].as_u64().unwrap();
+
+        let url = format!("https://api.github.com/repos/{}/{}/releases/latest", self.repo_owner, self.repo_name);
+
+        let latest_release = match get_json_from_url(&self.client, &url).await {
+            Ok(latest_release) => latest_release,
+            Err(e) => {
+                ccprintlne(format!("Failed to get latest release: {}", e));
+                return BotpackStatus::Skipped("Failed to get latest release".to_string());
+            }
+        };
+
+        let latest_revision = latest_release["tag_name"].as_str().unwrap()[1..].parse::<u64>().unwrap();
+
+        if latest_revision > revision {
+            BotpackStatus::RequiresFullDownload
+        } else {
+            ccprintln("Map pack is already up-to-date!".to_string());
+            BotpackStatus::Skipped("Map pack is already up-to-date!".to_string())
+        }
+    }
+
+    fn extract_maps_from_index(index: serde_json::Value) -> HashMap<String, u64> {
+        index["maps"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|map| (map["path"].as_str().unwrap().to_string(), map["revision"].as_u64().unwrap()))
+            .collect::<HashMap<String, u64>>()
+    }
+
+    /// Compares the old_index with current index and for any
+    /// maps that have updated the revision, we grab them
+    /// from the latest revision
+    pub async fn hydrate_map_pack(&self, old_index: Option<serde_json::Value>) {
+        let new_maps = match self.get_map_index() {
+            Some(index) => Self::extract_maps_from_index(index),
+            None => {
+                ccprintlne("Failed to get index.json".to_string());
+                return;
+            }
+        };
+
+        let old_maps = match old_index {
+            Some(index) => Self::extract_maps_from_index(index),
+            None => HashMap::new(),
+        };
+
+        let mut to_fetch = HashSet::new();
+        for (path, revision) in new_maps.iter() {
+            if !old_maps.contains_key(path) || old_maps[path] < *revision {
+                to_fetch.insert(path.to_string());
+            }
+        }
+
+        if to_fetch.is_empty() {
+            return;
+        }
+
+        let mut filename_to_path = HashMap::new();
+        for path in to_fetch.iter() {
+            let filename = Path::new(path).file_name().unwrap().to_str().unwrap();
+            filename_to_path.insert(filename.to_string(), path.to_string());
+        }
+
+        let url = format!("https://api.github.com/repos/{}/{}/releases/latest", self.repo_owner, self.repo_name);
+
+        let latest_release = match get_json_from_url(&self.client, &url).await {
+            Ok(latest_release) => latest_release,
+            Err(e) => {
+                ccprintlne(format!("Failed to get latest release: {}", e));
+                return;
+            }
+        };
+
+        for asset in latest_release["assets"].as_array().unwrap() {
+            let asset_name = asset["name"].as_str().unwrap();
+            if let Err(e) = self.download_asset(asset, asset_name, &filename_to_path, &self.full_path).await {
+                ccprintlne(format!("Failed to download asset {}: {}", asset_name, e));
+            }
+        }
+    }
+
+    async fn download_asset<T: AsRef<Path>>(
+        &self,
+        asset: &serde_json::Value,
+        asset_name: &str,
+        filename_to_path: &HashMap<String, String>,
+        full_path: T,
+    ) -> Result<(), Box<dyn Error>> {
+        if let Some(local_path) = filename_to_path.get(asset_name) {
+            let target_path = full_path.as_ref().join(local_path);
+            ccprintln(format!("Will fetch updated map {}", asset_name));
+
+            let url = asset["browser_download_url"].as_str().unwrap();
+            let resp = self.client.get(url).send().await?.bytes().await?;
+            let mut file = File::create(target_path)?;
+            file.write_all(&resp)?;
+        }
+
+        Ok(())
     }
 }

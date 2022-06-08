@@ -740,7 +740,7 @@ async fn pick_appearance_file() -> Option<String> {
     match FileDialog::new().add_filter("Appearance Cfg File", &["cfg"]).show_open_single_file() {
         Ok(path) => path.map(|path| path.to_str().unwrap().to_string()),
         Err(e) => {
-            dbg!(e);
+            ccprintlne(e.to_string());
             None
         }
     }
@@ -758,7 +758,7 @@ async fn pick_appearance_file(window: Window) -> Option<String> {
             *out_ref = match FileDialog::new().add_filter("Appearance Cfg File", &["cfg"]).show_open_single_file() {
                 Ok(path) => path.map(|path| path.to_str().unwrap().to_string()),
                 Err(e) => {
-                    dbg!(e);
+                    ccprintlne(e.to_string());
                     None
                 }
             };
@@ -805,7 +805,7 @@ fn get_recommendations_json() -> Option<AllRecommendations<String>> {
             let raw_json = match read_to_string(&path2) {
                 Ok(s) => s,
                 Err(_) => {
-                    println!("Failed to read {}", path2.to_str().unwrap());
+                    ccprintlne(format!("Failed to read {}", path2.to_str().unwrap()));
                     continue;
                 }
             };
@@ -813,7 +813,7 @@ fn get_recommendations_json() -> Option<AllRecommendations<String>> {
             match serde_json::from_str(&raw_json) {
                 Ok(j) => return Some(j),
                 Err(e) => {
-                    println!("Failed to parse file {}: {}", path2.to_str().unwrap(), e);
+                    ccprintlne(format!("Failed to parse file {}: {}", path2.to_str().unwrap(), e));
                     continue;
                 }
             }
@@ -1308,6 +1308,43 @@ async fn update_bot_pack(window: Window) -> String {
 }
 
 #[tauri::command]
+async fn update_map_pack(window: Window) -> String {
+    let mappack_location = get_content_folder().join(MAPPACK_FOLDER);
+    let updater = downloader::MapPackUpdater::new(&mappack_location, MAPPACK_REPO.0.to_string(), MAPPACK_REPO.1.to_string());
+    let location = mappack_location.to_str().unwrap();
+    let map_index_old = updater.get_map_index();
+
+    match updater.needs_update().await {
+        downloader::BotpackStatus::Skipped(message) => message,
+        downloader::BotpackStatus::Success(message) => {
+            // Configure the folder settings
+            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(location.to_string());
+            message
+        }
+        downloader::BotpackStatus::RequiresFullDownload => {
+            // We need to download the botpack
+            // the most likely cause is the botpack not existing in the first place
+            match downloader::download_repo(&window, MAPPACK_REPO.0, MAPPACK_REPO.1, location, false).await {
+                downloader::BotpackStatus::Success(message) => {
+                    BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(mappack_location.to_str().unwrap().to_string());
+
+                    if updater.get_map_index().is_none() {
+                        ccprintlne("Couldn't find revision number in map pack".to_string());
+                        return "Couldn't find revision number in map pack".to_string();
+                    }
+
+                    updater.hydrate_map_pack(map_index_old).await;
+
+                    message
+                }
+                downloader::BotpackStatus::Skipped(message) => message,
+                _ => unreachable!(),
+            }
+        }
+    }
+}
+
+#[tauri::command]
 async fn is_botpack_up_to_date() -> bool {
     let repo_full_name = format!("{}/{}", BOTPACK_REPO_OWNER, BOTPACK_REPO_NAME);
     bot_management::downloader::is_botpack_up_to_date(&repo_full_name).await
@@ -1545,6 +1582,7 @@ fn main() {
             update_bot_pack,
             is_botpack_up_to_date,
             check_rlbot_python,
+            update_map_pack,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

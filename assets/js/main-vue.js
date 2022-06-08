@@ -679,7 +679,7 @@ export default {
 			this.$bvModal.show('download-modal');
 			this.downloadStatus = "Starting";
 			this.downloadProgressPercent = 0;
-			// eel.update_map_pack()(this.botPackUpdated.bind(this, 'Downloaded Maps!'));
+			invoke("update_map_pack").then(this.botPackUpdated);
 		},
 		showAppearanceEditor: function(looksPath) {
 			this.appearancePath = looksPath;

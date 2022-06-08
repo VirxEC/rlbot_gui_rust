@@ -12,7 +12,7 @@ use sanitize_filename::sanitize;
 
 use crate::rlbot::parsing::bot_config_bundle::{BOT_CONFIG_MODULE_HEADER, BOT_CONFIG_PARAMS_HEADER, EXECUTABLE_PATH_KEY, NAME_KEY};
 use crate::rlbot::parsing::directory_scanner::scan_directory_for_bot_configs;
-use crate::{ccprintln, BOT_FOLDER_SETTINGS};
+use crate::{ccprintln, ccprintlne, BOT_FOLDER_SETTINGS};
 
 use super::zip_extract_fixed;
 
@@ -201,8 +201,8 @@ pub async fn bootstrap_scratch_bot(bot_name: String, directory: &str) -> Result<
         copy_inside: true,
         ..Default::default()
     };
-    if let Err(e) = move_dir(dbg!(top_dir.join("scratch_bot")), dbg!(&code_dir), &copy_options) {
-        dbg!(&e);
+    if let Err(e) = move_dir(top_dir.join("scratch_bot"), &code_dir, &copy_options) {
+        ccprintlne(e.to_string());
         return Err(format!("Failed to move scratch bot: {}", e));
     }
     rename(code_dir.join("my_scratch_bot.sb3"), sb3_file).unwrap();
