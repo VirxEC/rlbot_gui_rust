@@ -591,6 +591,7 @@ export default {
 			// setTimeout(() => {
 			// 	eel.start_match(blueBots.concat(orangeBots), this.matchSettings);
 			// }, 0);
+			invoke("start_match");
 		},
 		killBots: function(event) {
 			// eel.kill_bots();

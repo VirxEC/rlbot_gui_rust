@@ -29,12 +29,15 @@ use glob::glob;
 use custom_maps::find_all_custom_maps;
 use lazy_static::{initialize, lazy_static};
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelExtend, ParallelIterator};
-use rlbot::parsing::{
-    agent_config_parser::BotLooksConfig,
-    bot_config_bundle::{BotConfigBundle, Clean, ScriptConfigBundle},
-    directory_scanner::scan_directory_for_script_configs,
-};
 use rlbot::{agents::runnable::Runnable, parsing::match_settings_config_parser::*};
+use rlbot::{
+    gateway_util,
+    parsing::{
+        agent_config_parser::BotLooksConfig,
+        bot_config_bundle::{BotConfigBundle, Clean, ScriptConfigBundle},
+        directory_scanner::scan_directory_for_script_configs,
+    },
+};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tauri::{Manager, Window};
@@ -1350,6 +1353,14 @@ async fn is_botpack_up_to_date() -> bool {
     bot_management::downloader::is_botpack_up_to_date(&repo_full_name).await
 }
 
+#[tauri::command]
+async fn start_match() -> Option<String> {
+    let port = gateway_util::find_existing_process().unwrap_or(gateway_util::IDEAL_RLBOT_PORT);
+    dbg!(port);
+
+    None
+}
+
 fn main() {
     let config_path = get_config_path();
     println!("Config path: {}", config_path.to_str().unwrap());
@@ -1583,6 +1594,7 @@ fn main() {
             is_botpack_up_to_date,
             check_rlbot_python,
             update_map_pack,
+            start_match,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
