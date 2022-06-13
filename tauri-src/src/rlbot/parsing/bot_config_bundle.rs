@@ -128,7 +128,7 @@ pub struct BotConfigBundle {
     pub info: Option<DevInfo>,
     pub logo_path: Option<String>,
     pub logo: Option<String>,
-    pub type_: String,
+    pub runnable_type: String,
     pub warn: Option<String>,
     pub image: String,
     supports_standalone: Option<bool>,
@@ -187,7 +187,7 @@ impl BotConfigBundle {
 
         let info = Some(DevInfo::from_config(config));
 
-        let type_ = String::from("rlbot");
+        let runnable_type = String::from("rlbot");
         let warn = None;
         let image = String::from("imgs/rlbot.png");
         let missing_python_packages = None;
@@ -205,7 +205,7 @@ impl BotConfigBundle {
             info,
             logo_path,
             logo,
-            type_,
+            runnable_type,
             warn,
             image,
             supports_standalone,
@@ -219,7 +219,7 @@ impl BotConfigBundle {
 
     pub fn name_from_path(config_path: &Path) -> Result<(String, String), String> {
         let mut config = Ini::new();
-        config.load(config_path).unwrap();
+        config.load(config_path)?;
 
         let name = if let Some(the_name) = config.get(BOT_CONFIG_MODULE_HEADER, NAME_KEY) {
             the_name
@@ -368,7 +368,7 @@ impl Runnable for BotConfigBundle {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub struct ScriptConfigBundle {
     pub name: Option<String>,
-    pub type_: String,
+    pub runnable_type: String,
     pub warn: Option<String>,
     pub image: String,
     pub path: String,
@@ -390,7 +390,7 @@ impl ScriptConfigBundle {
         config.load(config_path.to_str().unwrap())?;
 
         let name = config.get(BOT_CONFIG_MODULE_HEADER, NAME_KEY);
-        let type_ = String::from("script");
+        let runnable_type = String::from("script");
         let warn = None;
         let image = String::from("imgs/rlbot.png");
         let path = config_path.to_str().unwrap().to_string();
@@ -426,7 +426,7 @@ impl ScriptConfigBundle {
 
         Ok(Self {
             name,
-            type_,
+            runnable_type,
             warn,
             image,
             path,

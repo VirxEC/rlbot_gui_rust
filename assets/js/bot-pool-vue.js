@@ -72,19 +72,19 @@ export default {
 			if (!runnable.name.toLowerCase().includes(this.botNameFilter.toLowerCase()))
 				return false;
 			
-			if (runnable.type === 'human')
+			if (runnable.runnable_type === 'human')
 				return this.displayHuman;
 
 			// show psyonix bots only in specific categories
-			if (runnable.type === 'psyonix')
+			if (runnable.runnable_type === 'psyonix')
 				return category.includePsyonixBots;
 
 			// if a script is enabled, display it regardless of which category is selected
 			// except for the script dependencies, where all scripts are displayed already
-			if (runnable.type === 'script' && !category.displayScriptDependencies && runnable.enabled)
+			if (runnable.runnable_type === 'script' && !category.displayScriptDependencies && runnable.enabled)
 				return true;
 
-			let allowedTags = runnable.type === 'script' ? category.scripts : category.bots;
+			let allowedTags = runnable.runnable_type === 'script' ? category.scripts : category.bots;
 			if (allowedTags) {
 				if (allowedTags === '*' || runnable.info == null) {
 					return true;

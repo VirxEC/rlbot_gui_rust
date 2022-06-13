@@ -16,7 +16,7 @@ use tauri::Window;
 
 use futures_util::StreamExt;
 
-use crate::{bot_management::zip_extract_fixed, ccprintln, ccprintlne, ccprintlnr, get_config_path};
+use crate::{bot_management::zip_extract_fixed, ccprintln, ccprintlne, ccprintlnr, get_config_path, load_gui_config};
 
 const FOLDER_SUFFIX: &str = "master";
 
@@ -141,12 +141,7 @@ pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, c
         };
 
         let config_path = get_config_path();
-        let mut config = Ini::new();
-
-        if let Err(e) = config.load(&config_path) {
-            ccprintlne(e);
-            return BotpackStatus::Success("Downloaded the bot pack, but failed to load GUI's config.".to_string());
-        }
+        let mut config = load_gui_config();
 
         config.set("bot_folder_settings", "incr", Some(latest_release_tag_name));
 
@@ -233,11 +228,7 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
     let mut next_download = Some(client.get(get_url_from_tag(&repo_full_name, tag)).send());
 
     let config_path = get_config_path();
-    let mut config = Ini::new();
-    if let Err(e) = config.load(&config_path) {
-        ccprintlne(format!("Failed to open GUI config: {}", e));
-        return BotpackStatus::Skipped("Failed to open GUI config.".to_string());
-    }
+    let mut config = load_gui_config();
 
     let tag_deleted_files_path = local_folder_path.join(".deleted");
 

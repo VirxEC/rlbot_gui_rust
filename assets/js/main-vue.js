@@ -9,12 +9,12 @@ import LauncherPreferenceModal from './launcher-preference-vue.js'
 const invoke = window.__TAURI__.invoke;
 const listen = window.__TAURI__.event.listen;
 
-const HUMAN = {'name': 'Human', 'type_': 'human', 'image': 'imgs/human.png'};
+const HUMAN = {'name': 'Human', 'runnable_type': 'human', 'skill': null, 'image': 'imgs/human.png'};
 const STARTING_BOT_POOL = [
 	HUMAN,
-	{'name': 'Psyonix Allstar', 'type_': 'psyonix', 'skill': 1, 'image': 'imgs/psyonix.png' },
-	{'name': 'Psyonix Pro', 'type_': 'psyonix', 'skill': 0.5, 'image': 'imgs/psyonix.png' },
-	{'name': 'Psyonix Rookie', 'type_': 'psyonix', 'skill': 0, 'image': 'imgs/psyonix.png' }
+	{'name': 'Psyonix Allstar', 'runnable_type': 'psyonix', 'skill': 1, 'image': 'imgs/psyonix.png' },
+	{'name': 'Psyonix Pro', 'runnable_type': 'psyonix', 'skill': 0.5, 'image': 'imgs/psyonix.png' },
+	{'name': 'Psyonix Rookie', 'runnable_type': 'psyonix', 'skill': 0, 'image': 'imgs/psyonix.png' }
 ];
 
 export default {
@@ -280,7 +280,7 @@ export default {
 			<p class="bot-file-path">{{activeBot.path}}</p>
 
 			<div>
-				<b-button v-if="activeBot.type !== 'script'" @click="showAppearanceEditor(activeBot.looks_path)" v-b-modal.appearance-editor-dialog>
+				<b-button v-if="activeBot.runnable_type !== 'script'" @click="showAppearanceEditor(activeBot.looks_path)" v-b-modal.appearance-editor-dialog>
 					<b-icon icon="card-image"></b-icon> Edit Appearance
 				</b-button>
 				<b-button v-if="activeBot.path" @click="showPathInExplorer(activeBot.path)">
@@ -581,17 +581,22 @@ export default {
 			if (this.matchSettings.randomizeMap) await this.setRandomMap();
 
 			this.matchSettings.scripts = this.scriptPool.filter((val) => { return val.enabled });
-			invoke("save_match_settings", { settings: this.matchSettings });
-			invoke("save_team_settings", { blueTeam: this.blueTeam, orangeTeam: this.orangeTeam });
+			invoke("save_match_settings", { settings: this.matchSettings }).then(() => {
+				invoke("save_team_settings", { blueTeam: this.blueTeam, orangeTeam: this.orangeTeam });
+			});
 
-			const blueBots = this.blueTeam.map((bot) => { return  {'name': bot.name, 'team': 0, 'type': bot.type, 'skill': bot.skill, 'path': bot.path} });
-			const orangeBots = this.orangeTeam.map((bot) => { return  {'name': bot.name, 'team': 1, 'type': bot.type, 'skill': bot.skill, 'path': bot.path} });
+			const blueBots = this.blueTeam.map((bot) => { return {'name': bot.name, 'team': 0, 'runnable_type': bot.runnable_type, 'skill': bot.skill ? bot.skill : 1, 'path': bot.path} });
+			const orangeBots = this.orangeTeam.map((bot) => { return {'name': bot.name, 'team': 1, 'runnable_type': bot.runnable_type, 'skill': bot.skill ? bot.skill : 1, 'path': bot.path} });
 
-			// start match asynchronously, so it doesn't block things like updating the background image
-			// setTimeout(() => {
-			// 	eel.start_match(blueBots.concat(orangeBots), this.matchSettings);
-			// }, 0);
-			invoke("start_match");
+			console.info(blueBots.concat(orangeBots));
+			invoke("start_match", { botList: blueBots.concat(orangeBots), matchSettings: this.matchSettings }).then(result => {
+				console.log(result);
+				if (result == "no_rl") {
+					this.$bvModal.show("no-rlbot-flag-modal")
+				}
+
+				this.matchStarting = false;
+			});
 		},
 		killBots: function(event) {
 			// eel.kill_bots();
@@ -723,6 +728,7 @@ export default {
 				this.scriptPool = [];
 				invoke("scan_for_bots").then(this.botsReceived);
 				invoke("scan_for_scripts").then(this.scriptsReceived);
+				invoke("get_recommendations").then(this.recommendationsReceived);
 			});
 		},
 		botLoadHandler: function (response) {
@@ -762,6 +768,8 @@ export default {
 					this.botPool[index].logo = botLogo.logo;
 				});
 			});
+
+			invoke("get_recommendations").then(this.recommendationsReceived);
 		},
 
 		scriptsReceived: function (scripts) {
@@ -902,7 +910,6 @@ export default {
 			this.showSnackbar = true;
 			this.$bvModal.hide('download-modal');
 			invoke("get_folder_settings").then(this.folderSettingsReceived);
-			invoke("get_recommendations").then(this.recommendationsReceived);
 			invoke("get_match_options").then(this.matchOptionsReceived);
 			this.$refs.botPool.setDefaultCategory();
 		},
@@ -990,11 +997,6 @@ export default {
 			// 	self.showSnackbar = true;
 			// }
 
-			// eel.expose(updateDownloadProgress);
-			// function updateDownloadProgress(progress, status) {
-			// 	this.downloadStatus = status;
-			// 	this.downloadProgressPercent = progress;
-			// }
 			this.init = true;
 		},
 		allUsableRunnables: function() {
