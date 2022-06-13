@@ -89,6 +89,9 @@ pub fn load_gui_config() -> Ini {
         conf.set("mutator_settings", "demolish", Some(DEMOLISH_MUTATOR_TYPES[0].to_string()));
         conf.set("mutator_settings", "respawn_time", Some(RESPAWN_TIME_MUTATOR_TYPES[0].to_string()));
         conf.set("python_config", "path", Some(auto_detect_python().unwrap_or_default()));
+        conf.set("launcher_settings", "preferred_launcher", Some("epic".to_string()));
+        conf.set("launcher_settings", "use_login_tricks", Some("true".to_string()));
+        conf.set("launcher_settings", "rocket_league_exe_path", None);
 
         conf.write(&config_path).unwrap();
     } else if let Err(e) = conf.load(config_path) {
@@ -484,10 +487,6 @@ fn get_content_folder() -> PathBuf {
 #[cfg(target_os = "linux")]
 fn get_content_folder() -> PathBuf {
     PathBuf::from(format!("{}/.RLBotGUI", env::var("HOME").unwrap()))
-}
-
-fn get_missing_packages_script_path() -> PathBuf {
-    get_content_folder().join("get_missing_packages.py")
 }
 
 #[tauri::command]
@@ -1388,6 +1387,45 @@ async fn is_botpack_up_to_date() -> bool {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+struct LauncherSettings {
+    preferred_launcher: String,
+    use_login_tricks: bool,
+    rocket_league_exe_path: Option<String>,
+}
+
+impl LauncherSettings {
+    fn new() -> Self {
+        let config = load_gui_config();
+
+        Self {
+            preferred_launcher: config.get("launcher_settings", "preferred_launcher").unwrap_or_else(|| "epic".to_string()),
+            use_login_tricks: config.getbool("launcher_settings", "use_login_tricks").unwrap_or_default().unwrap_or(true),
+            rocket_league_exe_path: config.get("launcher_settings", "rocket_league_exe_path"),
+        }
+    }
+
+    fn write_to_file(self) {
+        let mut config = load_gui_config();
+
+        config.set("launcher_settings", "preferred_launcher", Some(self.preferred_launcher));
+        config.set("launcher_settings", "use_login_tricks", Some(self.use_login_tricks.to_string()));
+        config.set("launcher_settings", "rocket_league_exe_path", self.rocket_league_exe_path);
+
+        config.write(get_config_path()).unwrap();
+    }
+}
+
+#[tauri::command]
+async fn get_launcher_settings() -> LauncherSettings {
+    LauncherSettings::new()
+}
+
+#[tauri::command]
+async fn save_launcher_settings(settings: LauncherSettings) {
+    settings.write_to_file();
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
 struct TeamBotBundle {
     pub name: String,
     pub team: u8,
@@ -1402,7 +1440,10 @@ async fn start_match(bot_list: Vec<TeamBotBundle>, match_settings: MatchSettings
     dbg!(port);
 
     match setup_manager::is_rocket_league_running(port) {
-        Ok(is_running) => ccprintln(format!("Rocket League is {}", if is_running { "already running with RLBot args!" } else { "not running yet..." })),
+        Ok(is_running) => ccprintln(format!(
+            "Rocket League is {}",
+            if is_running { "already running with RLBot args!" } else { "not running yet..." }
+        )),
         Err(err) => {
             ccprintlne(err);
             return Some("no_rl".to_string());
@@ -1412,18 +1453,24 @@ async fn start_match(bot_list: Vec<TeamBotBundle>, match_settings: MatchSettings
     None
 }
 
+fn bootstrap_python_script<T: AsRef<Path>, C: AsRef<[u8]>>(content_folder: T, file_name: &str, file_contents: C) {
+    let full_path = content_folder.as_ref().join(file_name);
+    println!("{}: {}", file_name, full_path.to_str().unwrap());
+
+    if !full_path.parent().unwrap().exists() {
+        create_dir_all(&full_path).unwrap();
+    }
+
+    write(full_path, file_contents).unwrap();
+}
+
 fn main() {
     println!("Config path: {}", get_config_path().display());
     load_gui_config();
 
-    let missing_packages_script_path = get_missing_packages_script_path();
-    println!("get_missing_packages.py: {}", missing_packages_script_path.to_str().unwrap());
-
-    if !missing_packages_script_path.parent().unwrap().exists() {
-        create_dir_all(&missing_packages_script_path).unwrap();
-    }
-
-    write(missing_packages_script_path, include_str!("get_missing_packages.py")).unwrap();
+    let content_folder = get_content_folder();
+    bootstrap_python_script(&content_folder, "get_missing_packages.py", include_str!("get_missing_packages.py"));
+    bootstrap_python_script(&content_folder, "start_match.py", include_str!("start_match.py"));
 
     initialize(&BOT_FOLDER_SETTINGS);
     initialize(&MATCH_SETTINGS);
@@ -1608,6 +1655,8 @@ fn main() {
             check_rlbot_python,
             update_map_pack,
             start_match,
+            get_launcher_settings,
+            save_launcher_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

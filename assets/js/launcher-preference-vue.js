@@ -1,3 +1,5 @@
+const invoke = window.__TAURI__.invoke;
+
 export default {
 	name: 'launcher-preference',
 	props: ['modalId'],
@@ -46,10 +48,12 @@ export default {
 	computed: {
 		exePathState: function() {
 			if (this.launcherSettings.preferred_launcher == 'steam' || this.launcherSettings.rocket_league_exe_path === '') return null;
-			return this.launcherSettings.rocket_league_exe_path.endsWith("RocketLeague.exe");
+			return this.launcherSettings.rocket_league_exe_path && this.launcherSettings.rocket_league_exe_path.endsWith("RocketLeague.exe");
 		},
 		correctedExePath: function() {
 			let path = this.launcherSettings.rocket_league_exe_path;
+			if (!path) return;
+
 			if (path.endsWith("rocketleague")) {
 				path += "\\Binaries";
 			}
@@ -60,7 +64,6 @@ export default {
 				path += "\\RocketLeague.exe";
 				return path;
 			}
-			return null;
 		},
 	},
 	methods: {
@@ -70,11 +73,11 @@ export default {
 			}
 		},
 		saveLauncherSettings: function () {
-			eel.save_launcher_settings(this.launcherSettings);
+			invoke("save_launcher_settings", { settings: this.launcherSettings});
 			this.$bvModal.hide(this.modalId);
 		},
 	},
 	created: function () {
-		eel.get_launcher_settings()(this.launcherSettingsReceived);
+		invoke("get_launcher_settings").then(this.launcherSettingsReceived); 
 	},
 }
