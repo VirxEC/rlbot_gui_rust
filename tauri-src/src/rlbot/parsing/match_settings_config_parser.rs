@@ -1,21 +1,3 @@
-// pub const MUTATOR_CONFIGURATION_HEADER: &str = "Mutator Configuration";
-// pub const MUTATOR_MATCH_LENGTH: &str = "Match Length";
-// pub const MUTATOR_MAX_SCORE: &str = "Max Score";
-// pub const MUTATOR_OVERTIME: &str = "Overtime";
-// pub const MUTATOR_SERIES_LENGTH: &str = "Series Length";
-// pub const MUTATOR_GAME_SPEED: &str = "Game Speed";
-// pub const MUTATOR_BALL_MAX_SPEED: &str = "Ball Max Speed";
-// pub const MUTATOR_BALL_TYPE: &str = "Ball Type";
-// pub const MUTATOR_BALL_WEIGHT: &str = "Ball Weight";
-// pub const MUTATOR_BALL_SIZE: &str = "Ball Size";
-// pub const MUTATOR_BALL_BOUNCINESS: &str = "Ball Bounciness";
-// pub const MUTATOR_BOOST_AMOUNT: &str = "Boost Amount";
-// pub const MUTATOR_RUMBLE: &str = "Rumble";
-// pub const MUTATOR_BOOST_STRENGTH: &str = "Boost Strength";
-// pub const MUTATOR_GRAVITY: &str = "Gravity";
-// pub const MUTATOR_DEMOLISH: &str = "Demolish";
-// pub const MUTATOR_RESPAWN_TIME: &str = "Respawn Time";
-
 // pub const MATCH_CONFIGURATION_HEADER: &str = "Match Configuration";
 // pub const PARTICIPANT_COUNT_KEY: &str = "num_participants";
 // pub const GAME_MODE: &str = "game_mode";

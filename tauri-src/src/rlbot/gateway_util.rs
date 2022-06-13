@@ -13,7 +13,7 @@ pub fn find_existing_process() -> Option<u16> {
     let system = System::new_with_specifics(RefreshKind::new().with_processes(ProcessRefreshKind::new()));
 
     if let Some(process_info) = system.processes_by_name(EXECUTABLE_NAME).next() {
-        if dbg!(process_info.cmd()).len() > 1 {
+        if process_info.cmd().len() > 1 {
             let port = process_info.cmd()[1].parse::<u16>().unwrap();
             return Some(port);
         }

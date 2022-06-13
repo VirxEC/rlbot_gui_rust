@@ -589,9 +589,8 @@ export default {
 			const orangeBots = this.orangeTeam.map((bot) => { return {'name': bot.name, 'team': 1, 'runnable_type': bot.runnable_type, 'skill': bot.skill ? bot.skill : 1, 'path': bot.path} });
 
 			console.info(blueBots.concat(orangeBots));
-			invoke("start_match", { botList: blueBots.concat(orangeBots), matchSettings: this.matchSettings }).then(result => {
-				console.log(result);
-				if (result == "no_rl") {
+			invoke("start_match", { botList: blueBots.concat(orangeBots), matchSettings: this.matchSettings }).then(ok => {
+				if (!ok) {
 					this.$bvModal.show("no-rlbot-flag-modal")
 				}
 

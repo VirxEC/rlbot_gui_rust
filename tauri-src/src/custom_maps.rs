@@ -1,10 +1,6 @@
-// pub const CUSTOM_MAP_TARGET: (&str, &str) = ("Labs_Utopia_P.upk", "UtopiaRetro");
-
-use std::collections::HashMap;
-
-use crate::BotFolder;
-
+use crate::settings::BotFolder;
 use glob::glob;
+use std::collections::HashMap;
 
 fn get_search_folders(bf: &HashMap<String, BotFolder>) -> Vec<String> {
     bf.iter().filter(|(_, bf)| bf.visible).map(|(path, _)| path.clone()).collect()

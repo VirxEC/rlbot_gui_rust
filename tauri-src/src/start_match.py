@@ -1,6 +1,7 @@
 import json
 import sys
 from pathlib import Path
+from threading import Thread
 from typing import List
 
 from rlbot.matchconfig.match_config import (MatchConfig, MutatorConfig,
@@ -19,8 +20,8 @@ sm: SetupManager = None
 
 def create_player_config(bot: dict, human_index_tracker: IncrementingInteger):
     player_config = PlayerConfig()
-    player_config.bot = bot['type'] in ('rlbot', 'psyonix')
-    player_config.rlbot_controlled = bot['type'] in ('rlbot', 'party_member_bot')
+    player_config.bot = bot['runnable_type'] in ('rlbot', 'psyonix')
+    player_config.rlbot_controlled = bot['runnable_type'] in ('rlbot', 'party_member_bot')
     player_config.bot_skill = bot['skill']
     player_config.human_index = 0 if player_config.bot else human_index_tracker.increment()
     player_config.name = bot['name']

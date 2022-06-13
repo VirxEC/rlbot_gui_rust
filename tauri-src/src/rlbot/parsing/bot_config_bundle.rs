@@ -1,13 +1,10 @@
-use std::process::{self, Stdio};
-use std::{fs, io::Read, path::Path};
-
+use crate::rlbot::agents::{base_script::SCRIPT_FILE_KEY, runnable::Runnable};
+use crate::{ccprintln, get_command_status, get_content_folder, PYTHON_PATH};
 use configparser::ini::Ini;
 use imghdr::Type;
 use serde::{Deserialize, Serialize};
-
-use crate::rlbot::agents::{base_script::SCRIPT_FILE_KEY, runnable::Runnable};
-
-use crate::{ccprintln, get_command_status, get_content_folder, PYTHON_PATH};
+use std::process::{self, Stdio};
+use std::{fs, io::Read, path::Path};
 
 pub const PYTHON_FILE_KEY: &str = "python_file";
 pub const REQUIREMENTS_FILE_KEY: &str = "requirements_file";
@@ -372,7 +369,7 @@ pub struct ScriptConfigBundle {
     pub warn: Option<String>,
     pub image: String,
     pub path: String,
-    pub info: DevInfo,
+    pub info: Option<DevInfo>,
     pub logo: Option<String>,
     pub logo_path: Option<String>,
     pub missing_python_packages: Option<Vec<String>>,
@@ -419,7 +416,7 @@ impl ScriptConfigBundle {
         let ta_logo = format!("{}/{}", config_directory, t_logo);
         let logo = None;
 
-        let info = DevInfo::from_config(config);
+        let info = Some(DevInfo::from_config(config));
 
         let missing_python_packages = None;
         let logo_path = Some(ta_logo);

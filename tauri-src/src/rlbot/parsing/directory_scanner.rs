@@ -1,8 +1,7 @@
+use super::bot_config_bundle::{BotConfigBundle, ScriptConfigBundle};
 use glob::glob;
 use rayon::iter::{FromParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::{collections::HashSet, path::Path};
-
-use super::bot_config_bundle::{BotConfigBundle, ScriptConfigBundle};
 
 pub fn scan_directory_for_bot_configs(root_dir: &str) -> HashSet<BotConfigBundle> {
     let pattern = Path::new(root_dir).join("**/*.cfg");
