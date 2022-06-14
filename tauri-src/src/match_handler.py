@@ -1,7 +1,7 @@
 import json
 import sys
 from pathlib import Path
-from threading import Thread
+from traceback import print_exc
 from typing import List
 
 from rlbot.matchconfig.match_config import (MatchConfig, MutatorConfig,
@@ -78,17 +78,6 @@ def setup_match(
     setup_manager.start_match()
     setup_manager.launch_bot_processes()
 
-def get_launcher_prefs() -> RocketLeagueLauncherPreference:
-    preferred_launcher = tuple(arg for arg in sys.argv if "preferred_launcher" in arg)[0].split('=')[1]
-    use_login_tricks = bool(tuple(arg for arg in sys.argv if "use_login_tricks" in arg)[0].split('=')[1])
-    rocket_league_exe_path_optional = tuple(arg for arg in sys.argv if "rocket_league_exe_path" in arg)[0].split('=')
-    if len(rocket_league_exe_path_optional) > 1:
-        rocket_league_exe_path = Path(rocket_league_exe_path_optional[1])
-    else:
-        rocket_league_exe_path = None
-
-    return RocketLeagueLauncherPreference(preferred_launcher, use_login_tricks, rocket_league_exe_path)
-
 def start_match_helper(bot_list: List[dict], match_settings: dict, launcher_prefs: RocketLeagueLauncherPreference):
     print(bot_list)
     print(match_settings)
@@ -128,19 +117,46 @@ def start_match_helper(bot_list: List[dict], match_settings: dict, launcher_pref
     match_config.player_configs = [create_player_config(bot, human_index_tracker) for bot in bot_list]
     match_config.script_configs = [create_script_config(script) for script in match_settings['scripts']]
 
+    # these fancy prints to stderr will not get printed to the console
+    # the Rust port of the RLBotGUI will capture it and fire a tauri event
+
     sm = get_fresh_setup_manager()
     try:
         setup_match(sm, match_config, launcher_prefs)
-    except Exception as e:
-        print(e)
+    except Exception:
+        print_exc()
+        print("-|-*|MATCH START FAILED|*-|-", file=sys.stderr)
         # eel.matchStartFailed(str(e))
         return
 
+    print("-|-*|MATCH STARTED|*-|-", file=sys.stderr)
     # eel.matchStarted()
 
-if __name__ == "__main__":
-    bot_list: List[dict] = json.loads(tuple(arg for arg in sys.argv if "bot_list" in arg)[0].split('=')[1])
-    match_settings: dict = json.loads(tuple(arg for arg in sys.argv if "match_settings" in arg)[0].split('=')[1])
-    launcher_prefs = get_launcher_prefs()
+def shut_down():
+    if sm is not None:
+        sm.shut_down(time_limit=5, kill_all_pids=True)
+    else:
+        print("There gotta be some setup manager already")
 
-    start_match_helper(bot_list, match_settings, launcher_prefs)
+while True:
+    command = input()
+    try:
+        params = command.split(" | ")
+        if params[0] == "start_match":
+            bot_list = json.loads(params[1])
+            match_settings = json.loads(params[2])
+
+            preferred_launcher = params[3]
+            use_login_tricks = bool(params[4])
+            if params[5] != "":
+                rocket_league_exe_path = Path(params[5])
+            else:
+                rocket_league_exe_path = None
+
+            start_match_helper(bot_list, match_settings, RocketLeagueLauncherPreference(preferred_launcher, use_login_tricks, rocket_league_exe_path))
+        elif params[0] == "shut_down":
+            break
+    except Exception:
+        print_exc()
+
+shut_down()

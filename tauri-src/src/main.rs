@@ -30,6 +30,19 @@ const MAPPACK_REPO: (&str, &str) = ("azeemba", "RLBotMapPack");
 const BOTPACK_REPO_OWNER: &str = "RLBot";
 const BOTPACK_REPO_NAME: &str = "RLBotPack";
 
+lazy_static! {
+    static ref BOT_FOLDER_SETTINGS: Mutex<BotFolderSettings> = Mutex::new(BotFolderSettings::new());
+    static ref MATCH_SETTINGS: Mutex<MatchSettings> = Mutex::new(MatchSettings::new());
+    static ref PYTHON_PATH: Mutex<String> = Mutex::new(load_gui_config().get("python_config", "path").unwrap_or_else(|| auto_detect_python().unwrap_or_default()));
+    static ref CONSOLE_TEXT: Mutex<Vec<ConsoleText>> = Mutex::new(vec![
+        ConsoleText::from("Welcome to the RLBot Console!".to_string(), false),
+        ConsoleText::from("".to_string(), false)
+    ]);
+    static ref MATCH_HANDLER_STDIN: Mutex<Option<MatchHandlerStdin>> = Mutex::new(None);
+    static ref STDOUT_CAPTURE: Arc<Mutex<Vec<Option<ChildStdout>>>> = Arc::new(Mutex::new(Vec::new()));
+    static ref STDERR_CAPTURE: Arc<Mutex<Vec<Option<ChildStderr>>>> = Arc::new(Mutex::new(Vec::new()));
+}
+
 #[cfg(windows)]
 fn auto_detect_python() -> Option<String> {
     let content_folder = get_content_folder();
@@ -105,21 +118,6 @@ fn auto_detect_python() -> Option<String> {
 
 fn get_config_path() -> PathBuf {
     get_content_folder().join("config.ini")
-}
-
-lazy_static! {
-    static ref BOT_FOLDER_SETTINGS: Mutex<BotFolderSettings> = Mutex::new(BotFolderSettings::new());
-    static ref MATCH_SETTINGS: Mutex<MatchSettings> = Mutex::new(MatchSettings::new());
-    static ref PYTHON_PATH: Mutex<String> = Mutex::new(match load_gui_config().get("python_config", "path") {
-        Some(path) => path,
-        None => auto_detect_python().unwrap_or_default(),
-    });
-    static ref CONSOLE_TEXT: Mutex<Vec<ConsoleText>> = Mutex::new(vec![
-        ConsoleText::from("Welcome to the RLBot Console!".to_string(), false),
-        ConsoleText::from("".to_string(), false)
-    ]);
-    static ref STDOUT_CAPTURE: Arc<Mutex<Vec<Option<ChildStdout>>>> = Arc::new(Mutex::new(Vec::new()));
-    static ref STDERR_CAPTURE: Arc<Mutex<Vec<Option<ChildStderr>>>> = Arc::new(Mutex::new(Vec::new()));
 }
 
 pub fn ccprintln(text: String) {
@@ -267,12 +265,13 @@ fn main() {
 
     let content_folder = get_content_folder();
     bootstrap_python_script(&content_folder, "get_missing_packages.py", include_str!("get_missing_packages.py"));
-    bootstrap_python_script(&content_folder, "start_match.py", include_str!("start_match.py"));
+    bootstrap_python_script(&content_folder, "match_handler.py", include_str!("match_handler.py"));
 
     initialize(&BOT_FOLDER_SETTINGS);
     initialize(&MATCH_SETTINGS);
     initialize(&PYTHON_PATH);
     initialize(&CONSOLE_TEXT);
+    initialize(&MATCH_HANDLER_STDIN);
     initialize(&STDOUT_CAPTURE);
     initialize(&STDERR_CAPTURE);
 
@@ -397,6 +396,14 @@ fn main() {
                         if !err_strs.is_empty() {
                             let mut console_text = CONSOLE_TEXT.lock().unwrap();
                             for err_str in &err_strs {
+                                if err_str.content.text == "-|-*|MATCH START FAILED|*-|-" {
+                                    eprintln!("START MATCH FAILED");
+                                    continue;
+                                } else if err_str.content.text == "-|-*|MATCH STARTED|*-|-" {
+                                    eprintln!("MATCH STARTED");
+                                    continue;
+                                }
+                                
                                 console_text.push(err_str.content.clone());
                             }
                             if console_text.len() > 1200 {
@@ -454,6 +461,7 @@ fn main() {
             start_match,
             get_launcher_settings,
             save_launcher_settings,
+            kill_bots,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

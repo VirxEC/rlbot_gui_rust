@@ -588,7 +588,6 @@ export default {
 			const blueBots = this.blueTeam.map((bot) => { return {'name': bot.name, 'team': 0, 'runnable_type': bot.runnable_type, 'skill': bot.skill ? bot.skill : 1, 'path': bot.path} });
 			const orangeBots = this.orangeTeam.map((bot) => { return {'name': bot.name, 'team': 1, 'runnable_type': bot.runnable_type, 'skill': bot.skill ? bot.skill : 1, 'path': bot.path} });
 
-			console.info(blueBots.concat(orangeBots));
 			invoke("start_match", { botList: blueBots.concat(orangeBots), matchSettings: this.matchSettings }).then(ok => {
 				if (!ok) {
 					this.$bvModal.show("no-rlbot-flag-modal")
@@ -598,7 +597,7 @@ export default {
 			});
 		},
 		killBots: function(event) {
-			// eel.kill_bots();
+			invoke("kill_bots");
 			this.matchStarting = false;
 		},
 		pickBotFolder: function (event) {

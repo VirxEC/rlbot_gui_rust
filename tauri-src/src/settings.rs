@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{collections::HashMap, fs::create_dir_all, str::FromStr};
+use std::{collections::HashMap, fs::create_dir_all, process::ChildStdin, str::FromStr};
 
 use crate::{
     auto_detect_python, ccprintlne, get_config_path,
@@ -431,4 +431,21 @@ pub struct TeamBotBundle {
     pub skill: f32,
     pub runnable_type: String,
     pub path: Option<String>,
+}
+
+#[derive(Debug)]
+pub struct MatchHandlerStdin {
+    pub stdin: ChildStdin,
+    pub stdout_index: usize,
+    pub stderr_index: usize,
+}
+
+impl MatchHandlerStdin {
+    pub const fn new(stdin: ChildStdin, stdout_index: usize, stderr_index: usize) -> Self {
+        Self {
+            stdin,
+            stdout_index,
+            stderr_index,
+        }
+    }
 }

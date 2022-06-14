@@ -21,7 +21,7 @@ use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelExte
 use std::{
     collections::{HashMap, HashSet},
     fs::{create_dir_all, read_to_string, File},
-    io::{copy, Cursor},
+    io::{copy, Cursor, Write},
     path::Path,
     process::{Command, Stdio},
 };
@@ -774,8 +774,10 @@ pub async fn save_launcher_settings(settings: LauncherSettings) {
     settings.write_to_file();
 }
 
-fn start_match_process(bot_list: &str, match_settings: &str, preferred_launcher: &str, use_login_tricks: bool, rocket_league_exe_path: Option<String>) {
-    let mut command = Command::new(&*PYTHON_PATH.lock().unwrap());
+fn create_match_handler() -> Option<MatchHandlerStdin> {
+    let mut program = Command::new(&*PYTHON_PATH.lock().unwrap());
+    let script_path = get_content_folder().join("match_handler.py");
+    let args = [script_path.to_str().unwrap().to_string()];
 
     #[cfg(windows)]
     {
@@ -784,20 +786,12 @@ fn start_match_process(bot_list: &str, match_settings: &str, preferred_launcher:
         command.creation_flags(0x08000000);
     };
 
-    let script_path = get_content_folder().join("start_match.py");
-    let args = vec![
-        script_path.to_str().unwrap().to_string(),
-        format!("bot_list={}", bot_list),
-        format!("match_settings={}", match_settings),
-        format!("preferred_launcher={}", preferred_launcher),
-        format!("use_login_tricks={}", use_login_tricks),
-        format!("rocket_league_exe_path={}", rocket_league_exe_path.unwrap_or_else(|| "None".to_string())),
-    ];
-
-    let mut child = if let Ok(the_child) = command.args(args).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn() {
-        the_child
-    } else {
-        return;
+    let mut child = match program.args(args).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn() {
+        Ok(child) => child,
+        Err(err) => {
+            ccprintlne(format!("Failed to start match handler: {}", err));
+            return None;
+        }
     };
 
     let stdout_index = {
@@ -822,15 +816,29 @@ fn start_match_process(bot_list: &str, match_settings: &str, preferred_launcher:
         }
     };
 
-    child.wait().unwrap();
-    STDOUT_CAPTURE.lock().unwrap()[stdout_index] = None;
-    STDERR_CAPTURE.lock().unwrap()[stderr_index] = None;
+    Some(MatchHandlerStdin::new(child.stdin.take().unwrap(), stdout_index, stderr_index))
+}
+
+pub fn issue_match_handler_command(command_parts: &[String]) {
+    let mut match_handler_stdin = MATCH_HANDLER_STDIN.lock().unwrap();
+
+    if match_handler_stdin.is_none() {
+        *match_handler_stdin = create_match_handler();
+    }
+
+    let command = format!("{}\n", command_parts.join(" | "));
+    let stdin = &mut match_handler_stdin.as_mut().unwrap().stdin;
+
+    if stdin.write_all(command.as_bytes()).is_err() {
+        *match_handler_stdin = None;
+        ccprintlne("Match handler is no longer accepting commands. Restarting!".to_string());
+        issue_match_handler_command(command_parts);
+    }
 }
 
 #[tauri::command]
 pub async fn start_match(bot_list: Vec<TeamBotBundle>, match_settings: MatchSettings) -> bool {
     let port = gateway_util::find_existing_process().unwrap_or(gateway_util::IDEAL_RLBOT_PORT);
-    dbg!(port);
 
     match setup_manager::is_rocket_league_running(port) {
         Ok(is_running) => ccprintln(format!(
@@ -845,17 +853,21 @@ pub async fn start_match(bot_list: Vec<TeamBotBundle>, match_settings: MatchSett
 
     let launcher_settings = LauncherSettings::new();
 
-    // TODO: we can send input, but we can't get output right now
-    // this means no error messages :(
-    // possible solution would be to just monitor stderr and fire an event
-    // TODO: this process is blocking, a way should be found to make it non-blocking
-    start_match_process(
-        serde_json::to_string(&bot_list).unwrap().as_str(),
-        serde_json::to_string(&match_settings.super_cleaned_scripts()).unwrap().as_str(),
-        launcher_settings.preferred_launcher.as_str(),
-        launcher_settings.use_login_tricks,
-        launcher_settings.rocket_league_exe_path,
-    );
+    let args = [
+        "start_match".to_string(),
+        serde_json::to_string(&bot_list).unwrap().as_str().to_string(),
+        serde_json::to_string(&match_settings.super_cleaned_scripts()).unwrap().as_str().to_string(),
+        launcher_settings.preferred_launcher,
+        launcher_settings.use_login_tricks.to_string(),
+        launcher_settings.rocket_league_exe_path.unwrap_or_default(),
+    ];
+
+    issue_match_handler_command(&args);
 
     true
+}
+
+#[tauri::command]
+pub async fn kill_bots() {
+    issue_match_handler_command(&["shut_down".to_string()]);
 }
