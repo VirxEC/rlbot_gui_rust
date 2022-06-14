@@ -1,15 +1,3 @@
-// pub const MATCH_CONFIGURATION_HEADER: &str = "Match Configuration";
-// pub const PARTICIPANT_COUNT_KEY: &str = "num_participants";
-// pub const GAME_MODE: &str = "game_mode";
-// pub const GAME_MAP: &str = "game_map";
-// pub const SKIP_REPLAYS: &str = "skip_replays";
-// pub const INSTANT_START: &str = "start_without_countdown";
-// pub const EXISTING_MATCH_BEHAVIOR: &str = "existing_match_behavior";
-// pub const ENABLE_LOCKSTEP: &str = "enable_lockstep";
-// pub const ENABLE_RENDERING: &str = "enable_rendering";
-// pub const ENABLE_STATE_SETTING: &str = "enable_state_setting";
-// pub const AUTO_SAVE_REPLAY: &str = "auto_save_replay";
-
 pub const MAP_TYPES: [&str; 60] = [
     "DFHStadium",
     "Mannfield",

@@ -207,7 +207,7 @@ export default {
 			</b-modal>
 
 			<div>
-				<b-form-checkbox v-model="matchSettings.randomizeMap" class="mt-1 mb-1">
+				<b-form-checkbox v-model="matchSettings.randomize_map" class="mt-1 mb-1">
 					Randomize Map
 				</b-form-checkbox>
 			</div>
@@ -453,7 +453,7 @@ export default {
 					demolish: null,
 					respawn_time: null
 				},
-				randomizeMap: false,
+				randomize_map: false,
 				enable_rendering: false,
 				enable_state_setting: false,
 				auto_save_replay: false,
@@ -485,6 +485,15 @@ export default {
 			updateDownloadProgressPercent: listen("update-download-progress", event => {
 				this.downloadProgressPercent = event.payload.percent;
 				this.downloadStatus = event.payload.status;
+			}),
+			matchStarted: listen("match-started", _ => {
+				this.matchStarting = false;
+				this.gameAlreadyLaunched = true;
+			}),
+			matchStartFailed: listen("match-start-failed", _ => {
+				this.matchStarting = false;
+				this.snackbarContent = "Error starting the match! See the console for more details.";
+				this.showSnackbar = true;
 			}),
 		}
 	},
@@ -578,7 +587,7 @@ export default {
 		startMatch: async function (event) {
 			this.matchStarting = true;
 
-			if (this.matchSettings.randomizeMap) await this.setRandomMap();
+			if (this.matchSettings.randomize_map) await this.setRandomMap();
 
 			this.matchSettings.scripts = this.scriptPool.filter((val) => { return val.enabled });
 			invoke("save_match_settings", { settings: this.matchSettings }).then(() => {
@@ -591,9 +600,8 @@ export default {
 			invoke("start_match", { botList: blueBots.concat(orangeBots), matchSettings: this.matchSettings }).then(ok => {
 				if (!ok) {
 					this.$bvModal.show("no-rlbot-flag-modal")
+					this.matchStarting = false;
 				}
-
-				this.matchStarting = false;
 			});
 		},
 		killBots: function(event) {
@@ -648,7 +656,7 @@ export default {
 			this.matchSettings.skip_replays = false;
 			this.matchSettings.instant_start = false;
 			this.matchSettings.enable_lockstep = false;
-			this.matchSettings.randomizeMap = false;
+			this.matchSettings.randomize_map = false;
 			this.matchSettings.enable_rendering = false;
 			this.matchSettings.enable_state_setting = true;
 			this.matchSettings.auto_save_replay = false;
@@ -975,25 +983,6 @@ export default {
 
 			invoke("is_botpack_up_to_date").then(this.botpackUpdateChecked);
 			invoke("get_recommendations").then(this.recommendationsReceived);
-
-			// eel.expose(noRLBotFlagPopup)
-			// function noRLBotFlagPopup(title, text){
-			// 	this.$bvModal.show("no-rlbot-flag-modal")
-			// 	this.matchStarting = false;
-			// }
-
-			// eel.expose(matchStarted)
-			// function matchStarted(){
-			// 	this.matchStarting = false;
-			// 	this.gameAlreadyLaunched = true;
-			// }
-			
-			// eel.expose(matchStartFailed)
-			// function matchStartFailed(message){
-			// 	self.matchStarting = false;
-			// 	self.snackbarContent = "Error starting match: " + message + "\n See console for more details.";
-			// 	self.showSnackbar = true;
-			// }
 
 			this.init = true;
 		},

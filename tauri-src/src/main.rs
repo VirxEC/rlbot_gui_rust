@@ -2,11 +2,13 @@
 
 mod bot_management;
 mod commands;
+mod config_handles;
 mod custom_maps;
 mod rlbot;
 mod settings;
 
 use crate::commands::*;
+use crate::config_handles::*;
 use crate::settings::*;
 use lazy_static::{initialize, lazy_static};
 use std::sync::Mutex;
@@ -335,8 +337,7 @@ fn main() {
                             }
 
                             if console_text.len() > 1200 {
-                                let diff = console_text.len() - 1200;
-                                console_text.drain(..diff);
+                                console_text.drain(1200..);
                             }
 
                             main_window_out.emit("new-console-text", out_strs).unwrap();
@@ -350,7 +351,7 @@ fn main() {
             thread::spawn(move || {
                 let mut next_replace_last = false;
                 loop {
-                    thread::sleep(Duration::from_micros(10));
+                    thread::sleep(Duration::from_micros(15));
                     let mut errs = stderr_capture.lock().unwrap();
 
                     while !errs.is_empty() && errs.last().unwrap().is_none() {
@@ -398,17 +399,16 @@ fn main() {
                             for err_str in &err_strs {
                                 if err_str.content.text == "-|-*|MATCH START FAILED|*-|-" {
                                     eprintln!("START MATCH FAILED");
-                                    continue;
+                                    main_window_err.emit("match-start-failed", ()).unwrap();
                                 } else if err_str.content.text == "-|-*|MATCH STARTED|*-|-" {
                                     eprintln!("MATCH STARTED");
-                                    continue;
+                                    main_window_err.emit("match-started", ()).unwrap();
+                                } else {
+                                    console_text.push(err_str.content.clone());
                                 }
-                                
-                                console_text.push(err_str.content.clone());
                             }
                             if console_text.len() > 1200 {
-                                let diff = console_text.len() - 1200;
-                                console_text.drain(..diff);
+                                console_text.drain(1200..);
                             }
                             main_window_err.emit("new-console-text", err_strs).unwrap();
                         }

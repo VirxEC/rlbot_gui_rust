@@ -1,21 +1,28 @@
 import json
+import os
+import shutil
 import sys
+from contextlib import contextmanager
+from datetime import datetime
+from os import path
 from pathlib import Path
 from traceback import print_exc
 from typing import List
 
+from rlbot.gamelaunch.epic_launch import \
+    locate_epic_games_launcher_rocket_league_binary
 from rlbot.matchconfig.match_config import (MatchConfig, MutatorConfig,
                                             PlayerConfig, ScriptConfig)
 from rlbot.parsing.incrementing_integer import IncrementingInteger
-from rlbot.setup_manager import RocketLeagueLauncherPreference, SetupManager
-
-# from rlbot_gui.match_runner.custom_maps import (
-#     prepare_custom_map,
-#     identify_map_directory,
-#     convert_custom_map_to_path
-# )
+from rlbot.setup_manager import (RocketLeagueLauncherPreference, SetupManager,
+                                 try_get_steam_executable_path)
+from rlbot.utils import logging_utils
 
 sm: SetupManager = None
+
+CUSTOM_MAP_TARGET = {"filename": "Labs_Utopia_P.upk", "game_map": "UtopiaRetro"}
+
+logger = logging_utils.get_logger("custom_maps")
 
 
 def create_player_config(bot: dict, human_index_tracker: IncrementingInteger):
@@ -45,27 +52,90 @@ def get_fresh_setup_manager():
     return sm
 
 
+@contextmanager
+def prepare_custom_map(custom_map_file: str, rl_directory: str):
+    """
+    Provides a context manager. It will swap out the custom_map_file
+    for an existing map in RL and it will return the `game_map`
+    name that should be used in a MatchConfig.
+    Once the context is left, the original map is replaced back.
+    The context should be left as soon as the match has started
+    """
+
+    # check if there metadata for the custom file
+    expected_config_name = "_" + path.basename(custom_map_file)[:-4] + ".cfg"
+    config_path = path.join(path.dirname(custom_map_file), expected_config_name)
+    additional_info = {
+        "original_path": custom_map_file,
+    }
+    if path.exists(config_path):
+        additional_info["config_path"] = config_path
+
+
+    real_map_file = path.join(rl_directory, CUSTOM_MAP_TARGET["filename"])
+    timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+    temp_filename = real_map_file + "." + timestamp
+
+    shutil.copy2(real_map_file, temp_filename)
+    logger.info("Copied real map to %s", temp_filename)
+    shutil.copy2(custom_map_file, real_map_file)
+    logger.info("Copied custom map from %s", custom_map_file)
+
+    try:
+        yield CUSTOM_MAP_TARGET["game_map"], additional_info
+    finally:
+        os.replace(temp_filename, real_map_file)
+        logger.info("Reverted real map to %s", real_map_file)
+
+
+def identify_map_directory(launcher_pref: RocketLeagueLauncherPreference):
+    """Find RocketLeague map directory"""
+    final_path = None
+    if launcher_pref.preferred_launcher == RocketLeagueLauncherPreference.STEAM:
+        steam = try_get_steam_executable_path()
+        suffix = r"steamapps\common\rocketleague\TAGame\CookedPCConsole"
+        if not steam:
+            return None
+
+        # TODO: Steam can install RL on a different disk. Need to
+        # read libraryfolders.vdf to detect this situation
+        # It's a human-readable but custom format so not trivial to parse
+
+        final_path = path.join(path.dirname(steam), suffix)
+    else:
+        rl_executable = locate_epic_games_launcher_rocket_league_binary()
+        suffix = r"TAGame\CookedPCConsole"
+        if not rl_executable:
+            return None
+
+        # Binaries/Win64/ is what we want to strip off
+        final_path = path.join(path.dirname(rl_executable), "..", "..", suffix)
+
+    if not path.exists(final_path):
+        logger.warning("%s - directory doesn't exist", final_path)
+        return None
+    return final_path
+
+
 def setup_match(
     setup_manager: SetupManager, match_config: MatchConfig, launcher_pref: RocketLeagueLauncherPreference
 ):
     """Starts the match and bots. Also detects and handles custom maps"""
 
-    # game_map = match_config.game_map
-    # if game_map.endswith('.upk') or game_map.endswith('.udk'):
-    #     map_file = convert_custom_map_to_path(game_map)
-    #     rl_directory = identify_map_directory(launcher_pref)
+    map_file = match_config.game_map
+    if map_file.endswith('.upk') or map_file.endswith('.udk'):
+        rl_directory = identify_map_directory(launcher_pref)
 
-    #     if not all([map_file, rl_directory]):
-    #         print("Couldn't load custom map")
-    #         return
+        if not rl_directory:
+            raise Exception("Couldn't find path to Rocket League maps folder")
 
-    #     with prepare_custom_map(map_file, rl_directory) as (game_map, metadata):
-    #         match_config.game_map = game_map
-    #         if "config_path" in metadata:
-    #             config_path = metadata["config_path"]
-    #             match_config.script_configs.append(
-    #                 create_script_config({'path': config_path}))
-    #             print(f"Will load custom script for map {config_path}")
+        with prepare_custom_map(map_file, rl_directory) as (map_file, metadata):
+            match_config.game_map = map_file
+            if "config_path" in metadata:
+                config_path = metadata["config_path"]
+                match_config.script_configs.append(
+                    create_script_config({'path': config_path}))
+                print(f"Will load custom script for map {config_path}")
 
     setup_manager.early_start_seconds = 5
     setup_manager.connect_to_game(launcher_preference=launcher_pref)
@@ -79,9 +149,9 @@ def setup_match(
     setup_manager.launch_bot_processes()
 
 def start_match_helper(bot_list: List[dict], match_settings: dict, launcher_prefs: RocketLeagueLauncherPreference):
-    print(bot_list)
-    print(match_settings)
-    print(launcher_prefs)
+    print(f"Bot list: {bot_list}")
+    print(f"Match settings: {match_settings}")
+    print(f"Launcher preferences: {launcher_prefs}")
 
     match_config = MatchConfig()
     match_config.game_mode = match_settings['game_mode']
@@ -126,11 +196,9 @@ def start_match_helper(bot_list: List[dict], match_settings: dict, launcher_pref
     except Exception:
         print_exc()
         print("-|-*|MATCH START FAILED|*-|-", file=sys.stderr)
-        # eel.matchStartFailed(str(e))
         return
 
     print("-|-*|MATCH STARTED|*-|-", file=sys.stderr)
-    # eel.matchStarted()
 
 def shut_down():
     if sm is not None:
@@ -138,25 +206,26 @@ def shut_down():
     else:
         print("There gotta be some setup manager already")
 
-while True:
-    command = input()
-    try:
-        params = command.split(" | ")
-        if params[0] == "start_match":
-            bot_list = json.loads(params[1])
-            match_settings = json.loads(params[2])
+if __name__ == "__main__":
+    while True:
+        command = input()
+        try:
+            params = command.split(" | ")
+            if params[0] == "start_match":
+                bot_list = json.loads(params[1])
+                match_settings = json.loads(params[2])
 
-            preferred_launcher = params[3]
-            use_login_tricks = bool(params[4])
-            if params[5] != "":
-                rocket_league_exe_path = Path(params[5])
-            else:
-                rocket_league_exe_path = None
+                preferred_launcher = params[3]
+                use_login_tricks = bool(params[4])
+                if params[5] != "":
+                    rocket_league_exe_path = Path(params[5])
+                else:
+                    rocket_league_exe_path = None
 
-            start_match_helper(bot_list, match_settings, RocketLeagueLauncherPreference(preferred_launcher, use_login_tricks, rocket_league_exe_path))
-        elif params[0] == "shut_down":
-            break
-    except Exception:
-        print_exc()
+                start_match_helper(bot_list, match_settings, RocketLeagueLauncherPreference(preferred_launcher, use_login_tricks, rocket_league_exe_path))
+            elif params[0] == "shut_down":
+                break
+        except Exception:
+            print_exc()
 
-shut_down()
+    shut_down()

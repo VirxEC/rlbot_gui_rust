@@ -21,3 +21,12 @@ pub fn find_all_custom_maps(bf: &HashMap<String, BotFolder>) -> Vec<String> {
         })
         .collect()
 }
+
+pub fn convert_custom_map_to_path(map: &str, bf: &HashMap<String, BotFolder>) -> Option<String> {
+    for folder in get_search_folders(bf) {
+        if let Some(map_path) = glob(&format!("{}/**/{}", folder, map)).unwrap().flatten().next() {
+            return Some(map_path.to_str().unwrap().to_string());
+        }
+    }
+    None
+}

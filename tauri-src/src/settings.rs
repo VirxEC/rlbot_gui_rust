@@ -1,66 +1,16 @@
-use core::fmt;
-use std::{collections::HashMap, fs::create_dir_all, process::ChildStdin, str::FromStr};
-
 use crate::{
-    auto_detect_python, ccprintlne, get_config_path,
+    ccprintlne,
+    config_handles::load_gui_config,
+    custom_maps::convert_custom_map_to_path,
+    get_config_path,
     rlbot::parsing::{
         bot_config_bundle::{Clean, ScriptConfigBundle},
         match_settings_config_parser::*,
     },
 };
-
+use core::fmt;
 use serde::{Deserialize, Serialize};
-
-use configparser::ini::Ini;
-
-pub fn load_gui_config() -> Ini {
-    let mut conf = Ini::new();
-    let config_path = get_config_path();
-
-    if !config_path.exists() {
-        create_dir_all(config_path.parent().unwrap()).unwrap();
-        conf.set("bot_folder_settings", "files", Some("{}".to_string()));
-        conf.set("bot_folder_settings", "folders", Some("{}".to_string()));
-        conf.set("bot_folder_settings", "incr", None);
-        conf.set("match_settings", "map", Some(MAP_TYPES[0].to_string()));
-        conf.set("match_settings", "game_mode", Some(GAME_MODES[0].to_string()));
-        conf.set("match_settings", "match_behavior", Some(EXISTING_MATCH_BEHAVIOR_TYPES[0].to_string()));
-        conf.set("match_settings", "skip_replays", Some("false".to_string()));
-        conf.set("match_settings", "instant_start", Some("false".to_string()));
-        conf.set("match_settings", "enable_lockstep", Some("false".to_string()));
-        conf.set("match_settings", "randomize_map", Some("false".to_string()));
-        conf.set("match_settings", "enable_rendering", Some("false".to_string()));
-        conf.set("match_settings", "enable_state_setting", Some("true".to_string()));
-        conf.set("match_settings", "auto_save_replay", Some("false".to_string()));
-        conf.set("match_settings", "scripts", Some("[]".to_string()));
-        conf.set("mutator_settings", "match_length", Some(MATCH_LENGTH_TYPES[0].to_string()));
-        conf.set("mutator_settings", "max_score", Some(MAX_SCORE_TYPES[0].to_string()));
-        conf.set("mutator_settings", "overtime", Some(OVERTIME_MUTATOR_TYPES[0].to_string()));
-        conf.set("mutator_settings", "series_length", Some(SERIES_LENGTH_MUTATOR_TYPES[0].to_string()));
-        conf.set("mutator_settings", "game_speed", Some(GAME_SPEED_MUTATOR_TYPES[0].to_string()));
-        conf.set("mutator_settings", "ball_max_speed", Some(BALL_MAX_SPEED_MUTATOR_TYPES[0].to_string()));
-        conf.set("mutator_settings", "ball_type", Some(BALL_TYPE_MUTATOR_TYPES[0].to_string()));
-        conf.set("mutator_settings", "ball_weight", Some(BALL_WEIGHT_MUTATOR_TYPES[0].to_string()));
-        conf.set("mutator_settings", "ball_size", Some(BALL_SIZE_MUTATOR_TYPES[0].to_string()));
-        conf.set("mutator_settings", "ball_bounciness", Some(BALL_BOUNCINESS_MUTATOR_TYPES[0].to_string()));
-        conf.set("mutator_settings", "boost_amount", Some(BOOST_AMOUNT_MUTATOR_TYPES[0].to_string()));
-        conf.set("mutator_settings", "rumble", Some(RUMBLE_MUTATOR_TYPES[0].to_string()));
-        conf.set("mutator_settings", "boost_strength", Some(BOOST_STRENGTH_MUTATOR_TYPES[0].to_string()));
-        conf.set("mutator_settings", "gravity", Some(GRAVITY_MUTATOR_TYPES[0].to_string()));
-        conf.set("mutator_settings", "demolish", Some(DEMOLISH_MUTATOR_TYPES[0].to_string()));
-        conf.set("mutator_settings", "respawn_time", Some(RESPAWN_TIME_MUTATOR_TYPES[0].to_string()));
-        conf.set("python_config", "path", Some(auto_detect_python().unwrap_or_default()));
-        conf.set("launcher_settings", "preferred_launcher", Some("epic".to_string()));
-        conf.set("launcher_settings", "use_login_tricks", Some("true".to_string()));
-        conf.set("launcher_settings", "rocket_league_exe_path", None);
-
-        conf.write(&config_path).unwrap();
-    } else if let Err(e) = conf.load(config_path) {
-        ccprintlne(format!("Failed to load config: {}", e));
-    }
-
-    conf
-}
+use std::{collections::HashMap, process::ChildStdin, str::FromStr};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BotFolder {
@@ -309,13 +259,25 @@ impl MatchSettings {
         new
     }
 
-    pub fn super_cleaned_scripts(&self) -> Self {
+    pub fn setup_for_start_match(&self, bf: &HashMap<String, BotFolder>) -> Option<Self> {
         let mut new = self.clone();
+
         for script in &mut new.scripts {
             script.info = None;
             *script = script.cleaned();
         }
-        new
+
+        if new.map.ends_with(".upk") || new.map.ends_with(".udk") {
+            new.map = match convert_custom_map_to_path(&new.map, bf) {
+                Some(path) => path,
+                None => {
+                    ccprintlne(format!("Failed to find custom map {}", new.map));
+                    return None;
+                }
+            };
+        }
+
+        Some(new)
     }
 }
 

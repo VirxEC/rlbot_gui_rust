@@ -2,217 +2,23 @@ use crate::bot_management::{
     bot_creation::{bootstrap_python_bot, bootstrap_python_hivemind, bootstrap_rust_bot, bootstrap_scratch_bot, CREATED_BOTS_FOLDER},
     downloader,
 };
-use crate::custom_maps::find_all_custom_maps;
-use crate::rlbot::{agents::runnable::Runnable, parsing::match_settings_config_parser::*};
 use crate::rlbot::{
+    agents::runnable::Runnable,
     gateway_util,
-    parsing::{
-        agent_config_parser::BotLooksConfig,
-        bot_config_bundle::{BotConfigBundle, ScriptConfigBundle},
-        directory_scanner::{scan_directory_for_bot_configs, scan_directory_for_script_configs},
-    },
+    parsing::bot_config_bundle::{BotConfigBundle, ScriptConfigBundle},
     setup_manager,
 };
 use crate::settings::*;
 use crate::*;
-use glob::glob;
-use native_dialog::FileDialog;
-use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelExtend, ParallelIterator};
+use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::{
-    collections::{HashMap, HashSet},
-    fs::{create_dir_all, read_to_string, File},
+    collections::HashMap,
+    fs::{create_dir_all, File},
     io::{copy, Cursor, Write},
     path::Path,
     process::{Command, Stdio},
 };
 use tauri::Window;
-
-#[tauri::command]
-pub async fn save_folder_settings(bot_folder_settings: BotFolderSettings) {
-    BOT_FOLDER_SETTINGS.lock().unwrap().update_config(bot_folder_settings)
-}
-
-#[tauri::command]
-pub async fn get_folder_settings() -> BotFolderSettings {
-    BOT_FOLDER_SETTINGS.lock().unwrap().clone()
-}
-
-fn filter_hidden_bundles<T: Runnable + Clone>(bundles: HashSet<T>) -> Vec<T> {
-    bundles.iter().filter(|b| !b.get_config_file_name().starts_with('_')).cloned().collect()
-}
-
-fn get_bots_from_directory(path: &str) -> Vec<BotConfigBundle> {
-    filter_hidden_bundles(scan_directory_for_bot_configs(path))
-}
-
-#[tauri::command]
-pub async fn scan_for_bots() -> Vec<BotConfigBundle> {
-    let bfs = BOT_FOLDER_SETTINGS.lock().unwrap();
-    let mut bots = Vec::new();
-
-    for (path, props) in bfs.folders.iter() {
-        if props.visible {
-            bots.extend(get_bots_from_directory(&*path));
-        }
-    }
-
-    for (path, props) in bfs.files.iter() {
-        if props.visible {
-            if let Ok(bundle) = BotConfigBundle::minimal_from_path(Path::new(path)) {
-                bots.push(bundle);
-            }
-        }
-    }
-
-    bots
-}
-
-fn get_scripts_from_directory(path: &str) -> Vec<ScriptConfigBundle> {
-    filter_hidden_bundles(scan_directory_for_script_configs(path))
-}
-
-#[tauri::command]
-pub async fn scan_for_scripts() -> Vec<ScriptConfigBundle> {
-    let bfs = BOT_FOLDER_SETTINGS.lock().unwrap();
-    let mut scripts = Vec::with_capacity(bfs.folders.len() + bfs.files.len());
-
-    for (path, props) in bfs.folders.iter() {
-        if props.visible {
-            scripts.extend(get_scripts_from_directory(&*path));
-        }
-    }
-
-    for (path, props) in bfs.files.iter() {
-        if props.visible {
-            if let Ok(bundle) = ScriptConfigBundle::minimal_from_path(Path::new(path)) {
-                scripts.push(bundle);
-            }
-        }
-    }
-
-    scripts
-}
-
-#[cfg(not(target_os = "macos"))]
-#[tauri::command]
-pub async fn pick_bot_folder() {
-    let path = match FileDialog::new().show_open_single_dir().unwrap() {
-        Some(path) => path,
-        None => return,
-    };
-
-    BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(path.to_str().unwrap().to_string());
-}
-
-#[cfg(target_os = "macos")]
-#[tauri::command]
-pub async fn pick_bot_folder(window: Window) {
-    // FileDialog must be ran on the main thread when running on MacOS, it will panic if it isn't
-    window
-        .run_on_main_thread(|| {
-            let path = match FileDialog::new().show_open_single_dir().unwrap() {
-                Some(path) => path,
-                None => return,
-            };
-
-            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(path.to_str().unwrap().to_string());
-        })
-        .unwrap();
-}
-
-#[tauri::command]
-pub async fn pick_bot_config() {
-    let path = match FileDialog::new().add_filter("Bot Cfg File", &["cfg"]).show_open_single_file().unwrap() {
-        Some(path) => path,
-        None => return,
-    };
-
-    BOT_FOLDER_SETTINGS.lock().unwrap().add_file(path.to_str().unwrap().to_string());
-}
-
-#[tauri::command]
-pub async fn show_path_in_explorer(path: String) {
-    let command = if cfg!(target_os = "windows") {
-        "explorer.exe"
-    } else if cfg!(target_os = "macos") {
-        "open"
-    } else {
-        "xdg-open"
-    };
-
-    let ppath = Path::new(&*path);
-    let path = if ppath.is_file() { ppath.parent().unwrap().to_str().unwrap() } else { &*path };
-
-    Command::new(command).arg(path).spawn().unwrap();
-}
-
-#[tauri::command]
-pub async fn get_looks(path: String) -> Option<BotLooksConfig> {
-    match BotLooksConfig::from_path(&*path) {
-        Ok(looks) => Some(looks),
-        Err(_) => None,
-    }
-}
-
-#[tauri::command]
-pub async fn save_looks(path: String, config: BotLooksConfig) {
-    config.save_to_path(&*path);
-}
-
-#[tauri::command]
-pub async fn get_match_options() -> MatchOptions {
-    let mut mo = MatchOptions::new();
-    mo.map_types.extend(find_all_custom_maps(&BOT_FOLDER_SETTINGS.lock().unwrap().folders));
-    mo
-}
-
-#[tauri::command]
-pub async fn get_match_settings() -> MatchSettings {
-    MATCH_SETTINGS.lock().unwrap().clone()
-}
-
-#[tauri::command]
-pub async fn save_match_settings(settings: MatchSettings) {
-    MATCH_SETTINGS.lock().unwrap().update_config(settings.cleaned_scripts());
-}
-
-#[tauri::command]
-pub async fn get_team_settings() -> HashMap<String, Vec<BotConfigBundle>> {
-    let config = load_gui_config();
-    let blue_team = serde_json::from_str(
-        &config
-            .get("team_settings", "blue_team")
-            .unwrap_or_else(|| "[{\"name\": \"Human\", \"runnable_type\": \"human\", \"image\": \"imgs/human.png\"}]".to_string()),
-    )
-    .unwrap_or_default();
-    let orange_team = serde_json::from_str(&config.get("team_settings", "orange_team").unwrap_or_else(|| "[]".to_string())).unwrap_or_default();
-
-    let mut bots = HashMap::new();
-    bots.insert("blue_team".to_string(), blue_team);
-    bots.insert("orange_team".to_string(), orange_team);
-
-    bots
-}
-
-#[tauri::command]
-pub async fn save_team_settings(blue_team: Vec<BotConfigBundle>, orange_team: Vec<BotConfigBundle>) {
-    let mut config = load_gui_config();
-    config.set("team_settings", "blue_team", Some(serde_json::to_string(&clean(blue_team)).unwrap()));
-    config.set("team_settings", "orange_team", Some(serde_json::to_string(&clean(orange_team)).unwrap()));
-    config.write(get_config_path()).unwrap();
-}
-
-#[tauri::command]
-pub async fn get_language_support() -> HashMap<String, bool> {
-    let mut lang_support = HashMap::new();
-
-    lang_support.insert("java".to_string(), get_command_status("java", vec!["-version"]));
-    lang_support.insert("node".to_string(), get_command_status("node", vec!["--version"]));
-    lang_support.insert("chrome".to_string(), has_chrome());
-    lang_support.insert("fullpython".to_string(), get_command_status(&PYTHON_PATH.lock().unwrap(), vec!["-c", "import tkinter"]));
-
-    dbg!(lang_support)
-}
 
 #[tauri::command]
 pub async fn check_rlbot_python() -> HashMap<String, bool> {
@@ -232,148 +38,6 @@ pub async fn check_rlbot_python() -> HashMap<String, bool> {
     }
 
     dbg!(python_support)
-}
-
-#[tauri::command]
-pub async fn get_detected_python_path() -> Option<String> {
-    auto_detect_python()
-}
-
-#[tauri::command]
-pub async fn get_python_path() -> String {
-    PYTHON_PATH.lock().unwrap().to_string()
-}
-
-#[tauri::command]
-pub async fn set_python_path(path: String) {
-    *PYTHON_PATH.lock().unwrap() = path.clone();
-    let mut config = load_gui_config();
-    config.set("python_config", "path", Some(path));
-    config.write(get_config_path()).unwrap();
-}
-
-#[cfg(not(target_os = "macos"))]
-#[tauri::command]
-pub async fn pick_appearance_file() -> Option<String> {
-    match FileDialog::new().add_filter("Appearance Cfg File", &["cfg"]).show_open_single_file() {
-        Ok(path) => path.map(|path| path.to_str().unwrap().to_string()),
-        Err(e) => {
-            ccprintlne(e.to_string());
-            None
-        }
-    }
-}
-
-#[cfg(target_os = "macos")]
-#[tauri::command]
-pub async fn pick_appearance_file(window: Window) -> Option<String> {
-    // FileDialog must be ran on the main thread when running on MacOS, it will panic if it isn't
-    let out = Arc::new(Mutex::new(None));
-    let out_clone = Arc::clone(&out);
-    window
-        .run_on_main_thread(move || {
-            let mut out_ref = out_clone.lock().unwrap();
-            *out_ref = match FileDialog::new().add_filter("Appearance Cfg File", &["cfg"]).show_open_single_file() {
-                Ok(path) => path.map(|path| path.to_str().unwrap().to_string()),
-                Err(e) => {
-                    ccprintlne(e.to_string());
-                    None
-                }
-            };
-        })
-        .unwrap();
-
-    // Rust requries that we first store the clone in a variable before we return it so out can be dropped safely
-    let x = out.lock().unwrap().clone();
-    x
-}
-
-fn get_recommendations_json() -> Option<AllRecommendations<String>> {
-    // Search for and load the json file
-    for path in BOT_FOLDER_SETTINGS.lock().unwrap().folders.keys() {
-        let pattern = Path::new(path).join("**/recommendations.json");
-
-        for path2 in glob(pattern.to_str().unwrap()).unwrap().flatten() {
-            let raw_json = match read_to_string(&path2) {
-                Ok(s) => s,
-                Err(_) => {
-                    ccprintlne(format!("Failed to read {}", path2.to_str().unwrap()));
-                    continue;
-                }
-            };
-
-            match serde_json::from_str(&raw_json) {
-                Ok(j) => return Some(j),
-                Err(e) => {
-                    ccprintlne(format!("Failed to parse file {}: {}", path2.to_str().unwrap(), e));
-                    continue;
-                }
-            }
-        }
-    }
-
-    None
-}
-
-#[tauri::command]
-pub async fn get_recommendations() -> Option<AllRecommendations<BotConfigBundle>> {
-    // If we found the json, return the corresponding BotConfigBundles for the bots
-    get_recommendations_json().map(|j| {
-        // Get a list of all the bots in (bot name, bot config file path) pairs
-        let name_path_pairs = {
-            let bfs = BOT_FOLDER_SETTINGS.lock().unwrap();
-            let mut bots = Vec::new();
-
-            bots.par_extend(
-                bfs.folders
-                    .par_iter()
-                    .filter_map(|(path, props)| {
-                        if props.visible {
-                            let pattern = Path::new(path).join("**/*.cfg");
-                            let paths = glob(pattern.to_str().unwrap()).unwrap().flatten().collect::<Vec<_>>();
-
-                            Some(paths.par_iter().filter_map(|path| BotConfigBundle::name_from_path(path.as_path()).ok()).collect::<Vec<_>>())
-                        } else {
-                            None
-                        }
-                    })
-                    .flatten(),
-            );
-
-            bots.par_extend(
-                bfs.files
-                    .par_iter()
-                    .filter_map(|(path, props)| if props.visible { BotConfigBundle::name_from_path(Path::new(path)).ok() } else { None }),
-            );
-
-            bots
-        };
-
-        let has_rlbot = check_has_rlbot();
-
-        // Load all of the bot config bundles
-        j.change_generic(&|bot_name| {
-            for (name, path) in &name_path_pairs {
-                if name == bot_name {
-                    if let Ok(mut bundle) = BotConfigBundle::minimal_from_path(Path::new(path)) {
-                        bundle.logo = bundle.get_logo();
-
-                        if has_rlbot {
-                            let missing_packages = bundle.get_missing_packages();
-                            if !missing_packages.is_empty() {
-                                bundle.warn = Some("pythonpkg".to_string());
-                            }
-                            bundle.missing_python_packages = Some(missing_packages);
-                        }
-
-                        return bundle;
-                    }
-                }
-            }
-
-            BotConfigBundle::default()
-        })
-    })
 }
 
 fn ensure_bot_directory() -> String {
@@ -729,7 +393,10 @@ pub async fn update_map_pack(window: Window) -> String {
     let map_index_old = updater.get_map_index();
 
     match updater.needs_update().await {
-        downloader::BotpackStatus::Skipped(message) => message,
+        downloader::BotpackStatus::Skipped(message) => {
+            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(mappack_location.to_str().unwrap().to_string());
+            message
+        }
         downloader::BotpackStatus::Success(message) => {
             // Configure the folder settings
             BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(location.to_string());
@@ -829,6 +496,7 @@ pub fn issue_match_handler_command(command_parts: &[String]) {
     let command = format!("{}\n", command_parts.join(" | "));
     let stdin = &mut match_handler_stdin.as_mut().unwrap().stdin;
 
+    println!("Issuing the following command to the match handler: {}", command);
     if stdin.write_all(command.as_bytes()).is_err() {
         *match_handler_stdin = None;
         ccprintlne("Match handler is no longer accepting commands. Restarting!".to_string());
@@ -837,7 +505,7 @@ pub fn issue_match_handler_command(command_parts: &[String]) {
 }
 
 #[tauri::command]
-pub async fn start_match(bot_list: Vec<TeamBotBundle>, match_settings: MatchSettings) -> bool {
+pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_settings: MatchSettings) -> bool {
     let port = gateway_util::find_existing_process().unwrap_or(gateway_util::IDEAL_RLBOT_PORT);
 
     match setup_manager::is_rocket_league_running(port) {
@@ -853,10 +521,18 @@ pub async fn start_match(bot_list: Vec<TeamBotBundle>, match_settings: MatchSett
 
     let launcher_settings = LauncherSettings::new();
 
+    let match_settings = match match_settings.setup_for_start_match(&BOT_FOLDER_SETTINGS.lock().unwrap().folders) {
+        Some(match_settings) => match_settings,
+        None => {
+            window.emit("match-start-failed", ()).unwrap();
+            return false;
+        }
+    };
+
     let args = [
         "start_match".to_string(),
         serde_json::to_string(&bot_list).unwrap().as_str().to_string(),
-        serde_json::to_string(&match_settings.super_cleaned_scripts()).unwrap().as_str().to_string(),
+        serde_json::to_string(&match_settings).unwrap().as_str().to_string(),
         launcher_settings.preferred_launcher,
         launcher_settings.use_login_tricks.to_string(),
         launcher_settings.rocket_league_exe_path.unwrap_or_default(),
