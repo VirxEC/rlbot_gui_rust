@@ -450,7 +450,7 @@ fn create_match_handler() -> Option<MatchHandlerStdin> {
     {
         use std::os::windows::process::CommandExt;
         // disable window creation
-        command.creation_flags(0x08000000);
+        program.creation_flags(0x08000000);
     };
 
     let mut child = match program.args(args).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn() {
