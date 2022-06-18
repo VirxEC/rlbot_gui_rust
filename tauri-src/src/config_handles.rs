@@ -137,7 +137,6 @@ pub async fn scan_for_scripts() -> Vec<ScriptConfigBundle> {
     scripts
 }
 
-#[cfg(not(target_os = "macos"))]
 #[tauri::command]
 pub async fn pick_bot_folder() {
     FileDialogBuilder::new().pick_folder(|folder_path| {
@@ -145,22 +144,6 @@ pub async fn pick_bot_folder() {
             BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(path.to_string_lossy().to_string());
         }
     });
-}
-
-#[cfg(target_os = "macos")]
-#[tauri::command]
-pub async fn pick_bot_folder(window: Window) {
-    // FileDialog must be ran on the main thread when running on MacOS, it will panic if it isn't
-    window
-        .run_on_main_thread(|| {
-            let path = match FileDialog::new().show_open_single_dir().unwrap() {
-                Some(path) => path,
-                None => return,
-            };
-
-            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(path.to_string_lossy().to_string());
-        })
-        .unwrap();
 }
 
 #[tauri::command]
