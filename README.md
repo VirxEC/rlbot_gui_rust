@@ -27,7 +27,7 @@ This hasn't been implemented, but it's easy to do.
 - Concurrent loading that utilizes all threads
 - In-GUI Python installation for Windows users
 - Better error messages when downloading or upgrading the botpack
-- [Self-updating of the GUI: TODO](https://tauri.studio/v1/guides/distribution/updater#update-file-json-format)
+- [Self-updating of the GUI: TODO](https://tauri.app/v1/guides/distribution/updater#update-file-json-format)
 
 ## Installation
 
@@ -39,7 +39,7 @@ It will put "RLBotGUI" in your Windows start menu.
 
 ### Prerequisites
 
-1. Follow the [Tauri prerequisites guide](https://tauri.studio/v1/guides/getting-started/prerequisites) for either Windows or Linux.
+1. Follow the [Tauri prerequisites guide](https://tauri.app/v1/guides/getting-started/prerequisites) for either Windows or Linux.
 2. A system with 16gb of RAM is recommended. If you have less, you may not be able to build the GUI while having other apps open (like your editor).
 
 ### Setup
@@ -51,7 +51,7 @@ It will put "RLBotGUI" in your Windows start menu.
    - `cargo run --release` - the GUI will compile with optimizations (like production) and launch. 
 
 ### Live Reload
-   - Install Tauri's CLI: `cargo install tauri-cli --locked --version "^1.0.0-rc"`
+   - Install Tauri's CLI: `cargo install tauri-cli --version "^1.0.0"`
    - Host the `assets` folder on `localhost` port `5500` - the Live Server extension for VS Code can do this:
        - Open the `assets` folder in a new VS Code window
        - In VS Code's `settings.json`, add the following:
@@ -72,10 +72,10 @@ It will put "RLBotGUI" in your Windows start menu.
 
 ### Building the GUI installer for users
 
-Taken from the [Tauri guide](https://tauri.studio/v1/guides/getting-started/beginning-tutorial):
+Taken from the [Tauri guide](https://tauri.app/v1/guides/):
 
 1. Navigate to the `tauri-src` folder
-1. Run `cargo install tauri-cli --locked --version "^1.0.0-rc"`
+1. Run `cargo install tauri-cli --version "^1.0.0"`
 2. In the project directory, run `cargo tauri build`
 
 Note that for Linux, you should build on the oldest version of Ubuntu possible. Ubuntu 18.04 is recommended for the best compatibility.

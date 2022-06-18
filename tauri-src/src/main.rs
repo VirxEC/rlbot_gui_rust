@@ -25,6 +25,7 @@ use std::{
     time::Duration,
 };
 use tauri::Manager;
+use tauri::Menu;
 
 const BOTPACK_FOLDER: &str = "RLBotPackDeletable";
 const MAPPACK_FOLDER: &str = "RLBotMapPackDeletable";
@@ -57,7 +58,7 @@ fn auto_detect_python() -> Option<String> {
                 // Windows actually doesn't have a python3.7.exe command, just python.exe (no matter what)
                 // but there is a pip3.7.exe and stuff
                 // we can then use that to find the path to the right python.exe and use that
-                for pip in ["pip3.7", "pip3.8", "pip3.9", "pip3.6", "pip3"] {
+                for pip in ["pip3.7", "pip3.8", "pip3.6", "pip3"] {
                     if let Ok(value) = get_python_from_pip(pip) {
                         return Some(value);
                     }
@@ -93,7 +94,7 @@ fn get_python_from_pip(pip: &str) -> Result<String, Box<dyn Error>> {
 
 #[cfg(target_os = "macos")]
 fn auto_detect_python() -> Option<String> {
-    for python in ["python3.7", "python3.8", "python3.9", "python3.6", "python3"] {
+    for python in ["python3.7", "python3.8", "python3.6", "python3"] {
         if get_command_status(python, vec!["--version"]) {
             return Some(python.to_string());
         }
@@ -107,7 +108,7 @@ fn auto_detect_python() -> Option<String> {
     match get_content_folder().join("env/bin/python") {
         path if path.exists() => Some(path.to_str().unwrap().to_string()),
         _ => {
-            for python in ["python3.7", "python3.8", "python3.9", "python3.6", "python3"] {
+            for python in ["python3.7", "python3.8", "python3.6", "python3"] {
                 if get_command_status(python, vec!["--version"]) {
                     return Some(python.to_string());
                 }
@@ -277,192 +278,202 @@ fn main() {
     initialize(&STDOUT_CAPTURE);
     initialize(&STDERR_CAPTURE);
 
-    tauri::Builder::default()
-        .setup(|app| {
-            let main_window_out = app.get_window("main").unwrap();
-            let stdout_capture = Arc::clone(&STDOUT_CAPTURE);
-            thread::spawn(move || {
-                let mut next_replace_last = false;
-                loop {
-                    thread::sleep(Duration::from_micros(10));
-                    let mut outs = stdout_capture.lock().unwrap();
+    let mut app = tauri::Builder::default();
 
-                    while !outs.is_empty() && outs.last().unwrap().is_none() {
-                        outs.pop();
-                    }
+    if cfg!(target_os = "macos") {
+        // Only used in MacOS because copy/pasting and stuff won't work otherwise
+        // Also, MacOS is the only OS with some actually slick app menu integration
+        // Might as well add it encase MacOS support gets added in the future
+        app = app.menu(Menu::os_default("RLBotGUI"));
+    }
 
-                    if !outs.is_empty() {
-                        let out_strs: Vec<ConsoleTextUpdate> = outs
-                            .iter_mut()
-                            .flatten()
-                            .filter_map(|s| {
-                                let mut text = String::new();
-                                let mut will_replace_last = next_replace_last;
-                                next_replace_last = false;
+    app.setup(|app| {
+        let main_window_out = app.get_window("main").unwrap();
+        let stdout_capture = Arc::clone(&STDOUT_CAPTURE);
+        thread::spawn(move || {
+            let mut next_replace_last = false;
+            loop {
+                thread::sleep(Duration::from_micros(1));
+                let mut outs = stdout_capture.lock().unwrap();
 
-                                loop {
-                                    let mut buf = [0];
-                                    match s.read(&mut buf[..]) {
-                                        Ok(0) | Err(_) => break,
-                                        Ok(_) => {
-                                            let string = String::from_utf8_lossy(&buf).to_string();
-                                            if &string == "\n" {
-                                                if text.is_empty() && will_replace_last {
-                                                    will_replace_last = false;
-                                                    continue;
-                                                }
+                while !outs.is_empty() && outs.last().unwrap().is_none() {
+                    outs.pop();
+                }
 
-                                                break;
-                                            } else if &string == "\r" {
-                                                next_replace_last = true;
-                                                break;
+                if !outs.is_empty() {
+                    let out_strs: Vec<ConsoleTextUpdate> = outs
+                        .iter_mut()
+                        .flatten()
+                        .filter_map(|s| {
+                            let mut text = String::new();
+                            let mut will_replace_last = next_replace_last;
+                            next_replace_last = false;
+
+                            loop {
+                                let mut buf = [0];
+                                match s.read(&mut buf[..]) {
+                                    Ok(0) | Err(_) => break,
+                                    Ok(_) => {
+                                        let string = String::from_utf8_lossy(&buf).to_string();
+                                        if &string == "\n" {
+                                            if text.is_empty() && will_replace_last {
+                                                will_replace_last = false;
+                                                continue;
                                             }
-                                            text.push_str(&string);
+
+                                            break;
+                                        } else if &string == "\r" {
+                                            next_replace_last = true;
+                                            break;
                                         }
-                                    };
-                                }
-
-                                text.is_empty().not().then(|| ConsoleTextUpdate::from(text, false, will_replace_last))
-                            })
-                            .collect();
-                        drop(outs);
-
-                        if !out_strs.is_empty() {
-                            let mut console_text = CONSOLE_TEXT.lock().unwrap();
-                            for out_str in &out_strs {
-                                if out_str.replace_last {
-                                    console_text.pop();
-                                }
-                                console_text.push(out_str.content.clone());
+                                        text.push_str(&string);
+                                    }
+                                };
                             }
 
-                            if console_text.len() > 1200 {
-                                console_text.drain(1200..);
-                            }
+                            text.is_empty().not().then(|| ConsoleTextUpdate::from(text, false, will_replace_last))
+                        })
+                        .collect();
+                    drop(outs);
 
-                            main_window_out.emit("new-console-text", out_strs).unwrap();
+                    if !out_strs.is_empty() {
+                        let mut console_text = CONSOLE_TEXT.lock().unwrap();
+                        for out_str in &out_strs {
+                            if out_str.replace_last {
+                                console_text.pop();
+                            }
+                            console_text.push(out_str.content.clone());
                         }
+
+                        if console_text.len() > 1200 {
+                            console_text.drain(1200..);
+                        }
+
+                        main_window_out.emit("new-console-text", out_strs).unwrap();
                     }
                 }
-            });
+            }
+        });
 
-            let main_window_err = app.get_window("main").unwrap();
-            let stderr_capture = Arc::clone(&STDERR_CAPTURE);
-            thread::spawn(move || {
-                let mut next_replace_last = false;
-                loop {
-                    thread::sleep(Duration::from_micros(15));
-                    let mut errs = stderr_capture.lock().unwrap();
+        let main_window_err = app.get_window("main").unwrap();
+        let stderr_capture = Arc::clone(&STDERR_CAPTURE);
+        thread::spawn(move || {
+            let mut next_replace_last = false;
+            loop {
+                thread::sleep(Duration::from_micros(1));
+                let mut errs = stderr_capture.lock().unwrap();
 
-                    while !errs.is_empty() && errs.last().unwrap().is_none() {
-                        errs.pop();
-                    }
+                while !errs.is_empty() && errs.last().unwrap().is_none() {
+                    errs.pop();
+                }
 
-                    if !errs.is_empty() {
-                        let err_strs: Vec<ConsoleTextUpdate> = errs
-                            .iter_mut()
-                            .flatten()
-                            .filter_map(|s| {
-                                let mut text = String::new();
-                                let mut will_replace_last = next_replace_last;
-                                next_replace_last = false;
+                if !errs.is_empty() {
+                    let err_strs: Vec<ConsoleTextUpdate> = errs
+                        .iter_mut()
+                        .flatten()
+                        .filter_map(|s| {
+                            let mut text = String::new();
+                            let mut will_replace_last = next_replace_last;
+                            next_replace_last = false;
 
-                                loop {
-                                    let mut buf = [0];
-                                    match s.read(&mut buf[..]) {
-                                        Ok(0) | Err(_) => break,
-                                        Ok(_) => {
-                                            let string = String::from_utf8_lossy(&buf).to_string();
-                                            if &string == "\n" {
-                                                if text.is_empty() && will_replace_last {
-                                                    will_replace_last = false;
-                                                    continue;
-                                                }
-
-                                                break;
-                                            } else if &string == "\r" {
-                                                next_replace_last = true;
-                                                break;
+                            loop {
+                                let mut buf = [0];
+                                match s.read(&mut buf[..]) {
+                                    Ok(0) | Err(_) => break,
+                                    Ok(_) => {
+                                        let string = String::from_utf8_lossy(&buf).to_string();
+                                        if &string == "\n" {
+                                            if text.is_empty() && will_replace_last {
+                                                will_replace_last = false;
+                                                continue;
                                             }
-                                            text.push_str(&string);
-                                        }
-                                    };
-                                }
 
+                                            break;
+                                        } else if &string == "\r" {
+                                            next_replace_last = true;
+                                            break;
+                                        }
+                                        text.push_str(&string);
+                                    }
+                                };
+                            }
+
+                            if text == "-|-*|MATCH START FAILED|*-|-" {
+                                eprintln!("START MATCH FAILED");
+                                main_window_err.emit("match-start-failed", ()).unwrap();
+                                None
+                            } else if text == "-|-*|MATCH STARTED|*-|-" {
+                                eprintln!("MATCH STARTED");
+                                main_window_err.emit("match-started", ()).unwrap();
+                                None
+                            } else {
                                 text.is_empty().not().then(|| ConsoleTextUpdate::from(text, true, will_replace_last))
-                            })
-                            .collect();
-                        drop(errs);
+                            }
+                        })
+                        .collect();
+                    drop(errs);
 
-                        if !err_strs.is_empty() {
-                            let mut console_text = CONSOLE_TEXT.lock().unwrap();
-                            for err_str in &err_strs {
-                                if err_str.content.text == "-|-*|MATCH START FAILED|*-|-" {
-                                    eprintln!("START MATCH FAILED");
-                                    main_window_err.emit("match-start-failed", ()).unwrap();
-                                } else if err_str.content.text == "-|-*|MATCH STARTED|*-|-" {
-                                    eprintln!("MATCH STARTED");
-                                    main_window_err.emit("match-started", ()).unwrap();
-                                } else {
-                                    console_text.push(err_str.content.clone());
-                                }
-                            }
-                            if console_text.len() > 1200 {
-                                console_text.drain(1200..);
-                            }
-                            main_window_err.emit("new-console-text", err_strs).unwrap();
+                    if !err_strs.is_empty() {
+                        let mut console_text = CONSOLE_TEXT.lock().unwrap();
+                        for err_str in &err_strs {
+                            console_text.push(err_str.content.clone());
                         }
+                        if console_text.len() > 1200 {
+                            console_text.drain(1200..);
+                        }
+                        main_window_err.emit("new-console-text", err_strs).unwrap();
                     }
                 }
-            });
+            }
+        });
 
-            Ok(())
-        })
-        .invoke_handler(tauri::generate_handler![
-            get_folder_settings,
-            save_folder_settings,
-            pick_bot_folder,
-            pick_bot_config,
-            show_path_in_explorer,
-            scan_for_bots,
-            get_looks,
-            save_looks,
-            scan_for_scripts,
-            get_match_options,
-            get_match_settings,
-            save_match_settings,
-            get_team_settings,
-            save_team_settings,
-            get_language_support,
-            get_python_path,
-            set_python_path,
-            get_recommendations,
-            pick_appearance_file,
-            begin_python_bot,
-            begin_python_hivemind,
-            begin_rust_bot,
-            begin_scratch_bot,
-            install_package,
-            install_requirements,
-            install_basic_packages,
-            get_console_texts,
-            get_detected_python_path,
-            get_missing_bot_packages,
-            get_missing_script_packages,
-            get_missing_bot_logos,
-            get_missing_script_logos,
-            is_windows,
-            install_python,
-            download_bot_pack,
-            update_bot_pack,
-            is_botpack_up_to_date,
-            check_rlbot_python,
-            update_map_pack,
-            start_match,
-            get_launcher_settings,
-            save_launcher_settings,
-            kill_bots,
-        ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        Ok(())
+    })
+    .invoke_handler(tauri::generate_handler![
+        get_folder_settings,
+        save_folder_settings,
+        pick_bot_folder,
+        pick_bot_config,
+        show_path_in_explorer,
+        scan_for_bots,
+        get_looks,
+        save_looks,
+        scan_for_scripts,
+        get_match_options,
+        get_match_settings,
+        save_match_settings,
+        get_team_settings,
+        save_team_settings,
+        get_language_support,
+        get_python_path,
+        set_python_path,
+        get_recommendations,
+        pick_appearance_file,
+        begin_python_bot,
+        begin_python_hivemind,
+        begin_rust_bot,
+        begin_scratch_bot,
+        install_package,
+        install_requirements,
+        install_basic_packages,
+        get_console_texts,
+        get_detected_python_path,
+        get_missing_bot_packages,
+        get_missing_script_packages,
+        get_missing_bot_logos,
+        get_missing_script_logos,
+        is_windows,
+        install_python,
+        download_bot_pack,
+        update_bot_pack,
+        is_botpack_up_to_date,
+        check_rlbot_python,
+        update_map_pack,
+        start_match,
+        get_launcher_settings,
+        save_launcher_settings,
+        kill_bots,
+    ])
+    .run(tauri::generate_context!())
+    .expect("error while running tauri application");
 }

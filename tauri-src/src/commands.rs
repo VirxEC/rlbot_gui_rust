@@ -486,11 +486,16 @@ fn create_match_handler() -> Option<MatchHandlerStdin> {
     Some(MatchHandlerStdin::new(child.stdin.take().unwrap(), stdout_index, stderr_index))
 }
 
-pub fn issue_match_handler_command(command_parts: &[String]) {
+pub fn issue_match_handler_command(command_parts: &[String], create_handler: bool) {
     let mut match_handler_stdin = MATCH_HANDLER_STDIN.lock().unwrap();
 
     if match_handler_stdin.is_none() {
-        *match_handler_stdin = create_match_handler();
+        if create_handler {
+            *match_handler_stdin = create_match_handler();
+        } else {
+            ccprintln("Not issuing command to handler as it's down and I was told to not start it".to_string());
+            return;
+        }
     }
 
     let command = format!("{}\n", command_parts.join(" | "));
@@ -500,7 +505,7 @@ pub fn issue_match_handler_command(command_parts: &[String]) {
     if stdin.write_all(command.as_bytes()).is_err() {
         *match_handler_stdin = None;
         ccprintlne("Match handler is no longer accepting commands. Restarting!".to_string());
-        issue_match_handler_command(command_parts);
+        issue_match_handler_command(command_parts, false);
     }
 }
 
@@ -538,12 +543,13 @@ pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_set
         launcher_settings.rocket_league_exe_path.unwrap_or_default(),
     ];
 
-    issue_match_handler_command(&args);
+    issue_match_handler_command(&args, true);
 
     true
 }
 
 #[tauri::command]
 pub async fn kill_bots() {
-    issue_match_handler_command(&["shut_down".to_string()]);
+    issue_match_handler_command(&["shut_down".to_string()], false);
+    // gateway_util::kill_existing_processes();
 }

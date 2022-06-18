@@ -16,7 +16,7 @@ panic = "abort"
 lto = true
 
 [build-dependencies]
-tauri-build = { version = "1.0.0-rc.13", features = [] }
+tauri-build = "1.0"
 
 [dependencies]
 sanitize-filename = "0.4"
@@ -40,16 +40,9 @@ sysinfo = "0.24"
 [target.'cfg(windows)'.dependencies]
 registry = "1.2"
 
-[dependencies.native-dialog]
-version = "0.6"
-
-[target.'cfg(windows)'.dependencies.native-dialog]
-version = "0.6"
-features = ["windows_dpi_awareness", "windows_visual_styles"]
-
 [dependencies.tauri]
-version = "1.0.0-rc.15"
-features = ["devtools", "reqwest-client"]
+version = "1.0"
+features = ["devtools", "reqwest-client", "dialog"]
 
 [features]
 # by default Tauri runs in production mode

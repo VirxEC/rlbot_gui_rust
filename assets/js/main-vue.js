@@ -495,6 +495,10 @@ export default {
 				this.snackbarContent = "Error starting the match! See the console for more details.";
 				this.showSnackbar = true;
 			}),
+			setAppearanceFile: listen("set-appearance-file", event => {
+				this.$store.commit('setActiveBot', null);
+				if (path) this.showAppearanceEditor(event.payload);
+			}),
 		}
 	},
 
@@ -504,7 +508,7 @@ export default {
 			this.$bvModal.show("python-setup");
 		},
 		quickReloadWarnings: function() {
-			invoke("get_language_support").then(support => {
+			invoke("check_rlbot_python").then(support => {
 				let noPython = !support.python;
 				let hasRLBot = support.rlbotpython;
 	
@@ -699,10 +703,7 @@ export default {
 			this.$bvModal.show('appearance-editor-dialog');
 		},
 		pickAndEditAppearanceFile: function() {
-			invoke("pick_appearance_file").then((path) => {
-				this.$store.commit('setActiveBot', null);
-				if (path) this.showAppearanceEditor(path);
-			});
+			invoke("pick_appearance_file");
 		},
 		showPathInExplorer: function (path) {
 			invoke("show_path_in_explorer", { path: path });

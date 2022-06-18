@@ -207,10 +207,12 @@ def shut_down():
         print("There gotta be some setup manager already")
 
 if __name__ == "__main__":
-    while True:
-        command = input()
-        try:
+    try:
+        while True:
+            print("Looking for new command")
+            command = sys.stdin.readline()
             params = command.split(" | ")
+            print(params[0])
             if params[0] == "start_match":
                 bot_list = json.loads(params[1])
                 match_settings = json.loads(params[2])
@@ -225,7 +227,10 @@ if __name__ == "__main__":
                 start_match_helper(bot_list, match_settings, RocketLeagueLauncherPreference(preferred_launcher, use_login_tricks, rocket_league_exe_path))
             elif params[0] == "shut_down":
                 break
-        except Exception:
-            print_exc()
+    except Exception:
+        print_exc()
 
-    shut_down()
+    try:
+        shut_down()
+    except Exception:
+        print_exc()

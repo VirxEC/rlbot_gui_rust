@@ -12,14 +12,15 @@ use crate::settings::*;
 use crate::*;
 use configparser::ini::Ini;
 use glob::glob;
-use native_dialog::FileDialog;
 use rayon::iter::{IntoParallelRefIterator, ParallelExtend, ParallelIterator};
+use tauri::Window;
 use std::{
     collections::{HashMap, HashSet},
     fs::read_to_string,
     path::Path,
     process::Command,
 };
+use tauri::api::dialog::FileDialogBuilder;
 
 pub fn load_gui_config() -> Ini {
     let mut conf = Ini::new();
@@ -139,12 +140,11 @@ pub async fn scan_for_scripts() -> Vec<ScriptConfigBundle> {
 #[cfg(not(target_os = "macos"))]
 #[tauri::command]
 pub async fn pick_bot_folder() {
-    let path = match FileDialog::new().show_open_single_dir().unwrap() {
-        Some(path) => path,
-        None => return,
-    };
-
-    BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(path.to_str().unwrap().to_string());
+    FileDialogBuilder::new().pick_folder(|folder_path| {
+        if let Some(path) = folder_path {
+            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(path.to_str().unwrap().to_string());
+        }
+    });
 }
 
 #[cfg(target_os = "macos")]
@@ -165,12 +165,11 @@ pub async fn pick_bot_folder(window: Window) {
 
 #[tauri::command]
 pub async fn pick_bot_config() {
-    let path = match FileDialog::new().add_filter("Bot Cfg File", &["cfg"]).show_open_single_file().unwrap() {
-        Some(path) => path,
-        None => return,
-    };
-
-    BOT_FOLDER_SETTINGS.lock().unwrap().add_file(path.to_str().unwrap().to_string());
+    FileDialogBuilder::new().add_filter("Bot Cfg File", &["cfg"]).pick_file(|path| {
+        if let Some(path) = path {
+            BOT_FOLDER_SETTINGS.lock().unwrap().add_file(path.to_str().unwrap().to_string());
+        }
+    });
 }
 
 #[tauri::command]
@@ -275,40 +274,14 @@ pub async fn set_python_path(path: String) {
     config.write(get_config_path()).unwrap();
 }
 
-#[cfg(not(target_os = "macos"))]
+
 #[tauri::command]
-pub async fn pick_appearance_file() -> Option<String> {
-    match FileDialog::new().add_filter("Appearance Cfg File", &["cfg"]).show_open_single_file() {
-        Ok(path) => path.map(|path| path.to_str().unwrap().to_string()),
-        Err(e) => {
-            ccprintlne(e.to_string());
-            None
+pub async fn pick_appearance_file(window: Window) {
+    FileDialogBuilder::new().add_filter("Appearance Cfg File", &["cfg"]).pick_file(move |path| {
+        if let Some(path) = path {
+            window.emit("set_appearance_file", path.to_str().unwrap().to_string()).unwrap();
         }
-    }
-}
-
-#[cfg(target_os = "macos")]
-#[tauri::command]
-pub async fn pick_appearance_file(window: Window) -> Option<String> {
-    // FileDialog must be ran on the main thread when running on MacOS, it will panic if it isn't
-    let out = Arc::new(Mutex::new(None));
-    let out_clone = Arc::clone(&out);
-    window
-        .run_on_main_thread(move || {
-            let mut out_ref = out_clone.lock().unwrap();
-            *out_ref = match FileDialog::new().add_filter("Appearance Cfg File", &["cfg"]).show_open_single_file() {
-                Ok(path) => path.map(|path| path.to_str().unwrap().to_string()),
-                Err(e) => {
-                    ccprintlne(e.to_string());
-                    None
-                }
-            };
-        })
-        .unwrap();
-
-    // Rust requries that we first store the clone in a variable before we return it so out can be dropped safely
-    let x = out.lock().unwrap().clone();
-    x
+    }); 
 }
 
 fn get_recommendations_json() -> Option<AllRecommendations<String>> {
