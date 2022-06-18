@@ -13,7 +13,6 @@ use crate::*;
 use configparser::ini::Ini;
 use glob::glob;
 use rayon::iter::{IntoParallelRefIterator, ParallelExtend, ParallelIterator};
-use tauri::Window;
 use std::{
     collections::{HashMap, HashSet},
     fs::read_to_string,
@@ -21,6 +20,7 @@ use std::{
     process::Command,
 };
 use tauri::api::dialog::FileDialogBuilder;
+use tauri::Window;
 
 pub fn load_gui_config() -> Ini {
     let mut conf = Ini::new();
@@ -142,7 +142,7 @@ pub async fn scan_for_scripts() -> Vec<ScriptConfigBundle> {
 pub async fn pick_bot_folder() {
     FileDialogBuilder::new().pick_folder(|folder_path| {
         if let Some(path) = folder_path {
-            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(path.to_str().unwrap().to_string());
+            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(path.to_string_lossy().to_string());
         }
     });
 }
@@ -158,7 +158,7 @@ pub async fn pick_bot_folder(window: Window) {
                 None => return,
             };
 
-            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(path.to_str().unwrap().to_string());
+            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(path.to_string_lossy().to_string());
         })
         .unwrap();
 }
@@ -167,7 +167,7 @@ pub async fn pick_bot_folder(window: Window) {
 pub async fn pick_bot_config() {
     FileDialogBuilder::new().add_filter("Bot Cfg File", &["cfg"]).pick_file(|path| {
         if let Some(path) = path {
-            BOT_FOLDER_SETTINGS.lock().unwrap().add_file(path.to_str().unwrap().to_string());
+            BOT_FOLDER_SETTINGS.lock().unwrap().add_file(path.to_string_lossy().to_string());
         }
     });
 }
@@ -183,9 +183,9 @@ pub async fn show_path_in_explorer(path: String) {
     };
 
     let ppath = Path::new(&*path);
-    let path = if ppath.is_file() { ppath.parent().unwrap().to_str().unwrap() } else { &*path };
+    let path = if ppath.is_file() { ppath.parent().unwrap().to_string_lossy().to_string() } else { path };
 
-    Command::new(command).arg(path).spawn().unwrap();
+    Command::new(command).arg(&path).spawn().unwrap();
 }
 
 #[tauri::command]
@@ -274,14 +274,13 @@ pub async fn set_python_path(path: String) {
     config.write(get_config_path()).unwrap();
 }
 
-
 #[tauri::command]
 pub async fn pick_appearance_file(window: Window) {
     FileDialogBuilder::new().add_filter("Appearance Cfg File", &["cfg"]).pick_file(move |path| {
         if let Some(path) = path {
-            window.emit("set_appearance_file", path.to_str().unwrap().to_string()).unwrap();
+            window.emit("set_appearance_file", path.to_string_lossy().to_string()).unwrap();
         }
-    }); 
+    });
 }
 
 fn get_recommendations_json() -> Option<AllRecommendations<String>> {
@@ -289,11 +288,11 @@ fn get_recommendations_json() -> Option<AllRecommendations<String>> {
     for path in BOT_FOLDER_SETTINGS.lock().unwrap().folders.keys() {
         let pattern = Path::new(path).join("**/recommendations.json");
 
-        for path2 in glob(pattern.to_str().unwrap()).unwrap().flatten() {
+        for path2 in glob(&pattern.to_string_lossy().to_string()).unwrap().flatten() {
             let raw_json = match read_to_string(&path2) {
                 Ok(s) => s,
                 Err(_) => {
-                    ccprintlne(format!("Failed to read {}", path2.to_str().unwrap()));
+                    ccprintlne(format!("Failed to read {}", path2.to_string_lossy()));
                     continue;
                 }
             };
@@ -301,7 +300,7 @@ fn get_recommendations_json() -> Option<AllRecommendations<String>> {
             match serde_json::from_str(&raw_json) {
                 Ok(j) => return Some(j),
                 Err(e) => {
-                    ccprintlne(format!("Failed to parse file {}: {}", path2.to_str().unwrap(), e));
+                    ccprintlne(format!("Failed to parse file {}: {}", path2.to_string_lossy(), e));
                     continue;
                 }
             }
@@ -326,7 +325,7 @@ pub async fn get_recommendations() -> Option<AllRecommendations<BotConfigBundle>
                     .filter_map(|(path, props)| {
                         if props.visible {
                             let pattern = Path::new(path).join("**/*.cfg");
-                            let paths = glob(pattern.to_str().unwrap()).unwrap().flatten().collect::<Vec<_>>();
+                            let paths = glob(&pattern.to_string_lossy().to_string()).unwrap().flatten().collect::<Vec<_>>();
 
                             Some(paths.par_iter().filter_map(|path| BotConfigBundle::name_from_path(path.as_path()).ok()).collect::<Vec<_>>())
                         } else {

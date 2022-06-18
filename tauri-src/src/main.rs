@@ -11,6 +11,10 @@ use crate::commands::*;
 use crate::config_handles::*;
 use crate::settings::*;
 use lazy_static::{initialize, lazy_static};
+use os_pipe::{pipe, PipeWriter};
+use std::io;
+use std::process::Child;
+use std::process::ChildStdin;
 use std::sync::Mutex;
 use std::{
     env,
@@ -19,10 +23,8 @@ use std::{
     io::Read,
     ops::Not,
     path::{Path, PathBuf},
-    process::{ChildStderr, ChildStdout, Command, Stdio},
-    sync::Arc,
+    process::{Command, Stdio},
     thread,
-    time::Duration,
 };
 use tauri::Manager;
 use tauri::Menu;
@@ -41,9 +43,8 @@ lazy_static! {
         ConsoleText::from("Welcome to the RLBot Console!".to_string(), false),
         ConsoleText::from("".to_string(), false)
     ]);
-    static ref MATCH_HANDLER_STDIN: Mutex<Option<MatchHandlerStdin>> = Mutex::new(None);
-    static ref STDOUT_CAPTURE: Arc<Mutex<Vec<Option<ChildStdout>>>> = Arc::new(Mutex::new(Vec::new()));
-    static ref STDERR_CAPTURE: Arc<Mutex<Vec<Option<ChildStderr>>>> = Arc::new(Mutex::new(Vec::new()));
+    static ref MATCH_HANDLER_STDIN: Mutex<Option<ChildStdin>> = Mutex::new(None);
+    static ref CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
 }
 
 #[cfg(windows)]
@@ -51,9 +52,9 @@ fn auto_detect_python() -> Option<String> {
     let content_folder = get_content_folder();
 
     match content_folder.join("Python37\\python.exe") {
-        path if path.exists() => Some(path.to_str().unwrap().to_string()),
+        path if path.exists() => Some(path.to_string_lossy().to_string()),
         _ => match content_folder.join("venv\\Scripts\\python.exe") {
-            path if path.exists() => Some(path.to_str().unwrap().to_string()),
+            path if path.exists() => Some(path.to_string_lossy().to_string()),
             _ => {
                 // Windows actually doesn't have a python3.7.exe command, just python.exe (no matter what)
                 // but there is a pip3.7.exe and stuff
@@ -85,7 +86,7 @@ fn get_python_from_pip(pip: &str) -> Result<String, Box<dyn Error>> {
     if let Some(first_line) = stdout.lines().next() {
         let python_path = Path::new(first_line).parent().unwrap().parent().unwrap().join("python.exe");
         if python_path.exists() {
-            return Ok(python_path.to_str().unwrap().to_string());
+            return Ok(python_path.to_string_lossy().to_string());
         }
     }
 
@@ -106,7 +107,7 @@ fn auto_detect_python() -> Option<String> {
 #[cfg(target_os = "linux")]
 fn auto_detect_python() -> Option<String> {
     match get_content_folder().join("env/bin/python") {
-        path if path.exists() => Some(path.to_str().unwrap().to_string()),
+        path if path.exists() => Some(path.to_string_lossy().to_string()),
         _ => {
             for python in ["python3.7", "python3.8", "python3.6", "python3"] {
                 if get_command_status(python, vec!["--version"]) {
@@ -188,7 +189,9 @@ fn get_command_status(program: &str, args: Vec<&str>) -> bool {
     }
 }
 
-pub fn spawn_capture_process_and_get_exit_code<S: AsRef<OsStr>>(program: S, args: &[&str]) -> i32 {
+/// Be sure to drop(command) after spawning the child process! Otherwise a deadlock could happen.
+/// This is due to how the os_pipe crate works.
+pub fn get_capture_command<S: AsRef<OsStr>>(program: S, args: &[&str]) -> Command {
     let mut command = Command::new(program);
 
     #[cfg(windows)]
@@ -198,38 +201,27 @@ pub fn spawn_capture_process_and_get_exit_code<S: AsRef<OsStr>>(program: S, args
         command.creation_flags(0x08000000);
     };
 
-    let mut child = if let Ok(the_child) = command.args(args).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn() {
-        the_child
+    let pipe = CAPTURE_PIPE_WRITER.lock().unwrap();
+    let out_pipe = pipe.as_ref().unwrap().try_clone().unwrap();
+    let err_pipe = pipe.as_ref().unwrap().try_clone().unwrap();
+
+    command.args(args).stdout(out_pipe).stderr(err_pipe);
+
+    command
+}
+
+/// This function is esstential because is drops the command, which causes a deadlock
+/// Note: Child != Command
+pub fn spawn_capture_process<S: AsRef<OsStr>>(program: S, args: &[&str]) -> io::Result<Child> {
+    get_capture_command(program, args).spawn()
+}
+
+pub fn spawn_capture_process_and_get_exit_code<S: AsRef<OsStr>>(program: S, args: &[&str]) -> i32 {
+    if let Ok(mut child) = spawn_capture_process(program, args) {
+        child.wait().unwrap().code().unwrap_or(1)
     } else {
-        return 2;
-    };
-
-    let stdout_index = {
-        let mut stdout_capture = STDOUT_CAPTURE.lock().unwrap();
-        if let Some(index) = stdout_capture.iter().position(|c| c.is_none()) {
-            stdout_capture[index] = Some(child.stdout.take().unwrap());
-            index
-        } else {
-            stdout_capture.push(Some(child.stdout.take().unwrap()));
-            stdout_capture.len() - 1
-        }
-    };
-
-    let stderr_index = {
-        let mut stderr_capture = STDERR_CAPTURE.lock().unwrap();
-        if let Some(index) = stderr_capture.iter().position(|c| c.is_none()) {
-            stderr_capture[index] = Some(child.stderr.take().unwrap());
-            index
-        } else {
-            stderr_capture.push(Some(child.stderr.take().unwrap()));
-            stderr_capture.len() - 1
-        }
-    };
-
-    let exit_code = child.wait().unwrap().code().unwrap_or(1);
-    STDOUT_CAPTURE.lock().unwrap()[stdout_index] = None;
-    STDERR_CAPTURE.lock().unwrap()[stderr_index] = None;
-    exit_code
+        2
+    }
 }
 
 pub fn check_has_rlbot() -> bool {
@@ -253,7 +245,7 @@ fn get_content_folder() -> PathBuf {
 
 fn bootstrap_python_script<T: AsRef<Path>, C: AsRef<[u8]>>(content_folder: T, file_name: &str, file_contents: C) {
     let full_path = content_folder.as_ref().join(file_name);
-    println!("{}: {}", file_name, full_path.to_str().unwrap());
+    println!("{}: {}", file_name, full_path.to_string_lossy());
 
     if !full_path.parent().unwrap().exists() {
         create_dir_all(&full_path).unwrap();
@@ -275,8 +267,7 @@ fn main() {
     initialize(&PYTHON_PATH);
     initialize(&CONSOLE_TEXT);
     initialize(&MATCH_HANDLER_STDIN);
-    initialize(&STDOUT_CAPTURE);
-    initialize(&STDERR_CAPTURE);
+    initialize(&CAPTURE_PIPE_WRITER);
 
     let mut app = tauri::Builder::default();
 
@@ -288,141 +279,57 @@ fn main() {
     }
 
     app.setup(|app| {
-        let main_window_out = app.get_window("main").unwrap();
-        let stdout_capture = Arc::clone(&STDOUT_CAPTURE);
+        let main_window = app.get_window("main").unwrap();
+        let (mut pipe_reader, pipe_writer) = pipe().unwrap();
+        *CAPTURE_PIPE_WRITER.lock().unwrap() = Some(pipe_writer);
+
         thread::spawn(move || {
             let mut next_replace_last = false;
             loop {
-                thread::sleep(Duration::from_micros(1));
-                let mut outs = stdout_capture.lock().unwrap();
+                let mut text = String::new();
+                let mut will_replace_last = next_replace_last;
+                next_replace_last = false;
 
-                while !outs.is_empty() && outs.last().unwrap().is_none() {
-                    outs.pop();
+                loop {
+                    let mut buf = [0];
+                    match pipe_reader.read(&mut buf[..]) {
+                        Ok(0) | Err(_) => break,
+                        Ok(_) => {
+                            let string = String::from_utf8_lossy(&buf).to_string();
+                            if &string == "\n" {
+                                if text.is_empty() && will_replace_last {
+                                    will_replace_last = false;
+                                    continue;
+                                }
+
+                                break;
+                            } else if &string == "\r" {
+                                next_replace_last = true;
+                                break;
+                            }
+                            text.push_str(&string);
+                        }
+                    };
                 }
 
-                if !outs.is_empty() {
-                    let out_strs: Vec<ConsoleTextUpdate> = outs
-                        .iter_mut()
-                        .flatten()
-                        .filter_map(|s| {
-                            let mut text = String::new();
-                            let mut will_replace_last = next_replace_last;
-                            next_replace_last = false;
-
-                            loop {
-                                let mut buf = [0];
-                                match s.read(&mut buf[..]) {
-                                    Ok(0) | Err(_) => break,
-                                    Ok(_) => {
-                                        let string = String::from_utf8_lossy(&buf).to_string();
-                                        if &string == "\n" {
-                                            if text.is_empty() && will_replace_last {
-                                                will_replace_last = false;
-                                                continue;
-                                            }
-
-                                            break;
-                                        } else if &string == "\r" {
-                                            next_replace_last = true;
-                                            break;
-                                        }
-                                        text.push_str(&string);
-                                    }
-                                };
-                            }
-
-                            text.is_empty().not().then(|| ConsoleTextUpdate::from(text, false, will_replace_last))
-                        })
-                        .collect();
-                    drop(outs);
-
-                    if !out_strs.is_empty() {
-                        let mut console_text = CONSOLE_TEXT.lock().unwrap();
-                        for out_str in &out_strs {
-                            if out_str.replace_last {
-                                console_text.pop();
-                            }
-                            console_text.push(out_str.content.clone());
-                        }
-
-                        if console_text.len() > 1200 {
-                            console_text.drain(1200..);
-                        }
-
-                        main_window_out.emit("new-console-text", out_strs).unwrap();
+                if text == "-|-*|MATCH START FAILED|*-|-" {
+                    eprintln!("START MATCH FAILED");
+                    main_window.emit("match-start-failed", ()).unwrap();
+                } else if text == "-|-*|MATCH STARTED|*-|-" {
+                    eprintln!("MATCH STARTED");
+                    main_window.emit("match-started", ()).unwrap();
+                } else if let Some(update) = text.is_empty().not().then(|| ConsoleTextUpdate::from(text, false, will_replace_last)) {
+                    let mut console_text = CONSOLE_TEXT.lock().unwrap();
+                    if update.replace_last {
+                        console_text.pop();
                     }
-                }
-            }
-        });
+                    console_text.push(update.content.clone());
 
-        let main_window_err = app.get_window("main").unwrap();
-        let stderr_capture = Arc::clone(&STDERR_CAPTURE);
-        thread::spawn(move || {
-            let mut next_replace_last = false;
-            loop {
-                thread::sleep(Duration::from_micros(1));
-                let mut errs = stderr_capture.lock().unwrap();
-
-                while !errs.is_empty() && errs.last().unwrap().is_none() {
-                    errs.pop();
-                }
-
-                if !errs.is_empty() {
-                    let err_strs: Vec<ConsoleTextUpdate> = errs
-                        .iter_mut()
-                        .flatten()
-                        .filter_map(|s| {
-                            let mut text = String::new();
-                            let mut will_replace_last = next_replace_last;
-                            next_replace_last = false;
-
-                            loop {
-                                let mut buf = [0];
-                                match s.read(&mut buf[..]) {
-                                    Ok(0) | Err(_) => break,
-                                    Ok(_) => {
-                                        let string = String::from_utf8_lossy(&buf).to_string();
-                                        if &string == "\n" {
-                                            if text.is_empty() && will_replace_last {
-                                                will_replace_last = false;
-                                                continue;
-                                            }
-
-                                            break;
-                                        } else if &string == "\r" {
-                                            next_replace_last = true;
-                                            break;
-                                        }
-                                        text.push_str(&string);
-                                    }
-                                };
-                            }
-
-                            if text == "-|-*|MATCH START FAILED|*-|-" {
-                                eprintln!("START MATCH FAILED");
-                                main_window_err.emit("match-start-failed", ()).unwrap();
-                                None
-                            } else if text == "-|-*|MATCH STARTED|*-|-" {
-                                eprintln!("MATCH STARTED");
-                                main_window_err.emit("match-started", ()).unwrap();
-                                None
-                            } else {
-                                text.is_empty().not().then(|| ConsoleTextUpdate::from(text, true, will_replace_last))
-                            }
-                        })
-                        .collect();
-                    drop(errs);
-
-                    if !err_strs.is_empty() {
-                        let mut console_text = CONSOLE_TEXT.lock().unwrap();
-                        for err_str in &err_strs {
-                            console_text.push(err_str.content.clone());
-                        }
-                        if console_text.len() > 1200 {
-                            console_text.drain(1200..);
-                        }
-                        main_window_err.emit("new-console-text", err_strs).unwrap();
+                    if console_text.len() > 1200 {
+                        console_text.drain(1200..);
                     }
+
+                    main_window.emit("new-console-text", vec![update]).unwrap();
                 }
             }
         });

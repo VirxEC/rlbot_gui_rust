@@ -429,7 +429,7 @@ impl MapPackUpdater {
 
         let mut filename_to_path = HashMap::new();
         for path in to_fetch.iter() {
-            let filename = Path::new(path).file_name().unwrap().to_str().unwrap();
+            let filename = Path::new(path).file_name().unwrap().to_string_lossy();
             filename_to_path.insert(filename.to_string(), path.to_string());
         }
 

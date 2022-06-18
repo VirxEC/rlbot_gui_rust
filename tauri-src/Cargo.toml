@@ -36,6 +36,7 @@ rand = "0.8"
 fs_extra = "1.2"
 futures-util = "0.3"
 sysinfo = "0.24"
+os_pipe = "1.0"
 
 [target.'cfg(windows)'.dependencies]
 registry = "1.2"

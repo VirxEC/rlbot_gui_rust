@@ -64,7 +64,7 @@ pub fn extract<S: Read + Seek>(source: S, target_dir: &Path, strip_toplevel: boo
         }
 
         let outpath = target_dir.join(relative_path);
-        let outpath_str = outpath.to_str().unwrap();
+        let outpath_str = outpath.to_string_lossy();
 
         ccprintlnr(format!("Creating {} from {}", outpath_str, relative_path.display()));
         if outpath_str.ends_with('/') || outpath_str.ends_with('\\') {

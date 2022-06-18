@@ -10,7 +10,7 @@ use crate::{
 };
 use core::fmt;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, process::ChildStdin, str::FromStr};
+use std::{collections::HashMap, str::FromStr};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BotFolder {
@@ -393,21 +393,4 @@ pub struct TeamBotBundle {
     pub skill: f32,
     pub runnable_type: String,
     pub path: Option<String>,
-}
-
-#[derive(Debug)]
-pub struct MatchHandlerStdin {
-    pub stdin: ChildStdin,
-    pub stdout_index: usize,
-    pub stderr_index: usize,
-}
-
-impl MatchHandlerStdin {
-    pub const fn new(stdin: ChildStdin, stdout_index: usize, stderr_index: usize) -> Self {
-        Self {
-            stdin,
-            stdout_index,
-            stderr_index,
-        }
-    }
 }

@@ -35,7 +35,7 @@ pub async fn bootstrap_python_bot(bot_name: String, directory: &str) -> Result<S
         }
     }
 
-    let bundles = scan_directory_for_bot_configs(top_dir.to_str().unwrap());
+    let bundles = scan_directory_for_bot_configs(&top_dir.to_string_lossy());
     let bundle = bundles.iter().next().unwrap();
     let config_file = bundle.path.clone().unwrap();
     let python_file = bundle.python_path.clone().unwrap();
@@ -50,7 +50,7 @@ pub async fn bootstrap_python_bot(bot_name: String, directory: &str) -> Result<S
     if open::that(python_file).is_err() {
         ccprintln(format!(
             "You have no default program to open .py files. Your new bot is located at {}",
-            top_dir.to_str().unwrap()
+            top_dir.to_string_lossy()
         ));
     }
 
@@ -106,14 +106,14 @@ pub async fn bootstrap_python_hivemind(hive_name: String, directory: &str) -> Re
         format!("class {}Hivemind(PythonHivemind)", &hive_name),
     );
 
-    let config_file = config_file.to_str().unwrap();
+    let config_file = config_file.to_string_lossy();
 
     BOT_FOLDER_SETTINGS.lock().unwrap().add_file(config_file.to_string());
 
     if open::that(hive_file).is_err() {
         ccprintln(format!(
             "You have no default program to open .py files. Your new bot is located at {}",
-            top_dir.to_str().unwrap()
+            top_dir.to_string_lossy()
         ));
     }
 
@@ -137,7 +137,7 @@ pub async fn bootstrap_rust_bot(bot_name: String, directory: &str) -> Result<Str
         }
     }
 
-    let bundles = scan_directory_for_bot_configs(top_dir.to_str().unwrap());
+    let bundles = scan_directory_for_bot_configs(&top_dir.to_string_lossy());
     let bundle = bundles.iter().next().unwrap();
     let config_file = bundle.path.clone().unwrap();
 
@@ -154,7 +154,7 @@ pub async fn bootstrap_rust_bot(bot_name: String, directory: &str) -> Result<Str
     if open::that(top_dir.join("src").join("main.rs")).is_err() {
         ccprintln(format!(
             "You have no default program to open .rs files. Your new bot is located at {}",
-            top_dir.to_str().unwrap()
+            top_dir.to_string_lossy()
         ));
     }
 
@@ -190,7 +190,7 @@ pub async fn bootstrap_scratch_bot(bot_name: String, directory: &str) -> Result<
     replace_all_regex_in_file(
         &top_dir.join("rlbot.cfg"),
         &Regex::new(r"(?P<a>participant_config_\d = ).*$").unwrap(),
-        Regex::new(&format!(r"$a{}", Path::new(&sanitized_name).join(config_filename).to_str().unwrap().replace('\\', "\\\\")))
+        Regex::new(&format!(r"$a{}", Path::new(&sanitized_name).join(config_filename).to_string_lossy().replace('\\', "\\\\")))
             .unwrap()
             .to_string(),
     );
@@ -219,7 +219,7 @@ pub async fn bootstrap_scratch_bot(bot_name: String, directory: &str) -> Result<
     // delete the old config file
     remove_file(old_config_file).unwrap();
 
-    ccprintln(format!("Your new bot is located at {}", top_dir.to_str().unwrap()));
+    ccprintln(format!("Your new bot is located at {}", top_dir.to_string_lossy()));
 
-    Ok(config_file.to_str().unwrap().to_string())
+    Ok(config_file.to_string_lossy().to_string())
 }

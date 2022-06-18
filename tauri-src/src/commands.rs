@@ -16,7 +16,7 @@ use std::{
     fs::{create_dir_all, File},
     io::{copy, Cursor, Write},
     path::Path,
-    process::{Command, Stdio},
+    process::Command,
 };
 use tauri::Window;
 
@@ -48,7 +48,7 @@ fn ensure_bot_directory() -> String {
         create_dir_all(&bot_directory_path).unwrap();
     }
 
-    bot_directory.to_str().unwrap().to_string()
+    bot_directory.to_string_lossy().to_string()
 }
 
 #[tauri::command]
@@ -337,14 +337,14 @@ pub async fn install_python() -> Option<u8> {
         let stdout = String::from_utf8(output.stdout).ok()?;
         Path::new(stdout.lines().next()?).parent().unwrap().parent().unwrap().join("python.exe")
     };
-    *PYTHON_PATH.lock().unwrap() = new_python_path.to_str().unwrap().to_string();
+    *PYTHON_PATH.lock().unwrap() = new_python_path.to_string_lossy().to_string();
 
     Some(0)
 }
 
 #[tauri::command]
 pub async fn download_bot_pack(window: Window) -> String {
-    let botpack_location = get_content_folder().join(BOTPACK_FOLDER).to_str().unwrap().to_string();
+    let botpack_location = get_content_folder().join(BOTPACK_FOLDER).to_string_lossy().to_string();
     let botpack_status = downloader::download_repo(&window, BOTPACK_REPO_OWNER, BOTPACK_REPO_NAME, &botpack_location, true).await;
 
     match botpack_status {
@@ -360,7 +360,7 @@ pub async fn download_bot_pack(window: Window) -> String {
 
 #[tauri::command]
 pub async fn update_bot_pack(window: Window) -> String {
-    let botpack_location = get_content_folder().join(BOTPACK_FOLDER).to_str().unwrap().to_string();
+    let botpack_location = get_content_folder().join(BOTPACK_FOLDER).to_string_lossy().to_string();
     let botpack_status = downloader::update_bot_pack(&window, BOTPACK_REPO_OWNER, BOTPACK_REPO_NAME, &botpack_location).await;
 
     match botpack_status {
@@ -389,25 +389,25 @@ pub async fn update_bot_pack(window: Window) -> String {
 pub async fn update_map_pack(window: Window) -> String {
     let mappack_location = get_content_folder().join(MAPPACK_FOLDER);
     let updater = downloader::MapPackUpdater::new(&mappack_location, MAPPACK_REPO.0.to_string(), MAPPACK_REPO.1.to_string());
-    let location = mappack_location.to_str().unwrap();
+    let location = mappack_location.to_string_lossy().to_string();
     let map_index_old = updater.get_map_index();
 
     match updater.needs_update().await {
         downloader::BotpackStatus::Skipped(message) => {
-            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(mappack_location.to_str().unwrap().to_string());
+            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(location);
             message
         }
         downloader::BotpackStatus::Success(message) => {
             // Configure the folder settings
-            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(location.to_string());
+            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(location);
             message
         }
         downloader::BotpackStatus::RequiresFullDownload => {
             // We need to download the botpack
             // the most likely cause is the botpack not existing in the first place
-            match downloader::download_repo(&window, MAPPACK_REPO.0, MAPPACK_REPO.1, location, false).await {
+            match downloader::download_repo(&window, MAPPACK_REPO.0, MAPPACK_REPO.1, &location, false).await {
                 downloader::BotpackStatus::Success(message) => {
-                    BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(mappack_location.to_str().unwrap().to_string());
+                    BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(location);
 
                     if updater.get_map_index().is_none() {
                         ccprintlne("Couldn't find revision number in map pack".to_string());
@@ -441,49 +441,17 @@ pub async fn save_launcher_settings(settings: LauncherSettings) {
     settings.write_to_file();
 }
 
-fn create_match_handler() -> Option<MatchHandlerStdin> {
-    let mut program = Command::new(&*PYTHON_PATH.lock().unwrap());
-    let script_path = get_content_folder().join("match_handler.py");
-    let args = [script_path.to_str().unwrap().to_string()];
+fn create_match_handler() -> Option<ChildStdin> {
+    let program = PYTHON_PATH.lock().unwrap().clone();
+    let script_path = get_content_folder().join("match_handler.py").to_string_lossy().to_string();
 
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        // disable window creation
-        program.creation_flags(0x08000000);
-    };
-
-    let mut child = match program.args(args).stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn() {
-        Ok(child) => child,
+    match get_capture_command(program, &[&script_path]).stdin(Stdio::piped()).spawn() {
+        Ok(mut child) => child.stdin.take(),
         Err(err) => {
             ccprintlne(format!("Failed to start match handler: {}", err));
-            return None;
+            None
         }
-    };
-
-    let stdout_index = {
-        let mut stdout_capture = STDOUT_CAPTURE.lock().unwrap();
-        if let Some(index) = stdout_capture.iter().position(|c| c.is_none()) {
-            stdout_capture[index] = Some(child.stdout.take().unwrap());
-            index
-        } else {
-            stdout_capture.push(Some(child.stdout.take().unwrap()));
-            stdout_capture.len() - 1
-        }
-    };
-
-    let stderr_index = {
-        let mut stderr_capture = STDERR_CAPTURE.lock().unwrap();
-        if let Some(index) = stderr_capture.iter().position(|c| c.is_none()) {
-            stderr_capture[index] = Some(child.stderr.take().unwrap());
-            index
-        } else {
-            stderr_capture.push(Some(child.stderr.take().unwrap()));
-            stderr_capture.len() - 1
-        }
-    };
-
-    Some(MatchHandlerStdin::new(child.stdin.take().unwrap(), stdout_index, stderr_index))
+    }
 }
 
 pub fn issue_match_handler_command(command_parts: &[String], create_handler: bool) {
@@ -499,7 +467,7 @@ pub fn issue_match_handler_command(command_parts: &[String], create_handler: boo
     }
 
     let command = format!("{}\n", command_parts.join(" | "));
-    let stdin = &mut match_handler_stdin.as_mut().unwrap().stdin;
+    let stdin = match_handler_stdin.as_mut().unwrap();
 
     println!("Issuing the following command to the match handler: {}", command);
     if stdin.write_all(command.as_bytes()).is_err() {

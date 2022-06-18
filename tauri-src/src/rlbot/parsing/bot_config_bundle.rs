@@ -141,9 +141,9 @@ impl BotConfigBundle {
         let mut config = Ini::new();
         config.load(config_path)?;
 
-        let path = config_path.to_str().unwrap().to_string();
-        let config_directory = config_path.parent().unwrap().to_str().unwrap().to_string();
-        let config_file_name = Some(config_path.file_name().unwrap().to_str().unwrap().to_string());
+        let path = config_path.to_string_lossy().to_string();
+        let config_directory = config_path.parent().unwrap().to_string_lossy().to_string();
+        let config_file_name = Some(config_path.file_name().unwrap().to_string_lossy().to_string());
 
         let name = config.get(BOT_CONFIG_MODULE_HEADER, NAME_KEY);
         let looks_path = config.get(BOT_CONFIG_MODULE_HEADER, LOOKS_CONFIG_KEY).map(|path| format!("{}/{}", config_directory, path));
@@ -224,9 +224,9 @@ impl BotConfigBundle {
             return Err("Bot name not found".to_string());
         };
 
-        let path = config_path.to_str().unwrap().to_string();
+        let path = config_path.to_string_lossy().to_string();
 
-        let config_directory = config_path.parent().unwrap().to_str().unwrap().to_string();
+        let config_directory = config_path.parent().unwrap().to_string_lossy().to_string();
 
         let looks_path = config.get(BOT_CONFIG_MODULE_HEADER, LOOKS_CONFIG_KEY).map(|path| format!("{}/{}", config_directory, path));
 
@@ -317,8 +317,8 @@ impl Runnable for BotConfigBundle {
         let requires_tkinter = self.requires_tkinter.unwrap_or(false);
 
         if let Some(req_file) = self.get_requirements_file() {
-            let script_path = get_content_folder().join("get_missing_packages.py");
-            let mut args: Vec<&str> = vec![script_path.to_str().unwrap()];
+            let script_path = get_content_folder().join("get_missing_packages.py").to_string_lossy().to_string();
+            let mut args: Vec<&str> = vec![&script_path];
 
             if requires_tkinter {
                 args.push("requires_tkinter");
@@ -384,15 +384,15 @@ pub struct ScriptConfigBundle {
 impl ScriptConfigBundle {
     pub fn minimal_from_path(config_path: &Path) -> Result<Self, String> {
         let mut config = Ini::new();
-        config.load(config_path.to_str().unwrap())?;
+        config.load(config_path.to_string_lossy().to_string())?;
 
         let name = config.get(BOT_CONFIG_MODULE_HEADER, NAME_KEY);
         let runnable_type = String::from("script");
         let warn = None;
         let image = String::from("imgs/rlbot.png");
-        let path = config_path.to_str().unwrap().to_string();
-        let config_directory = config_path.parent().unwrap().to_str().unwrap().to_string();
-        let config_file_name = config_path.file_name().unwrap().to_str().unwrap().to_string();
+        let path = config_path.to_string_lossy().to_string();
+        let config_directory = config_path.parent().unwrap().to_string_lossy().to_string();
+        let config_file_name = config_path.file_name().unwrap().to_string_lossy().to_string();
         let use_virtual_environment = config.getbool(BOT_CONFIG_MODULE_HEADER, USE_VIRTUAL_ENVIRONMENT_KEY).unwrap_or(None).unwrap_or(false);
         let requirements_file = config
             .get(BOT_CONFIG_MODULE_HEADER, REQUIREMENTS_FILE_KEY)
@@ -482,7 +482,7 @@ impl Runnable for ScriptConfigBundle {
     #[cfg(not(windows))]
     fn get_environment_path(&self) -> String {
         if self.use_virtual_environment() {
-            Path::new(&self.config_directory).join("venv").join("bin").join("python").to_str().unwrap().to_string()
+            Path::new(&self.config_directory).join("venv").join("bin").join("python").to_string_lossy().to_string()
         } else {
             PYTHON_PATH.lock().unwrap().to_string()
         }
@@ -496,8 +496,8 @@ impl Runnable for ScriptConfigBundle {
         let python = PYTHON_PATH.lock().unwrap().to_string();
 
         if let Some(req_file) = self.get_requirements_file() {
-            let script_path = get_content_folder().join("get_missing_packages.py");
-            let mut args: Vec<&str> = vec![script_path.to_str().unwrap()];
+            let script_path = get_content_folder().join("get_missing_packages.py").to_string_lossy().to_string();
+            let mut args: Vec<&str> = vec![&script_path];
 
             if self.requires_tkinter {
                 args.push("requires_tkinter");
