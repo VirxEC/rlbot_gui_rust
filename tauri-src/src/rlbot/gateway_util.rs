@@ -24,3 +24,19 @@ pub fn find_existing_process() -> Option<u16> {
     ccprintln("No existing RLBot process found...".to_string());
     None
 }
+
+pub fn kill_existing_processes() {
+    let system = System::new_with_specifics(RefreshKind::new().with_processes(ProcessRefreshKind::new()));
+
+    let mut found = false;
+    // there might be multiple processes, so just be able to kill them all encase
+    for process_info in system.processes_by_name(EXECUTABLE_NAME) {
+        ccprintln("Killing existing RLBot process".to_string());
+        process_info.kill();
+        found = true;
+    }
+
+    if !found {
+        ccprintln("No existing RLBot process found".to_string());
+    }
+}

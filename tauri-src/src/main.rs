@@ -21,7 +21,6 @@ use std::{
     ffi::OsStr,
     fs::{create_dir_all, write},
     io::Read,
-    ops::Not,
     path::{Path, PathBuf},
     process::{Command, Stdio},
     thread,
@@ -40,8 +39,8 @@ lazy_static! {
     static ref MATCH_SETTINGS: Mutex<MatchSettings> = Mutex::new(MatchSettings::new());
     static ref PYTHON_PATH: Mutex<String> = Mutex::new(load_gui_config().get("python_config", "path").unwrap_or_else(|| auto_detect_python().unwrap_or_default()));
     static ref CONSOLE_TEXT: Mutex<Vec<ConsoleText>> = Mutex::new(vec![
-        ConsoleText::from("Welcome to the RLBot Console!".to_string(), false),
-        ConsoleText::from("".to_string(), false)
+        ConsoleText::from("Welcome to the RLBot Console!".to_string(), None),
+        ConsoleText::from("".to_string(), None)
     ]);
     static ref MATCH_HANDLER_STDIN: Mutex<Option<ChildStdin>> = Mutex::new(None);
     static ref CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
@@ -126,19 +125,19 @@ fn get_config_path() -> PathBuf {
 
 pub fn ccprintln(text: String) {
     println!("{}", &text);
-    CONSOLE_TEXT.lock().unwrap().push(ConsoleText::from(text, false));
+    CONSOLE_TEXT.lock().unwrap().push(ConsoleText::from(text, None));
 }
 
 pub fn ccprintlnr(text: String) {
     println!("\r{}", &text);
     let mut ct = CONSOLE_TEXT.lock().unwrap();
     ct.pop();
-    ct.push(ConsoleText::from(text, false));
+    ct.push(ConsoleText::from(text, None));
 }
 
 pub fn ccprintlne(text: String) {
     eprintln!("{}", &text);
-    CONSOLE_TEXT.lock().unwrap().push(ConsoleText::from(text, true));
+    CONSOLE_TEXT.lock().unwrap().push(ConsoleText::from(text, Some("red".to_string())));
 }
 
 #[cfg(windows)]
@@ -318,7 +317,22 @@ fn main() {
                 } else if text == "-|-*|MATCH STARTED|*-|-" {
                     eprintln!("MATCH STARTED");
                     main_window.emit("match-started", ()).unwrap();
-                } else if let Some(update) = text.is_empty().not().then(|| ConsoleTextUpdate::from(text, false, will_replace_last)) {
+                } else {
+                    let color = {
+                        let text = text.to_ascii_lowercase();
+                        if text.contains("error") {
+                            Some("red".to_string())
+                        } else if text.contains("warning") {
+                            Some("#A1761B".to_string())
+                        } else if text.contains("info") {
+                            Some("blue".to_string())
+                        } else {
+                            None
+                        }
+                    };
+
+                    let update = ConsoleTextUpdate::from(text, color, will_replace_last);
+
                     let mut console_text = CONSOLE_TEXT.lock().unwrap();
                     if update.replace_last {
                         console_text.pop();

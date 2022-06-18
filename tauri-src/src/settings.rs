@@ -333,12 +333,12 @@ pub struct LogoUpdate {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ConsoleText {
     pub text: String,
-    pub err: bool,
+    pub color: Option<String>,
 }
 
 impl ConsoleText {
-    pub const fn from(text: String, err: bool) -> ConsoleText {
-        ConsoleText { text, err }
+    pub const fn from(text: String, color: Option<String>) -> ConsoleText {
+        ConsoleText { text, color }
     }
 }
 
@@ -349,9 +349,9 @@ pub struct ConsoleTextUpdate {
 }
 
 impl ConsoleTextUpdate {
-    pub const fn from(text: String, err: bool, replace_last: bool) -> Self {
+    pub const fn from(text: String, color: Option<String>, replace_last: bool) -> Self {
         ConsoleTextUpdate {
-            content: ConsoleText::from(text, err),
+            content: ConsoleText::from(text, color),
             replace_last,
         }
     }

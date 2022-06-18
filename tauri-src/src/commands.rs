@@ -459,6 +459,7 @@ pub fn issue_match_handler_command(command_parts: &[String], create_handler: boo
 
     if match_handler_stdin.is_none() {
         if create_handler {
+            ccprintln("Starting match handler!".to_string());
             *match_handler_stdin = create_match_handler();
         } else {
             ccprintln("Not issuing command to handler as it's down and I was told to not start it".to_string());
@@ -466,26 +467,32 @@ pub fn issue_match_handler_command(command_parts: &[String], create_handler: boo
         }
     }
 
-    let command = format!("{}\n", command_parts.join(" | "));
+    let command = format!("{} | \n", command_parts.join(" | "));
     let stdin = match_handler_stdin.as_mut().unwrap();
 
     println!("Issuing the following command to the match handler: {}", command);
     if stdin.write_all(command.as_bytes()).is_err() {
-        *match_handler_stdin = None;
-        ccprintlne("Match handler is no longer accepting commands. Restarting!".to_string());
-        issue_match_handler_command(command_parts, false);
+        match_handler_stdin.take().unwrap();
     }
 }
 
 #[tauri::command]
 pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_settings: MatchSettings) -> bool {
-    let port = gateway_util::find_existing_process().unwrap_or(gateway_util::IDEAL_RLBOT_PORT);
+    let port = gateway_util::find_existing_process();
 
-    match setup_manager::is_rocket_league_running(port) {
-        Ok(is_running) => ccprintln(format!(
-            "Rocket League is {}",
-            if is_running { "already running with RLBot args!" } else { "not running yet..." }
-        )),
+    match setup_manager::is_rocket_league_running(port.unwrap_or(gateway_util::IDEAL_RLBOT_PORT)) {
+        Ok(rl_is_running) => {
+            ccprintln(format!(
+                "Rocket League is {}",
+                if rl_is_running { "already running with RLBot args!" } else { "not running yet..." }
+            ));
+
+            // kill RLBot if it's running but Rocket League isn't
+            if !rl_is_running && port.is_some() {
+                kill_bots().await;
+                gateway_util::kill_existing_processes();
+            }
+        }
         Err(err) => {
             ccprintlne(err);
             return false;
@@ -519,5 +526,9 @@ pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_set
 #[tauri::command]
 pub async fn kill_bots() {
     issue_match_handler_command(&["shut_down".to_string()], false);
-    // gateway_util::kill_existing_processes();
+
+    let mut match_handler_stdin = MATCH_HANDLER_STDIN.lock().unwrap();
+    if match_handler_stdin.is_some() {
+        match_handler_stdin.take().unwrap();
+    }
 }

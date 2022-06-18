@@ -14,19 +14,22 @@ This hasn't been implemented, but it's easy to do.
 
 [See this guide](https://github.com/tauri-apps/tauri-action)
 
-## Features unqiue to the Rust port
+## Features & fixes unqiue to the Rust port
+
+NOTE: "FCBP" stands for "Feature/fix could be backported"
 
 - Launching of the GUI without Python
 - Managing Python from within the GUI
 - Running RLBot with a custom Python executable
-- Fast & smart reloading misssing python packages upon executable change/package install
-- Add new bots into their proper place in the bot list instead of the end
+- Fast & smart reloading misssing python packages upon executable change/package install (FCBP)
+- Add new bots into their proper place in the bot list instead of the end (FCBP)
 - Easy Python pip fixing if something breaks; top right -> menu -> "Edit/Repair Python Settings"
 - Real-time non-blocking subprocess stdout & stderr capture redirected to built-in GUI console for debugging purposes
-- Defered bundle logo loading and missing python package checking
-- Concurrent loading that utilizes all threads
+- Defered bundle logo loading and missing python package checking (FCBP)
+- Concurrent loading that utilizes all threads (FCBP)
 - In-GUI Python installation for Windows users
-- Better error messages when downloading or upgrading the botpack
+- Better error messages when downloading or upgrading the botpack (FCBP)
+- Letting the user close Rocket League in between matches without restarting the GUI (FCBP)
 - [Self-updating of the GUI: TODO](https://tauri.app/v1/guides/distribution/updater#update-file-json-format)
 
 ## Installation

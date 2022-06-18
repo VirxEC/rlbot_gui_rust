@@ -193,25 +193,19 @@ def start_match_helper(bot_list: List[dict], match_settings: dict, launcher_pref
     sm = get_fresh_setup_manager()
     try:
         setup_match(sm, match_config, launcher_prefs)
+        print("-|-*|MATCH STARTED|*-|-", flush=True)
     except Exception:
         print_exc()
-        print("-|-*|MATCH START FAILED|*-|-", file=sys.stderr)
-        return
-
-    print("-|-*|MATCH STARTED|*-|-", file=sys.stderr)
-
-def shut_down():
-    if sm is not None:
-        sm.shut_down(time_limit=5, kill_all_pids=True)
-    else:
-        print("There gotta be some setup manager already")
+        print("-|-*|MATCH START FAILED|*-|-", flush=True)
 
 if __name__ == "__main__":
     try:
-        while True:
+        online = True
+        while online:
             print("Looking for new command")
             command = sys.stdin.readline()
             params = command.split(" | ")
+
             print(params[0])
             if params[0] == "start_match":
                 bot_list = json.loads(params[1])
@@ -226,11 +220,18 @@ if __name__ == "__main__":
 
                 start_match_helper(bot_list, match_settings, RocketLeagueLauncherPreference(preferred_launcher, use_login_tricks, rocket_league_exe_path))
             elif params[0] == "shut_down":
-                break
+                if sm is not None:
+                    sm.shut_down(time_limit=5, kill_all_pids=True)
+                    sm = None
+                else:
+                    print("There gotta be some setup manager already")
+                online = False
     except Exception:
         print_exc()
 
-    try:
-        shut_down()
-    except Exception:
-        print_exc()
+    if sm is not None:
+        sm.shut_down(time_limit=5, kill_all_pids=True)
+        sm = None
+    
+    print("Closing...")
+    exit()

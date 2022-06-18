@@ -17,9 +17,9 @@ export default {
 		</b-navbar-nav>
 	</b-navbar>
 	<b-container fluid>
-		<b-card no-body class="bot-pool p-1">
-			<span :class="text.err ? 'text-danger' : ''" v-for="text in consoleTexts.slice().reverse()">
-				{{ text.text }}<br>
+		<b-card no-body class="bot-pool p-1" style="white-space: pre-wrap;">
+			<span :style="'color:' + (text.color ? text.color : 'black') + ';'" v-for="text in consoleTexts.slice().reverse()">
+				<span>{{ text.text }}</span><br>
 			</span>
 		</b-card>
 	</b-container>
@@ -40,7 +40,7 @@ export default {
 				});
 
 				if (this.consoleTexts.length > 1200) {
-					this.consoleTexts = this.consoleTexts.slice(0, this.consoleTexts.length - 1200);
+					this.consoleTexts = this.consoleTexts.slice(this.consoleTexts.length - 1200);
 				}
 			})
 		}
