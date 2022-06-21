@@ -201,3 +201,5 @@ rlbot_gui/gui/imgs/logos
 /target/
 WixTools
 /rlbot_gui/
+pgpkeys-*
+pgp-key.private

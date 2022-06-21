@@ -21,7 +21,6 @@ NOTE: "FCBP" stands for "Feature/fix could be backported"
 - Launching of the GUI without Python
 - Managing Python from within the GUI
 - Running RLBot with a custom Python executable
-- Fast & smart reloading misssing python packages upon executable change/package install (FCBP)
 - Add new bots into their proper place in the bot list instead of the end (FCBP)
 - Easy Python pip fixing if something breaks; top right -> menu -> "Edit/Repair Python Settings"
 - Real-time non-blocking subprocess stdout & stderr capture redirected to built-in GUI console for debugging purposes
@@ -30,19 +29,47 @@ NOTE: "FCBP" stands for "Feature/fix could be backported"
 - In-GUI Python installation for Windows users
 - Better error messages when downloading or upgrading the botpack (FCBP)
 - Letting the user close Rocket League in between matches without restarting the GUI (FCBP)
-- [Self-updating of the GUI: TODO](https://tauri.app/v1/guides/distribution/updater#update-file-json-format)
+- Full self-updating of the GUI: Implemented for Windows and Ubunutu users. Reserved spot on AUR. (FCBP)
 
-## Installation
+## User Installation
 
-If you just want to use this GUI, you can go download the installer from http://www.rlbot.org/
+### Windows
+
+Download the installer from http://www.rlbot.org/
 
 It will put "RLBotGUI" in your Windows start menu.
+
+### Debian-based Linux distros
+
+1. Add the public GPG key of the ppa to your system: `curl -s --compressed https://virxec.github.io/rlbot-gui-rust/apt-repo/pgp-key.public | sudo apt-key add -`
+2. Add the repository to your system: `echo "deb [arch=amd64] https://virxec.github.io/rlbot-gui-rust/apt-repo/ stable main" | sudo tee /etc/apt/sources.list.d/rlbot-gui-rust.list`
+3. Refresh app list: `sudo apt-get update`
+4. Install the GUI: `sudo apt-get install rl-bot-gui`
+
+### Arch-based Linux distros
+
+TODO :) it's on the AUR as `rlbotgui-rust-git`
+
+### Other Linux distros & MacOS
+
+Warning to MacOS users: RLBot (not the GUI, the underlying RLBot project) is currently broken on MacOS.
+For all Linux distros: Before wasting your time compiling the GUI, RLBot will only work on a native-Linux install of Rocket League from Steam.
+
+You're going to have build the GUI from scratch.
+
+1. Follow the [Tauri prerequisites guide](https://tauri.app/v1/guides/getting-started/prerequisites).
+2. A system with at least 8GB of RAM is required. 4GB will not work.
+3. Clone this repository into your home directory: `git clone https://github.com/VirxEC/rlbot_gui_rust.git`
+4. Navigate to the right folder: `cd rlbot_gui_rust/tauri-src`
+5. Build the GUI: `cargo build --release`
+6. The compiled binary is `target/release/rl-bot-gui`
+7. To check for updates, run `git fetch` then `git pull` and if there's updates re-run `cargo build --release` to compile the new binary.
 
 ## Dev Environment Setup
 
 ### Prerequisites
 
-1. Follow the [Tauri prerequisites guide](https://tauri.app/v1/guides/getting-started/prerequisites) for either Windows or Linux.
+1. Follow the [Tauri prerequisites guide](https://tauri.app/v1/guides/getting-started/prerequisites).
 2. A system with 16gb of RAM is recommended. If you have less, you may not be able to build the GUI while having other apps open (like your editor).
 
 ### Setup

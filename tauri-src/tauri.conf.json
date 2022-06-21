@@ -1,7 +1,7 @@
 {
   "package": {
     "productName": "RLBotGUI",
-    "version": "0.1.0"
+    "version": "1.0.0"
   },
   "build": {
     "distDir": "../assets",
@@ -28,7 +28,12 @@
       "csp": null
     },
     "updater": {
-      "active": false
+      "active": true,
+      "endpoints": [
+        "https://virxec.github.io/rlbot-gui-rust/latest.json"
+      ],
+      "dialog": true,
+      "pubkey": ""
     },
     "windows": [
       {

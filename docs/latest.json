@@ -1,0 +1,18 @@
+{
+    "name":"v1.0.0",
+    "notes":"Initial release",
+    "platforms": {
+      "darwin-aarch64": {
+        "signature":"",
+        "url":""
+      },
+      "darwin-intel": {
+        "signature":"",
+        "url":""
+      },
+      "windows-x86_64": {
+        "signature":"",
+        "url":""
+      }
+    }
+  }

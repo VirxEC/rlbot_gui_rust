@@ -1,6 +1,6 @@
 [package]
 name = "rl-bot-gui"
-version = "0.1.0"
+version = "1.0.0"
 description = "The RLBot GUI ported to Rust"
 authors = ["VirxEC"]
 license = "MIT"
@@ -44,7 +44,7 @@ registry = "1.2"
 
 [dependencies.tauri]
 version = "1.0"
-features = ["devtools", "dialog", "reqwest-client"]
+features = ["devtools", "dialog", "reqwest-client", "updater"]
 
 [features]
 # by default Tauri runs in production mode

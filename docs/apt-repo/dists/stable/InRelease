@@ -1,0 +1,38 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
+Origin: RLBotGUI
+Label: The RLBotGUI Debian package repository
+Suite: stable
+Codename: stable
+Version: 1.0
+Architectures: amd64
+Components: main
+Description: The software repository of the RLBotGUI for Debian-based systems
+Date: Mon, 20 Jun 2022 22:48:57 +0000
+MD5Sum:
+ a2acbf01ccd42065389c06356ca4138e 455 main/binary-amd64/Packages
+ 125bd46e24fef0b4732c82048bf6b09f 353 main/binary-amd64/Packages.gz
+SHA1:
+ b5e71ac1d6898ddc241f94b96e800c606481e7e5 455 main/binary-amd64/Packages
+ e2416391abbb1b2afae2e022681309544822fe1d 353 main/binary-amd64/Packages.gz
+SHA256:
+ cd78dff0ccc178b880966674567382e0b4676269990e95c99cd04f148148f4e8 455 main/binary-amd64/Packages
+ c2baade10a20f73dc778708802f28085738337ec36fc3c830d50d690fb828dbb 353 main/binary-amd64/Packages.gz
+-----BEGIN PGP SIGNATURE-----
+
+iQJGBAEBCgAwFiEECvv4qK1Ipm6JoyTLBqp9j+y8Lv8FAmKw+VoSHHZpcnhAdmly
+eGNhc2UuZGV2AAoJEAaqfY/svC7/e5gP/ixoyVQW5PVG/7YwKNbxFcPJuBlOM1um
+nRpUmVNJyuUUvlEfcX92w3VMXJjO7R7PDU2PPqKxudcbYkH3oWKi1gw9vEGq5tIo
+c9Ag157HMQzMF2+bhbEeTFHsf2Mtk60J1PXzQ4Z6yo/YVCcheqWxFpY3aXpiMPNR
+wVYXN0QGkRIHAnPQh9HUjhwHCZUhgcuQXReFVUMdRGGe/VMbq2csJxHQqCcV72MC
+jwZdIZmxHyEBr6jueNcPjReQVZCdic834VnFuLIKDarSvqhvSdnpkVKkzva8jK+X
+EkJUpBP8YO12YvOS9uXTDRcyyyIKmN62XU7klIR7mUAhsgc92Skighk/7zwXRA1F
+ajXr4JniEG+7r3E9hynNnpP6yHrSEd2M/RtesCRKMPKOp8o2V5Udz5U+J41a2Z7F
+mQ9QgmoZat5V5fXn3pGZWTEAIDEia6Wxm1knv49l93XcpEEGLfRp8uYBnD/3f7W3
+1VMeCEpdQvMpoA+eQywCWNvw2xvZlGISWVT/9g2S1N6CtOKie1cJkVo8efQ83WI1
+Jam+Y/8cqA3maGXxb488X1KHk6ekpkSxeN9P/nmr8YxK99Uw+s6JQUiQUZLPDuP2
+JzTuoomjL2UFja72MdP9Lliq8Yy1nnFS/7UdA4XErXjwX2ywyZ9uaXowMM6tCPy1
+TGl9js0Ek6cw
+=UgQZ
+-----END PGP SIGNATURE-----

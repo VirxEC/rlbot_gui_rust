@@ -1,0 +1,18 @@
+Origin: RLBotGUI
+Label: The RLBotGUI Debian package repository
+Suite: stable
+Codename: stable
+Version: 1.0
+Architectures: amd64
+Components: main
+Description: The software repository of the RLBotGUI for Debian-based systems
+Date: Mon, 20 Jun 2022 22:48:57 +0000
+MD5Sum:
+ a2acbf01ccd42065389c06356ca4138e 455 main/binary-amd64/Packages
+ 125bd46e24fef0b4732c82048bf6b09f 353 main/binary-amd64/Packages.gz
+SHA1:
+ b5e71ac1d6898ddc241f94b96e800c606481e7e5 455 main/binary-amd64/Packages
+ e2416391abbb1b2afae2e022681309544822fe1d 353 main/binary-amd64/Packages.gz
+SHA256:
+ cd78dff0ccc178b880966674567382e0b4676269990e95c99cd04f148148f4e8 455 main/binary-amd64/Packages
+ c2baade10a20f73dc778708802f28085738337ec36fc3c830d50d690fb828dbb 353 main/binary-amd64/Packages.gz
