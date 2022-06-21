@@ -1,5 +1,7 @@
 import json
+import multiprocessing as mp
 import os
+import platform
 import shutil
 import sys
 from contextlib import contextmanager
@@ -147,6 +149,17 @@ def setup_match(
     setup_manager.launch_early_start_bot_processes()
     setup_manager.start_match()
     setup_manager.launch_bot_processes()
+
+    if platform.system() == "Windows":
+        # This is a very weird issue on Windows only
+        # This is the only solution I could find
+        # Basically, all bots but the last bot were starting
+        # And this somehow fixes that?
+        logger.warning("Starting dummy process to ensure bots start")
+        proc = mp.Process()
+        proc.start()
+        proc.join()
+        logger.info("Dummy process started, all bots should be running")
 
 def start_match_helper(bot_list: List[dict], match_settings: dict, launcher_prefs: RocketLeagueLauncherPreference):
     print(f"Bot list: {bot_list}")
