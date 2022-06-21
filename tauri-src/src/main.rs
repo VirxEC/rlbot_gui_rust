@@ -58,7 +58,7 @@ fn auto_detect_python() -> Option<String> {
                 // Windows actually doesn't have a python3.7.exe command, just python.exe (no matter what)
                 // but there is a pip3.7.exe and stuff
                 // we can then use that to find the path to the right python.exe and use that
-                for pip in ["pip3.7", "pip3.8", "pip3.6", "pip3"] {
+                for pip in ["pip3.7", "pip3.8", "pip3.9", "pip3.6", "pip3"] {
                     if let Ok(value) = get_python_from_pip(pip) {
                         return Some(value);
                     }

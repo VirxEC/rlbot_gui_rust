@@ -21,9 +21,9 @@ export default {
 			<b-card title="Python configuration menu" id="python-setup" hide-footer centered>
 				<b-form>
 					<p class="mr-3">Path to Python executable or command (verison 3.7.X for best compatibility):</p>
-					<b-form-input :placeholder="rec_python ? 'Confused? Click the button just below!' : ''" id="python-exe-path" v-model="python_path" size="md" width="100%"></b-form-input>
-					<b-button v-if="noPython && !rec_python && is_windows" variant="success" class="mt-3" @click="installPython()"><b-icon icon="exclamation-triangle-fill"/>&nbsp;Download & Install Python</b-button>
-					<b-button v-if="rec_python && rec_python != python_path" variant="success" class="mt-3" @click="partialPythonSetup()"><b-icon icon="exclamation-triangle-fill"/>&nbsp;Use recommended Python path</b-button>
+					<b-form-input :placeholder="rec_python || (rec_is_37 && is_windows) ? 'Confused? Click the button just below!' : ''" id="python-exe-path" v-model="python_path" size="md" width="100%"></b-form-input>
+					<span v-if="!rec_is_37 && is_windows"><b-button variant="success" class="mt-3" @click="installPython()">&nbsp;Download & Install Python 3.7</b-button><br></span>
+					<b-button v-if="rec_python && rec_python != python_path" :variant="(!rec_is_37 && is_windows) ? 'warning' : 'success'" class="mt-3" @click="partialPythonSetup()"><b-icon v-if="!rec_is_37 && is_windows" icon="exclamation-triangle-fill"/>&nbsp;Use found Python path</b-button>
 					<hr>
 					<p class="mr-3">RLBot <b>requires</b> some basic Python packages to be installed in order to run <b>that you do not have.</b></p>
 					<p class="mr-3">Clicking "Apply" will attempt to <b>install, repair, and/or update</b> these packages.</p>
@@ -53,6 +53,7 @@ export default {
 			python_path: "",
 			rec_python: null,
 			is_windows: false,
+			rec_is_37: false,
 		}
 	},
 	methods: {
@@ -123,7 +124,10 @@ export default {
 		},
 		startup_inner: function() {
 			invoke("get_python_path").then(path => this.python_path = path);
-			invoke("get_detected_python_path").then(path => {console.log(path);this.rec_python = path});
+			invoke("get_detected_python_path").then(path => {
+				this.rec_python = path;
+				this.rec_is_37 = this.rec_python && this.rec_python.includes("37");
+			});
 
 			invoke("is_windows").then(is_windows => this.is_windows = is_windows);
 		}
