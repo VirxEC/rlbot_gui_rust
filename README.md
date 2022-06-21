@@ -48,7 +48,15 @@ It will put "RLBotGUI" in your Windows start menu.
 
 ### Arch-based Linux distros
 
-TODO :) it's on the AUR as `rlbotgui-rust-git`
+Using yay: `yay -S rlbotgui-rust-git`
+
+Using paru: `paru -S rlbotgui-rust-git`
+
+Without using an AUR helper:
+1. Setup: `sudo pacman -S --needed base-devel`
+2. Clone PKGBUILD: `git clone https://aur.archlinux.org/rlbotgui-rust-git.git`
+3. Navigate to the folder: `cd rlbotgui-rust-git`
+4. Install using PKGBUILD: `makepkg -si`
 
 ### Other Linux distros & MacOS
 
