@@ -35,7 +35,7 @@ NOTE: "FCBP" stands for "Feature/fix could be backported"
 
 ### Windows
 
-Download the installer from http://www.rlbot.org/
+Download the installer from (not here yet lol)
 
 It will put "RLBotGUI" in your Windows start menu.
 
