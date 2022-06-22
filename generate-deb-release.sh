@@ -4,7 +4,7 @@ set -e
 
 # https://earthly.dev/blog/creating-and-hosting-your-own-deb-packages-and-apt-repo/
 cd tauri-src
-# cargo tauri build
+cargo tauri build
 cd ..
 cp tauri-src/target/release/bundle/deb/rl-bot-gui_*.*.*_amd64.deb docs/apt-repo/pool/main/.
 cd docs/apt-repo
