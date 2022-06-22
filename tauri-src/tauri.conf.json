@@ -11,7 +11,7 @@
   "tauri": {
     "bundle": {
       "active": true,
-      "targets": ["deb", "app", "msi", "dmg"],
+      "targets": ["deb", "app", "msi", "dmg", "updater"],
       "identifier": "org.rlbot.gui",
       "icon": [
         "../icons/icon.png",
