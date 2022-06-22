@@ -1,18 +1,18 @@
 {
-    "name":"v1.0.1",
-    "notes":"Initial release",
-    "platforms": {
-      "darwin-aarch64": {
-        "signature":"",
-        "url":""
-      },
-      "darwin-intel": {
-        "signature":"",
-        "url":""
-      },
-      "windows-x86_64": {
-        "signature":"",
-        "url":"https://github.com/VirxEC/rlbot_gui_rust/releases/download/v1.0.1/RLBotGUI_1.0.1_x64_en-US.msi.zip"
-      }
+  "name":"v1.0.2",
+  "notes": "Fix GUI updates",
+  "platforms": {
+    "darwin-aarch64": {
+      "signature":"",
+      "url":""
+    },
+    "darwin-intel": {
+      "signature":"",
+      "url":""
+    },
+    "windows-x86_64": {
+      "signature":"",
+      "url":"https://github.com/VirxEC/rlbot_gui_rust/releases/download/v1.0.2/RLBotGUI_1.0.2_x64_en-US.msi.zip"
     }
   }
+}
