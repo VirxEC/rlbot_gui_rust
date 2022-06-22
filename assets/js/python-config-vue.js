@@ -20,8 +20,8 @@ export default {
 		<b-card no-body class="bot-pool p-1">
 			<b-card title="Python configuration menu" id="python-setup" hide-footer centered>
 				<b-form>
-					<p class="mr-3">Path to Python executable or command (verison 3.7.X for best compatibility):</p>
-					<b-form-input :placeholder="rec_python || (rec_is_37 && is_windows) ? 'Confused? Click the button just below!' : ''" id="python-exe-path" v-model="python_path" size="md" width="100%"></b-form-input>
+					<h6 class="mr-3">Path to python.exe or Python command - verison 3.7.X for best compatibility; virtual environment python.exe's also work:</h6>
+					<b-form-input :placeholder="rec_python || (rec_is_37 && is_windows) ? 'Confused? Click the button just below!' : 'Path to python.exe'" id="python-exe-path" v-model="python_path" size="md" width="100%"></b-form-input>
 					<span v-if="!rec_is_37 && is_windows"><b-button variant="success" class="mt-3" @click="installPython()">&nbsp;Download & Install Python 3.7</b-button><br></span>
 					<b-button v-if="rec_python && rec_python != python_path" :variant="(!rec_is_37 && is_windows) ? 'warning' : 'success'" class="mt-3" @click="partialPythonSetup()"><b-icon v-if="!rec_is_37 && is_windows" icon="exclamation-triangle-fill"/>&nbsp;Use found Python path</b-button>
 					<hr>
@@ -124,9 +124,11 @@ export default {
 		},
 		startup_inner: function() {
 			invoke("get_python_path").then(path => this.python_path = path);
-			invoke("get_detected_python_path").then(path => {
-				this.rec_python = path;
-				this.rec_is_37 = this.rec_python && this.rec_python.includes("37");
+			invoke("get_detected_python_path").then(info => {
+				this.rec_python = info[0];
+				this.rec_is_37 = info[1];
+				console.log(this.rec_python);
+				console.log(this.rec_is_37);
 			});
 
 			invoke("is_windows").then(is_windows => this.is_windows = is_windows);

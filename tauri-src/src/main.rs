@@ -37,7 +37,7 @@ const BOTPACK_REPO_NAME: &str = "RLBotPack";
 lazy_static! {
     static ref BOT_FOLDER_SETTINGS: Mutex<BotFolderSettings> = Mutex::new(BotFolderSettings::new());
     static ref MATCH_SETTINGS: Mutex<MatchSettings> = Mutex::new(MatchSettings::new());
-    static ref PYTHON_PATH: Mutex<String> = Mutex::new(load_gui_config().get("python_config", "path").unwrap_or_else(|| auto_detect_python().unwrap_or_default()));
+    static ref PYTHON_PATH: Mutex<String> = Mutex::new(load_gui_config().get("python_config", "path").unwrap_or_else(|| auto_detect_python().unwrap_or_default().0));
     static ref CONSOLE_TEXT: Mutex<Vec<ConsoleText>> = Mutex::new(vec![
         ConsoleText::from("Welcome to the RLBot Console!".to_string(), None),
         ConsoleText::from("".to_string(), None)
@@ -47,30 +47,38 @@ lazy_static! {
 }
 
 #[cfg(windows)]
-fn auto_detect_python() -> Option<String> {
+fn auto_detect_python() -> Option<(String, Option<bool>)> {
     let content_folder = get_content_folder();
 
-    match content_folder.join("Python37\\python.exe") {
-        path if path.exists() => Some(path.to_string_lossy().to_string()),
-        _ => match content_folder.join("venv\\Scripts\\python.exe") {
-            path if path.exists() => Some(path.to_string_lossy().to_string()),
-            _ => {
-                // Windows actually doesn't have a python3.7.exe command, just python.exe (no matter what)
-                // but there is a pip3.7.exe and stuff
-                // we can then use that to find the path to the right python.exe and use that
-                for pip in ["pip3.7", "pip3.8", "pip3.9", "pip3.6", "pip3"] {
-                    if let Ok(value) = get_python_from_pip(pip) {
-                        return Some(value);
-                    }
-                }
+    let new_python = content_folder.join("Python37\\python.exe");
+    if new_python.exists() {
+        return Some((new_python.to_str().unwrap().to_string(), Some(true)));
+    }
 
-                if get_command_status("python", vec!["--version"]) {
-                    Some("python".to_string())
-                } else {
-                    None
-                }
-            }
-        },
+    let old_python = content_folder.join("venv\\Scripts\\python.exe");
+    if old_python.exists() {
+        return Some((old_python.to_str().unwrap().to_string(), None));
+    }
+
+    // Windows actually doesn't have a python3.7.exe command, just python.exe (no matter what)
+    // but there is a pip3.7.exe and stuff
+    // we can then use that to find the path to the right python.exe and use that
+    for (pip, is_37) in [
+        ("pip3.7", Some(true)),
+        ("pip3.8", Some(false)),
+        ("pip3.9", Some(false)),
+        ("pip3.6", Some(false)),
+        ("pip3", None),
+    ] {
+        if let Ok(value) = get_python_from_pip(pip) {
+            return Some((value, is_37));
+        }
+    }
+
+    if get_command_status("python", vec!["--version"]) {
+        Some(("python".to_string(), None))
+    } else {
+        None
     }
 }
 
@@ -93,10 +101,16 @@ fn get_python_from_pip(pip: &str) -> Result<String, Box<dyn Error>> {
 }
 
 #[cfg(target_os = "macos")]
-fn auto_detect_python() -> Option<String> {
-    for python in ["python3.7", "python3.8", "python3.6", "python3"] {
+fn auto_detect_python() -> Option<(String, Option<bool>)> {
+    for (python, is_37) in [
+        ("python3.7", Some(true)),
+        ("python3.8", Some(false)),
+        ("python3.9", Some(false)),
+        ("python3.6", Some(false)),
+        ("python3", None),
+    ] {
         if get_command_status(python, vec!["--version"]) {
-            return Some(python.to_string());
+            return Some((python.to_string(), is_37));
         }
     }
 
@@ -104,19 +118,25 @@ fn auto_detect_python() -> Option<String> {
 }
 
 #[cfg(target_os = "linux")]
-fn auto_detect_python() -> Option<String> {
-    match get_content_folder().join("env/bin/python") {
-        path if path.exists() => Some(path.to_string_lossy().to_string()),
-        _ => {
-            for python in ["python3.7", "python3.8", "python3.6", "python3"] {
-                if get_command_status(python, vec!["--version"]) {
-                    return Some(python.to_string());
-                }
-            }
+fn auto_detect_python() -> Option<(String, Option<bool>)> {
+    let path = get_content_folder().join("env/bin/python");
+    if path.exists() {
+        return Some((path.to_string_lossy().to_string(), Some(true)));
+    }
 
-            None
+    for (python, is_37) in [
+        ("python3.7", Some(true)),
+        ("python3.8", Some(false)),
+        ("python3.9", Some(false)),
+        ("python3.6", Some(false)),
+        ("python3", None),
+    ] {
+        if get_command_status(python, vec!["--version"]) {
+            return Some((python.to_string(), is_37));
         }
     }
+
+    None
 }
 
 fn get_config_path() -> PathBuf {

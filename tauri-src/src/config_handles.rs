@@ -58,7 +58,7 @@ pub fn load_gui_config() -> Ini {
         conf.set("mutator_settings", "gravity", Some(GRAVITY_MUTATOR_TYPES[0].to_string()));
         conf.set("mutator_settings", "demolish", Some(DEMOLISH_MUTATOR_TYPES[0].to_string()));
         conf.set("mutator_settings", "respawn_time", Some(RESPAWN_TIME_MUTATOR_TYPES[0].to_string()));
-        conf.set("python_config", "path", Some(auto_detect_python().unwrap_or_default()));
+        conf.set("python_config", "path", Some(auto_detect_python().unwrap_or_default().0));
         conf.set("launcher_settings", "preferred_launcher", Some("epic".to_string()));
         conf.set("launcher_settings", "use_login_tricks", Some("true".to_string()));
         conf.set("launcher_settings", "rocket_league_exe_path", None);
@@ -239,9 +239,34 @@ pub async fn get_language_support() -> HashMap<String, bool> {
     dbg!(lang_support)
 }
 
+fn find_if_python_37(python: &str) -> bool {
+    let mut command = Command::new(python);
+
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // disable window creation
+        command.creation_flags(0x08000000);
+    };
+
+    if let Ok(output) = command.arg("--version").stdout(Stdio::piped()).output() {
+        if String::from_utf8_lossy(&output.stdout).contains("Python 3.7") {
+            return true;
+        }
+    }
+
+    false
+}
+
 #[tauri::command]
-pub async fn get_detected_python_path() -> Option<String> {
-    auto_detect_python()
+pub async fn get_detected_python_path() -> Option<(String, bool)> {
+    match auto_detect_python() {
+        Some((path, is_37)) => {
+            let is_37 = is_37.unwrap_or_else(|| find_if_python_37(&path));
+            Some((path, is_37))
+        }
+        None => None,
+    }
 }
 
 #[tauri::command]
