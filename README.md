@@ -41,8 +41,8 @@ It will put "RLBotGUI" in your Windows start menu.
 
 ### Debian-based Linux distros
 
-1. Add the public GPG key of the ppa to your system: `wget -O- https://virxec.github.io/rlbot_gui_rust/apt-repo/pgp-key.public | sudo tee /usr/share/keyrings/rlbotgui-rust-keyring.gpg`
-2. Add the repository to your system (only 64-bit systems are supported): `sudo add-apt-repository 'deb [arch=amd64] https://virxec.github.io/rlbot_gui_rust/apt-repo/ stable main'`
+1. Add the public GPG key of the ppa to your system: `wget -O- https://virxec.github.io/rlbot_gui_rust_apt/apt-repo/pgp-key.public | sudo tee /usr/share/keyrings/rlbotgui-rust-keyring.gpg`
+2. Add the repository to your system (only 64-bit systems are supported): `sudo add-apt-repository 'deb [arch=amd64] https://virxec.github.io/rlbot_gui_rust_apt/apt-repo/ stable main'`
 3. Refresh app list: `sudo apt-get update`
 4. Install the GUI: `sudo apt-get install rl-bot-gui`
 
