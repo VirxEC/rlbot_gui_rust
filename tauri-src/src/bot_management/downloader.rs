@@ -98,7 +98,7 @@ async fn download_and_extract_repo_zip<T: IntoUrl, J: AsRef<Path>>(
 
         if last_update.elapsed().as_secs_f32() >= 0.1 {
             let progress = bytes.len() as f32 / total_size as f32 * 100.0;
-            if let Err(e) = window.emit("update-download-progress", ProgressBarUpdate::new(progress, "Downloading zip...".to_string())) {
+            if let Err(e) = window.emit("update-download-progress", ProgressBarUpdate::new(progress, "Downloading zip...".to_owned())) {
                 ccprintlne(format!("Error when updating progress bar: {}", e));
             }
             last_update = Instant::now();
@@ -109,7 +109,7 @@ async fn download_and_extract_repo_zip<T: IntoUrl, J: AsRef<Path>>(
         dir::remove(local_folder_path).unwrap();
     }
 
-    if let Err(e) = window.emit("update-download-progress", ProgressBarUpdate::new(100., "Extracting zip...".to_string())) {
+    if let Err(e) = window.emit("update-download-progress", ProgressBarUpdate::new(100., "Extracting zip...".to_owned())) {
         ccprintlne(format!("Error when updating progress bar: {}", e));
     }
 
@@ -133,10 +133,10 @@ pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, c
 
     if status.is_ok() && update_tag_settings {
         let latest_release_tag_name = match get_json_from_url(&client, &format!("https://api.github.com/repos/{}/releases/latest", repo_full_name)).await {
-            Ok(release) => release["tag_name"].as_str().unwrap().to_string(),
+            Ok(release) => release["tag_name"].as_str().unwrap().to_owned(),
             Err(e) => {
                 ccprintlne(e.to_string());
-                return BotpackStatus::Success("Downloaded the bot pack, but failed to get the latest release tag.".to_string());
+                return BotpackStatus::Success("Downloaded the bot pack, but failed to get the latest release tag.".to_owned());
             }
         };
 
@@ -147,15 +147,15 @@ pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, c
 
         if let Err(e) = config.write(config_path) {
             ccprintlne(e.to_string());
-            return BotpackStatus::Success("Downloaded the bot pack, but failed to write GUI's config.".to_string());
+            return BotpackStatus::Success("Downloaded the bot pack, but failed to write GUI's config.".to_owned());
         }
     }
 
     match status {
-        Ok(_) => BotpackStatus::Success("Downloaded the bot pack!".to_string()),
+        Ok(_) => BotpackStatus::Success("Downloaded the bot pack!".to_owned()),
         Err(e) => {
             ccprintlne(e.to_string());
-            BotpackStatus::Skipped("Failed to download the bot pack...".to_string())
+            BotpackStatus::Skipped("Failed to download the bot pack...".to_owned())
         }
     }
 }
@@ -202,13 +202,13 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
         Ok(release) => release["tag_name"].as_str().unwrap().replace("incr-", "").parse::<u32>().unwrap(),
         Err(e) => {
             ccprintlne(format!("{}", e));
-            return BotpackStatus::Skipped("Failed to get the latest release tag.".to_string());
+            return BotpackStatus::Skipped("Failed to get the latest release tag.".to_owned());
         }
     };
 
     if latest_release_tag == current_tag_name {
-        ccprintln("The botpack is already up-to-date!".to_string());
-        return BotpackStatus::Skipped("The botpack is already up-to-date!".to_string());
+        ccprintln("The botpack is already up-to-date!".to_owned());
+        return BotpackStatus::Skipped("The botpack is already up-to-date!".to_owned());
     }
 
     let total_patches = latest_release_tag - current_tag_name;
@@ -322,9 +322,9 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
     }
 
     if tag - 1 == latest_release_tag {
-        BotpackStatus::Success("Updated the botpack!".to_string())
+        BotpackStatus::Success("Updated the botpack!".to_owned())
     } else {
-        BotpackStatus::Skipped("Failed to update the botpack...".to_string())
+        BotpackStatus::Skipped("Failed to update the botpack...".to_owned())
     }
 }
 
@@ -376,7 +376,7 @@ impl MapPackUpdater {
             Ok(latest_release) => latest_release,
             Err(e) => {
                 ccprintlne(format!("Failed to get latest release: {}", e));
-                return BotpackStatus::Skipped("Failed to get latest release".to_string());
+                return BotpackStatus::Skipped("Failed to get latest release".to_owned());
             }
         };
 
@@ -385,8 +385,8 @@ impl MapPackUpdater {
         if latest_revision > revision {
             BotpackStatus::RequiresFullDownload
         } else {
-            ccprintln("Map pack is already up-to-date!".to_string());
-            BotpackStatus::Skipped("Map pack is already up-to-date!".to_string())
+            ccprintln("Map pack is already up-to-date!".to_owned());
+            BotpackStatus::Skipped("Map pack is already up-to-date!".to_owned())
         }
     }
 
@@ -395,7 +395,7 @@ impl MapPackUpdater {
             .as_array()
             .unwrap()
             .iter()
-            .map(|map| (map["path"].as_str().unwrap().to_string(), map["revision"].as_u64().unwrap()))
+            .map(|map| (map["path"].as_str().unwrap().to_owned(), map["revision"].as_u64().unwrap()))
             .collect::<HashMap<String, u64>>()
     }
 
@@ -406,7 +406,7 @@ impl MapPackUpdater {
         let new_maps = match self.get_map_index() {
             Some(index) => Self::extract_maps_from_index(index),
             None => {
-                ccprintlne("Failed to get index.json".to_string());
+                ccprintlne("Failed to get index.json".to_owned());
                 return;
             }
         };
@@ -419,7 +419,7 @@ impl MapPackUpdater {
         let mut to_fetch = HashSet::new();
         for (path, revision) in new_maps.iter() {
             if !old_maps.contains_key(path) || old_maps[path] < *revision {
-                to_fetch.insert(path.to_string());
+                to_fetch.insert(path.to_owned());
             }
         }
 
@@ -430,7 +430,7 @@ impl MapPackUpdater {
         let mut filename_to_path = HashMap::new();
         for path in to_fetch.iter() {
             let filename = Path::new(path).file_name().unwrap().to_string_lossy();
-            filename_to_path.insert(filename.to_string(), path.to_string());
+            filename_to_path.insert(filename.to_string(), path.to_owned());
         }
 
         let url = format!("https://api.github.com/repos/{}/{}/releases/latest", self.repo_owner, self.repo_name);

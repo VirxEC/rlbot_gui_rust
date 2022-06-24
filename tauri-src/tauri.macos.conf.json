@@ -1,0 +1,15 @@
+{
+  "tauri": {
+    "bundle": {
+      "targets": ["dmg", "updater"]
+    },
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://virxec.github.io/rlbot_gui_rust/latest.json"
+      ],
+      "dialog": true,
+      "pubkey": ""
+    }
+  }
+}

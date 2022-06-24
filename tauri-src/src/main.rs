@@ -4,6 +4,7 @@ mod bot_management;
 mod commands;
 mod config_handles;
 mod custom_maps;
+mod is_online;
 mod rlbot;
 mod settings;
 
@@ -39,44 +40,38 @@ lazy_static! {
     static ref MATCH_SETTINGS: Mutex<MatchSettings> = Mutex::new(MatchSettings::new());
     static ref PYTHON_PATH: Mutex<String> = Mutex::new(load_gui_config().get("python_config", "path").unwrap_or_else(|| auto_detect_python().unwrap_or_default().0));
     static ref CONSOLE_TEXT: Mutex<Vec<ConsoleText>> = Mutex::new(vec![
-        ConsoleText::from("Welcome to the RLBot Console!".to_string(), None),
-        ConsoleText::from("".to_string(), None)
+        ConsoleText::from("Welcome to the RLBot Console!".to_owned(), None),
+        ConsoleText::from("".to_owned(), None)
     ]);
     static ref MATCH_HANDLER_STDIN: Mutex<Option<ChildStdin>> = Mutex::new(None);
     static ref CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
 }
 
 #[cfg(windows)]
-fn auto_detect_python() -> Option<(String, Option<bool>)> {
+fn auto_detect_python() -> Option<(String, bool)> {
     let content_folder = get_content_folder();
 
     let new_python = content_folder.join("Python37\\python.exe");
     if new_python.exists() {
-        return Some((new_python.to_str().unwrap().to_string(), Some(true)));
+        return Some((new_python.to_str().unwrap().to_owned(), true));
     }
 
     let old_python = content_folder.join("venv\\Scripts\\python.exe");
     if old_python.exists() {
-        return Some((old_python.to_str().unwrap().to_string(), None));
+        return Some((old_python.to_str().unwrap().to_owned(), true));
     }
 
     // Windows actually doesn't have a python3.7.exe command, just python.exe (no matter what)
     // but there is a pip3.7.exe and stuff
     // we can then use that to find the path to the right python.exe and use that
-    for (pip, is_37) in [
-        ("pip3.7", Some(true)),
-        ("pip3.8", Some(false)),
-        ("pip3.9", Some(false)),
-        ("pip3.6", Some(false)),
-        ("pip3", None),
-    ] {
+    for pip in ["pip3.7", "pip3.8", "pip3.9", "pip3.6", "pip3"] {
         if let Ok(value) = get_python_from_pip(pip) {
-            return Some((value, is_37));
+            return Some((value, false));
         }
     }
 
     if get_command_status("python", vec!["--version"]) {
-        Some(("python".to_string(), None))
+        Some(("python".to_owned(), false))
     } else {
         None
     }
@@ -93,7 +88,7 @@ fn get_python_from_pip(pip: &str) -> Result<String, Box<dyn Error>> {
     if let Some(first_line) = stdout.lines().next() {
         let python_path = Path::new(first_line).parent().unwrap().parent().unwrap().join("python.exe");
         if python_path.exists() {
-            return Ok(python_path.to_string_lossy().to_string());
+            return Ok(python_path.to_string_lossy().to_owned());
         }
     }
 
@@ -101,16 +96,10 @@ fn get_python_from_pip(pip: &str) -> Result<String, Box<dyn Error>> {
 }
 
 #[cfg(target_os = "macos")]
-fn auto_detect_python() -> Option<(String, Option<bool>)> {
-    for (python, is_37) in [
-        ("python3.7", Some(true)),
-        ("python3.8", Some(false)),
-        ("python3.9", Some(false)),
-        ("python3.6", Some(false)),
-        ("python3", None),
-    ] {
+fn auto_detect_python() -> Option<(String, bool)> {
+    for python in ["python3.7", "python3.8", "python3.9", "python3.6", "python3"] {
         if get_command_status(python, vec!["--version"]) {
-            return Some((python.to_string(), is_37));
+            return Some((python.to_owned(), false));
         }
     }
 
@@ -118,21 +107,15 @@ fn auto_detect_python() -> Option<(String, Option<bool>)> {
 }
 
 #[cfg(target_os = "linux")]
-fn auto_detect_python() -> Option<(String, Option<bool>)> {
+fn auto_detect_python() -> Option<(String, bool)> {
     let path = get_content_folder().join("env/bin/python");
     if path.exists() {
-        return Some((path.to_string_lossy().to_string(), Some(true)));
+        return Some((path.to_string_lossy().to_string(), true));
     }
 
-    for (python, is_37) in [
-        ("python3.7", Some(true)),
-        ("python3.8", Some(false)),
-        ("python3.9", Some(false)),
-        ("python3.6", Some(false)),
-        ("python3", None),
-    ] {
+    for python in ["python3.7", "python3.8", "python3.9", "python3.6", "python3"] {
         if get_command_status(python, vec!["--version"]) {
-            return Some((python.to_string(), is_37));
+            return Some((python.to_owned(), false));
         }
     }
 
@@ -157,7 +140,7 @@ pub fn ccprintlnr(text: String) {
 
 pub fn ccprintlne(text: String) {
     eprintln!("{}", &text);
-    CONSOLE_TEXT.lock().unwrap().push(ConsoleText::from(text, Some("red".to_string())));
+    CONSOLE_TEXT.lock().unwrap().push(ConsoleText::from(text, Some("red".to_owned())));
 }
 
 #[cfg(windows)]
@@ -172,7 +155,7 @@ fn has_chrome() -> bool {
         };
 
         if let Ok(chrome_path) = reg_key.value("") {
-            if Path::new(&chrome_path.to_string()).is_file() {
+            if Path::new(&chrome_path.to_owned()).is_file() {
                 return true;
             }
         }
@@ -314,7 +297,7 @@ fn main() {
                     match pipe_reader.read(&mut buf[..]) {
                         Ok(0) | Err(_) => break,
                         Ok(_) => {
-                            let string = String::from_utf8_lossy(&buf).to_string();
+                            let string = String::from_utf8_lossy(&buf).to_owned();
                             if &string == "\n" {
                                 if text.is_empty() && will_replace_last {
                                     will_replace_last = false;
@@ -341,11 +324,11 @@ fn main() {
                     let color = {
                         let text = text.to_ascii_lowercase();
                         if text.contains("error") {
-                            Some("red".to_string())
+                            Some("red".to_owned())
                         } else if text.contains("warning") {
-                            Some("#A1761B".to_string())
+                            Some("#A1761B".to_owned())
                         } else if text.contains("info") {
-                            Some("blue".to_string())
+                            Some("blue".to_owned())
                         } else {
                             None
                         }

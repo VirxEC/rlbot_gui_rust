@@ -1,6 +1,6 @@
 use crate::bot_management::{
     bot_creation::{bootstrap_python_bot, bootstrap_python_hivemind, bootstrap_rust_bot, bootstrap_scratch_bot, CREATED_BOTS_FOLDER},
-    downloader,
+    downloader, zip_extract_fixed,
 };
 use crate::rlbot::{
     agents::runnable::Runnable,
@@ -16,7 +16,6 @@ use std::{
     fs::{create_dir_all, File},
     io::{copy, Cursor, Write},
     path::Path,
-    process::Command,
 };
 use tauri::Window;
 
@@ -24,17 +23,17 @@ use tauri::Window;
 pub async fn check_rlbot_python() -> HashMap<String, bool> {
     let mut python_support = HashMap::new();
 
-    let python_path = PYTHON_PATH.lock().unwrap().to_string();
+    let python_path = PYTHON_PATH.lock().unwrap().to_owned();
 
     if get_command_status(&python_path, vec!["--version"]) {
-        python_support.insert("python".to_string(), true);
+        python_support.insert("python".to_owned(), true);
         python_support.insert(
-            "rlbotpython".to_string(),
+            "rlbotpython".to_owned(),
             get_command_status(&python_path, vec!["-c", "import rlbot; import numpy; import numba; import scipy; import selenium"]),
         );
     } else {
-        python_support.insert("python".to_string(), false);
-        python_support.insert("rlbotpython".to_string(), false);
+        python_support.insert("python".to_owned(), false);
+        python_support.insert("rlbotpython".to_owned(), false);
     }
 
     dbg!(python_support)
@@ -54,39 +53,39 @@ fn ensure_bot_directory() -> String {
 #[tauri::command]
 pub async fn begin_python_bot(bot_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
     match bootstrap_python_bot(bot_name, &ensure_bot_directory()).await {
-        Ok(config_file) => Ok(HashMap::from([("bot".to_string(), BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap())])),
-        Err(e) => Err(HashMap::from([("error".to_string(), e)])),
+        Ok(config_file) => Ok(HashMap::from([("bot".to_owned(), BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap())])),
+        Err(e) => Err(HashMap::from([("error".to_owned(), e)])),
     }
 }
 
 #[tauri::command]
 pub async fn begin_python_hivemind(hive_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
     match bootstrap_python_hivemind(hive_name, &ensure_bot_directory()).await {
-        Ok(config_file) => Ok(HashMap::from([("bot".to_string(), BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap())])),
-        Err(e) => Err(HashMap::from([("error".to_string(), e)])),
+        Ok(config_file) => Ok(HashMap::from([("bot".to_owned(), BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap())])),
+        Err(e) => Err(HashMap::from([("error".to_owned(), e)])),
     }
 }
 
 #[tauri::command]
 pub async fn begin_rust_bot(bot_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
     match bootstrap_rust_bot(bot_name, &ensure_bot_directory()).await {
-        Ok(config_file) => Ok(HashMap::from([("bot".to_string(), BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap())])),
-        Err(e) => Err(HashMap::from([("error".to_string(), e)])),
+        Ok(config_file) => Ok(HashMap::from([("bot".to_owned(), BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap())])),
+        Err(e) => Err(HashMap::from([("error".to_owned(), e)])),
     }
 }
 
 #[tauri::command]
 pub async fn begin_scratch_bot(bot_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
     match bootstrap_scratch_bot(bot_name, &ensure_bot_directory()).await {
-        Ok(config_file) => Ok(HashMap::from([("bot".to_string(), BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap())])),
-        Err(e) => Err(HashMap::from([("error".to_string(), e)])),
+        Ok(config_file) => Ok(HashMap::from([("bot".to_owned(), BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap())])),
+        Err(e) => Err(HashMap::from([("error".to_owned(), e)])),
     }
 }
 
 #[tauri::command]
 pub async fn install_package(package_string: String) -> PackageResult {
     let exit_code = spawn_capture_process_and_get_exit_code(
-        PYTHON_PATH.lock().unwrap().to_string(),
+        PYTHON_PATH.lock().unwrap().to_owned(),
         &["-m", "pip", "install", "-U", "--no-warn-script-location", &package_string],
     );
 
@@ -102,47 +101,48 @@ pub async fn install_requirements(config_path: String) -> PackageResult {
 
     if let Some(file) = bundle.get_requirements_file() {
         let packages = bundle.get_missing_packages();
-        let python = PYTHON_PATH.lock().unwrap().to_string();
+        let python = PYTHON_PATH.lock().unwrap().to_owned();
         let exit_code = spawn_capture_process_and_get_exit_code(&python, &["-m", "pip", "install", "-U", "--no-warn-script-location", "-r", file]);
 
         PackageResult { exit_code, packages }
     } else {
         PackageResult {
             exit_code: 1,
-            packages: vec!["Unknown file".to_owned()],
+            packages: vec!["unknown file".to_owned()],
         }
     }
 }
 
-const INSTALL_BASIC_PACKAGES_ARGS: [&[&str]; 4] = [
-    &["-m", "ensurepip"],
-    &["-m", "pip", "install", "-U", "--no-warn-script-location", "pip"],
-    &["-m", "pip", "install", "-U", "--no-warn-script-location", "setuptools", "wheel"],
-    &["-m", "pip", "install", "-U", "--no-warn-script-location", "numpy", "scipy", "numba", "selenium", "rlbot"],
-];
-
-fn install_upgrade_basic_packages() -> PackageResult {
+async fn install_upgrade_basic_packages() -> PackageResult {
     let packages = vec![
         String::from("pip"),
         String::from("setuptools"),
         String::from("wheel"),
-        String::from("numpy"),
+        String::from("numpy<1.23"),
         String::from("scipy"),
-        String::from("numba"),
+        String::from("numba<0.56"),
         String::from("selenium"),
         String::from("rlbot"),
     ];
 
-    let python = PYTHON_PATH.lock().unwrap().to_string();
+    if !is_online::check().await {
+        ccprintlne("Could not connect to the internet to install/update basic packages. Please check your internet connection and try again.".to_string());
+
+        return PackageResult { exit_code: 3, packages };
+    }
+
+    let python = PYTHON_PATH.lock().unwrap().to_owned();
+
+    spawn_capture_process_and_get_exit_code(&python, &["-m", "ensurepip"]);
 
     let mut exit_code = 0;
 
-    for command in INSTALL_BASIC_PACKAGES_ARGS {
+    for package in &packages {
         if exit_code != 0 {
             break;
         }
 
-        exit_code = spawn_capture_process_and_get_exit_code(&python, command);
+        exit_code = spawn_capture_process_and_get_exit_code(&python, &["-m", "pip", "install", "-U", "--no-warn-script-location", package]);
     }
 
     PackageResult { exit_code, packages }
@@ -150,7 +150,7 @@ fn install_upgrade_basic_packages() -> PackageResult {
 
 #[tauri::command]
 pub async fn install_basic_packages() -> PackageResult {
-    install_upgrade_basic_packages()
+    install_upgrade_basic_packages().await
 }
 
 #[tauri::command]
@@ -169,14 +169,14 @@ pub async fn get_missing_bot_packages(bots: Vec<BotConfigBundle>) -> Vec<Missing
                     let mut missing_packages = bot.missing_python_packages.clone();
 
                     if let Some(missing_packages) = &missing_packages {
-                        if warn == Some("pythonpkg".to_string()) && missing_packages.is_empty() {
+                        if warn == Some("pythonpkg".to_owned()) && missing_packages.is_empty() {
                             warn = None;
                         }
                     } else {
                         let bot_missing_packages = bot.get_missing_packages();
 
                         if !bot_missing_packages.is_empty() {
-                            warn = Some("pythonpkg".to_string());
+                            warn = Some("pythonpkg".to_owned());
                         } else {
                             warn = None;
                         }
@@ -221,14 +221,14 @@ pub async fn get_missing_script_packages(scripts: Vec<ScriptConfigBundle>) -> Ve
                 let mut missing_packages = script.missing_python_packages.clone();
 
                 if let Some(missing_packages) = &missing_packages {
-                    if warn == Some("pythonpkg".to_string()) && missing_packages.is_empty() {
+                    if warn == Some("pythonpkg".to_owned()) && missing_packages.is_empty() {
                         warn = None;
                     }
                 } else {
                     let script_missing_packages = script.get_missing_packages();
 
                     if !script_missing_packages.is_empty() {
-                        warn = Some("pythonpkg".to_string());
+                        warn = Some("pythonpkg".to_owned());
                     } else {
                         warn = None;
                     }
@@ -302,42 +302,23 @@ pub fn is_windows() -> bool {
 
 #[tauri::command]
 pub async fn install_python() -> Option<u8> {
-    // https://www.python.org/ftp/python/3.7.9/python-3.7.9-amd64.exe
-    // download the above file to python-3.7.9-amd64.exe
-
-    let file_path = get_content_folder().join("python-3.7.9-amd64.exe");
+    let content_folder = get_content_folder();
+    let folder_destination = content_folder.join("Python37");
+    let file_path = content_folder.join("python-3.7.9-custom-amd64.zip");
 
     if !file_path.exists() {
-        let response = reqwest::get("https://www.python.org/ftp/python/3.7.9/python-3.7.9-amd64.exe").await.ok()?;
+        let response = reqwest::get("https://virxec.github.io/rlbot_gui_rust/python-3.7.9-custom-amd64.zip").await.ok()?;
         let mut file = File::create(&file_path).ok()?;
         let mut content = Cursor::new(response.bytes().await.ok()?);
         copy(&mut content, &mut file).ok()?;
     }
 
-    // only installs for the current user (requires no admin privileges)
-    // adds the Python version to PATH
-    // Launches the installer in a simplified mode for a one-button install
-    let mut process = Command::new(file_path)
-        .args([
-            "InstallLauncherAllUsers=0",
-            "SimpleInstall=1",
-            "PrependPath=1",
-            "SimpleInstallDescription='Install Python 3.7.9 for the current user to use with RLBot'",
-        ])
-        .spawn()
-        .ok()?;
-    process.wait().ok()?;
+    // Extract the zip file
+    let file = File::open(&file_path).ok()?;
+    zip_extract_fixed::extract(&file, folder_destination.as_path(), false).ok()?;
 
-    // Windows actually doesn't have a python3.7.exe command, just python.exe (no matter what)
-    // but there is a pip3.7.exe
-    // Since we added Python to PATH, we can use where to find the path to pip3.7.exe
-    // we can then use that to find the path to the right python.exe and use that
-    let new_python_path = {
-        let output = Command::new("where").arg("pip3.7").output().ok()?;
-        let stdout = String::from_utf8(output.stdout).ok()?;
-        Path::new(stdout.lines().next()?).parent().unwrap().parent().unwrap().join("python.exe")
-    };
-    *PYTHON_PATH.lock().unwrap() = new_python_path.to_string_lossy().to_string();
+    // Updat the Python path
+    *PYTHON_PATH.lock().unwrap() = folder_destination.join("python.exe").to_string_lossy().to_string();
 
     Some(0)
 }
@@ -388,7 +369,7 @@ pub async fn update_bot_pack(window: Window) -> String {
 #[tauri::command]
 pub async fn update_map_pack(window: Window) -> String {
     let mappack_location = get_content_folder().join(MAPPACK_FOLDER);
-    let updater = downloader::MapPackUpdater::new(&mappack_location, MAPPACK_REPO.0.to_string(), MAPPACK_REPO.1.to_string());
+    let updater = downloader::MapPackUpdater::new(&mappack_location, MAPPACK_REPO.0.to_owned(), MAPPACK_REPO.1.to_owned());
     let location = mappack_location.to_string_lossy().to_string();
     let map_index_old = updater.get_map_index();
 
@@ -410,8 +391,8 @@ pub async fn update_map_pack(window: Window) -> String {
                     BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(location);
 
                     if updater.get_map_index().is_none() {
-                        ccprintlne("Couldn't find revision number in map pack".to_string());
-                        return "Couldn't find revision number in map pack".to_string();
+                        ccprintlne("Couldn't find revision number in map pack".to_owned());
+                        return "Couldn't find revision number in map pack".to_owned();
                     }
 
                     updater.hydrate_map_pack(map_index_old).await;
@@ -459,10 +440,10 @@ pub fn issue_match_handler_command(command_parts: &[String], create_handler: boo
 
     if match_handler_stdin.is_none() {
         if create_handler {
-            ccprintln("Starting match handler!".to_string());
+            ccprintln("Starting match handler!".to_owned());
             *match_handler_stdin = create_match_handler();
         } else {
-            ccprintln("Not issuing command to handler as it's down and I was told to not start it".to_string());
+            ccprintln("Not issuing command to handler as it's down and I was told to not start it".to_owned());
             return;
         }
     }
@@ -510,9 +491,9 @@ pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_set
     };
 
     let args = [
-        "start_match".to_string(),
-        serde_json::to_string(&bot_list).unwrap().as_str().to_string(),
-        serde_json::to_string(&match_settings).unwrap().as_str().to_string(),
+        "start_match".to_owned(),
+        serde_json::to_string(&bot_list).unwrap().as_str().to_owned(),
+        serde_json::to_string(&match_settings).unwrap().as_str().to_owned(),
         launcher_settings.preferred_launcher,
         launcher_settings.use_login_tricks.to_string(),
         launcher_settings.rocket_league_exe_path.unwrap_or_default(),
@@ -525,7 +506,7 @@ pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_set
 
 #[tauri::command]
 pub async fn kill_bots() {
-    issue_match_handler_command(&["shut_down".to_string()], false);
+    issue_match_handler_command(&["shut_down".to_owned()], false);
 
     let mut match_handler_stdin = MATCH_HANDLER_STDIN.lock().unwrap();
     if match_handler_stdin.is_some() {

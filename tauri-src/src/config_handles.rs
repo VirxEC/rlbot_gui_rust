@@ -28,39 +28,39 @@ pub fn load_gui_config() -> Ini {
 
     if !config_path.exists() {
         create_dir_all(config_path.parent().unwrap()).unwrap();
-        conf.set("bot_folder_settings", "files", Some("{}".to_string()));
-        conf.set("bot_folder_settings", "folders", Some("{}".to_string()));
+        conf.set("bot_folder_settings", "files", Some("{}".to_owned()));
+        conf.set("bot_folder_settings", "folders", Some("{}".to_owned()));
         conf.set("bot_folder_settings", "incr", None);
-        conf.set("match_settings", "map", Some(MAP_TYPES[0].to_string()));
-        conf.set("match_settings", "game_mode", Some(GAME_MODES[0].to_string()));
-        conf.set("match_settings", "match_behavior", Some(EXISTING_MATCH_BEHAVIOR_TYPES[0].to_string()));
-        conf.set("match_settings", "skip_replays", Some("false".to_string()));
-        conf.set("match_settings", "instant_start", Some("false".to_string()));
-        conf.set("match_settings", "enable_lockstep", Some("false".to_string()));
-        conf.set("match_settings", "randomize_map", Some("false".to_string()));
-        conf.set("match_settings", "enable_rendering", Some("false".to_string()));
-        conf.set("match_settings", "enable_state_setting", Some("true".to_string()));
-        conf.set("match_settings", "auto_save_replay", Some("false".to_string()));
-        conf.set("match_settings", "scripts", Some("[]".to_string()));
-        conf.set("mutator_settings", "match_length", Some(MATCH_LENGTH_TYPES[0].to_string()));
-        conf.set("mutator_settings", "max_score", Some(MAX_SCORE_TYPES[0].to_string()));
-        conf.set("mutator_settings", "overtime", Some(OVERTIME_MUTATOR_TYPES[0].to_string()));
-        conf.set("mutator_settings", "series_length", Some(SERIES_LENGTH_MUTATOR_TYPES[0].to_string()));
-        conf.set("mutator_settings", "game_speed", Some(GAME_SPEED_MUTATOR_TYPES[0].to_string()));
-        conf.set("mutator_settings", "ball_max_speed", Some(BALL_MAX_SPEED_MUTATOR_TYPES[0].to_string()));
-        conf.set("mutator_settings", "ball_type", Some(BALL_TYPE_MUTATOR_TYPES[0].to_string()));
-        conf.set("mutator_settings", "ball_weight", Some(BALL_WEIGHT_MUTATOR_TYPES[0].to_string()));
-        conf.set("mutator_settings", "ball_size", Some(BALL_SIZE_MUTATOR_TYPES[0].to_string()));
-        conf.set("mutator_settings", "ball_bounciness", Some(BALL_BOUNCINESS_MUTATOR_TYPES[0].to_string()));
-        conf.set("mutator_settings", "boost_amount", Some(BOOST_AMOUNT_MUTATOR_TYPES[0].to_string()));
-        conf.set("mutator_settings", "rumble", Some(RUMBLE_MUTATOR_TYPES[0].to_string()));
-        conf.set("mutator_settings", "boost_strength", Some(BOOST_STRENGTH_MUTATOR_TYPES[0].to_string()));
-        conf.set("mutator_settings", "gravity", Some(GRAVITY_MUTATOR_TYPES[0].to_string()));
-        conf.set("mutator_settings", "demolish", Some(DEMOLISH_MUTATOR_TYPES[0].to_string()));
-        conf.set("mutator_settings", "respawn_time", Some(RESPAWN_TIME_MUTATOR_TYPES[0].to_string()));
+        conf.set("match_settings", "map", Some(MAP_TYPES[0].to_owned()));
+        conf.set("match_settings", "game_mode", Some(GAME_MODES[0].to_owned()));
+        conf.set("match_settings", "match_behavior", Some(EXISTING_MATCH_BEHAVIOR_TYPES[0].to_owned()));
+        conf.set("match_settings", "skip_replays", Some("false".to_owned()));
+        conf.set("match_settings", "instant_start", Some("false".to_owned()));
+        conf.set("match_settings", "enable_lockstep", Some("false".to_owned()));
+        conf.set("match_settings", "randomize_map", Some("false".to_owned()));
+        conf.set("match_settings", "enable_rendering", Some("false".to_owned()));
+        conf.set("match_settings", "enable_state_setting", Some("true".to_owned()));
+        conf.set("match_settings", "auto_save_replay", Some("false".to_owned()));
+        conf.set("match_settings", "scripts", Some("[]".to_owned()));
+        conf.set("mutator_settings", "match_length", Some(MATCH_LENGTH_TYPES[0].to_owned()));
+        conf.set("mutator_settings", "max_score", Some(MAX_SCORE_TYPES[0].to_owned()));
+        conf.set("mutator_settings", "overtime", Some(OVERTIME_MUTATOR_TYPES[0].to_owned()));
+        conf.set("mutator_settings", "series_length", Some(SERIES_LENGTH_MUTATOR_TYPES[0].to_owned()));
+        conf.set("mutator_settings", "game_speed", Some(GAME_SPEED_MUTATOR_TYPES[0].to_owned()));
+        conf.set("mutator_settings", "ball_max_speed", Some(BALL_MAX_SPEED_MUTATOR_TYPES[0].to_owned()));
+        conf.set("mutator_settings", "ball_type", Some(BALL_TYPE_MUTATOR_TYPES[0].to_owned()));
+        conf.set("mutator_settings", "ball_weight", Some(BALL_WEIGHT_MUTATOR_TYPES[0].to_owned()));
+        conf.set("mutator_settings", "ball_size", Some(BALL_SIZE_MUTATOR_TYPES[0].to_owned()));
+        conf.set("mutator_settings", "ball_bounciness", Some(BALL_BOUNCINESS_MUTATOR_TYPES[0].to_owned()));
+        conf.set("mutator_settings", "boost_amount", Some(BOOST_AMOUNT_MUTATOR_TYPES[0].to_owned()));
+        conf.set("mutator_settings", "rumble", Some(RUMBLE_MUTATOR_TYPES[0].to_owned()));
+        conf.set("mutator_settings", "boost_strength", Some(BOOST_STRENGTH_MUTATOR_TYPES[0].to_owned()));
+        conf.set("mutator_settings", "gravity", Some(GRAVITY_MUTATOR_TYPES[0].to_owned()));
+        conf.set("mutator_settings", "demolish", Some(DEMOLISH_MUTATOR_TYPES[0].to_owned()));
+        conf.set("mutator_settings", "respawn_time", Some(RESPAWN_TIME_MUTATOR_TYPES[0].to_owned()));
         conf.set("python_config", "path", Some(auto_detect_python().unwrap_or_default().0));
-        conf.set("launcher_settings", "preferred_launcher", Some("epic".to_string()));
-        conf.set("launcher_settings", "use_login_tricks", Some("true".to_string()));
+        conf.set("launcher_settings", "preferred_launcher", Some("epic".to_owned()));
+        conf.set("launcher_settings", "use_login_tricks", Some("true".to_owned()));
         conf.set("launcher_settings", "rocket_league_exe_path", None);
 
         conf.write(&config_path).unwrap();
@@ -207,14 +207,14 @@ pub async fn get_team_settings() -> HashMap<String, Vec<BotConfigBundle>> {
     let blue_team = serde_json::from_str(
         &config
             .get("team_settings", "blue_team")
-            .unwrap_or_else(|| "[{\"name\": \"Human\", \"runnable_type\": \"human\", \"image\": \"imgs/human.png\"}]".to_string()),
+            .unwrap_or_else(|| "[{\"name\": \"Human\", \"runnable_type\": \"human\", \"image\": \"imgs/human.png\"}]".to_owned()),
     )
     .unwrap_or_default();
-    let orange_team = serde_json::from_str(&config.get("team_settings", "orange_team").unwrap_or_else(|| "[]".to_string())).unwrap_or_default();
+    let orange_team = serde_json::from_str(&config.get("team_settings", "orange_team").unwrap_or_else(|| "[]".to_owned())).unwrap_or_default();
 
     let mut bots = HashMap::new();
-    bots.insert("blue_team".to_string(), blue_team);
-    bots.insert("orange_team".to_string(), orange_team);
+    bots.insert("blue_team".to_owned(), blue_team);
+    bots.insert("orange_team".to_owned(), orange_team);
 
     bots
 }
@@ -231,47 +231,22 @@ pub async fn save_team_settings(blue_team: Vec<BotConfigBundle>, orange_team: Ve
 pub async fn get_language_support() -> HashMap<String, bool> {
     let mut lang_support = HashMap::new();
 
-    lang_support.insert("java".to_string(), get_command_status("java", vec!["-version"]));
-    lang_support.insert("node".to_string(), get_command_status("node", vec!["--version"]));
-    lang_support.insert("chrome".to_string(), has_chrome());
-    lang_support.insert("fullpython".to_string(), get_command_status(&PYTHON_PATH.lock().unwrap(), vec!["-c", "import tkinter"]));
+    lang_support.insert("java".to_owned(), get_command_status("java", vec!["-version"]));
+    lang_support.insert("node".to_owned(), get_command_status("node", vec!["--version"]));
+    lang_support.insert("chrome".to_owned(), has_chrome());
+    lang_support.insert("fullpython".to_owned(), get_command_status(&PYTHON_PATH.lock().unwrap(), vec!["-c", "import tkinter"]));
 
     dbg!(lang_support)
 }
 
-fn find_if_python_37(python: &str) -> bool {
-    let mut command = Command::new(python);
-
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        // disable window creation
-        command.creation_flags(0x08000000);
-    };
-
-    if let Ok(output) = command.arg("--version").stdout(Stdio::piped()).output() {
-        if String::from_utf8_lossy(&output.stdout).contains("Python 3.7") {
-            return true;
-        }
-    }
-
-    false
-}
-
 #[tauri::command]
 pub async fn get_detected_python_path() -> Option<(String, bool)> {
-    match auto_detect_python() {
-        Some((path, is_37)) => {
-            let is_37 = is_37.unwrap_or_else(|| find_if_python_37(&path));
-            Some((path, is_37))
-        }
-        None => None,
-    }
+    auto_detect_python()
 }
 
 #[tauri::command]
 pub async fn get_python_path() -> String {
-    PYTHON_PATH.lock().unwrap().to_string()
+    PYTHON_PATH.lock().unwrap().to_owned()
 }
 
 #[tauri::command]
@@ -296,7 +271,7 @@ fn get_recommendations_json() -> Option<AllRecommendations<String>> {
     for path in BOT_FOLDER_SETTINGS.lock().unwrap().folders.keys() {
         let pattern = Path::new(path).join("**/recommendations.json");
 
-        for path2 in glob(&pattern.to_string_lossy().to_string()).unwrap().flatten() {
+        for path2 in glob(&pattern.to_string_lossy().to_owned()).unwrap().flatten() {
             let raw_json = match read_to_string(&path2) {
                 Ok(s) => s,
                 Err(_) => {
@@ -333,7 +308,7 @@ pub async fn get_recommendations() -> Option<AllRecommendations<BotConfigBundle>
                     .filter_map(|(path, props)| {
                         if props.visible {
                             let pattern = Path::new(path).join("**/*.cfg");
-                            let paths = glob(&pattern.to_string_lossy().to_string()).unwrap().flatten().collect::<Vec<_>>();
+                            let paths = glob(&pattern.to_string_lossy().to_owned()).unwrap().flatten().collect::<Vec<_>>();
 
                             Some(paths.par_iter().filter_map(|path| BotConfigBundle::name_from_path(path.as_path()).ok()).collect::<Vec<_>>())
                         } else {
@@ -364,7 +339,7 @@ pub async fn get_recommendations() -> Option<AllRecommendations<BotConfigBundle>
                         if has_rlbot {
                             let missing_packages = bundle.get_missing_packages();
                             if !missing_packages.is_empty() {
-                                bundle.warn = Some("pythonpkg".to_string());
+                                bundle.warn = Some("pythonpkg".to_owned());
                             }
                             bundle.missing_python_packages = Some(missing_packages);
                         }

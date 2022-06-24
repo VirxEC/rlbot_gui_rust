@@ -149,7 +149,7 @@ pub async fn bootstrap_rust_bot(bot_name: String, directory: &str) -> Result<Str
 
     let cargo_toml_file = top_dir.join("Cargo.toml");
     replace_all_regex_in_file(&cargo_toml_file, &Regex::new(r"name = .*$").unwrap(), format!("name = \"{}\"", bot_name));
-    replace_all_regex_in_file(&cargo_toml_file, &Regex::new(r"authors = .*$").unwrap(), "authors = []".to_string());
+    replace_all_regex_in_file(&cargo_toml_file, &Regex::new(r"authors = .*$").unwrap(), "authors = []".to_owned());
 
     if open::that(top_dir.join("src").join("main.rs")).is_err() {
         ccprintln(format!(

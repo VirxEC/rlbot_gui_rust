@@ -46,7 +46,7 @@ impl DevInfo {
             .get(BOT_CONFIG_DETAILS_HEADER, "tags")
             .unwrap_or_default()
             .split(", ")
-            .map(|s| s.to_string())
+            .map(|s| s.to_owned())
             .collect();
 
         Self {
@@ -156,7 +156,7 @@ impl BotConfigBundle {
         let requires_tkinter = config.getbool(BOT_CONFIG_MODULE_HEADER, REQUIRES_TKINTER).unwrap_or(Some(false));
 
         if name.is_none() {
-            return Err("Bot name not found".to_string());
+            return Err("Bot name not found".to_owned());
         }
 
         let valid_looks = match &looks_path {
@@ -165,7 +165,7 @@ impl BotConfigBundle {
         };
 
         if !valid_looks {
-            return Err("Looks config not found".to_string());
+            return Err("Looks config not found".to_owned());
         }
 
         let valid_path = match &python_path {
@@ -174,7 +174,7 @@ impl BotConfigBundle {
         };
 
         if !valid_path {
-            return Err("Python file not found".to_string());
+            return Err("Python file not found".to_owned());
         }
 
         let t_logo = config.get(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY).unwrap_or_else(|| String::from("logo.png"));
@@ -221,12 +221,12 @@ impl BotConfigBundle {
         let name = if let Some(the_name) = config.get(BOT_CONFIG_MODULE_HEADER, NAME_KEY) {
             the_name
         } else {
-            return Err("Bot name not found".to_string());
+            return Err("Bot name not found".to_owned());
         };
 
         let path = config_path.to_string_lossy().to_string();
 
-        let config_directory = config_path.parent().unwrap().to_string_lossy().to_string();
+        let config_directory = config_path.parent().unwrap().to_string_lossy().to_owned();
 
         let looks_path = config.get(BOT_CONFIG_MODULE_HEADER, LOOKS_CONFIG_KEY).map(|path| format!("{}/{}", config_directory, path));
 
@@ -236,7 +236,7 @@ impl BotConfigBundle {
         };
 
         if !valid_looks {
-            return Err("Looks config not found".to_string());
+            return Err("Looks config not found".to_owned());
         }
 
         let python_path = config.get(BOT_CONFIG_MODULE_HEADER, PYTHON_FILE_KEY).map(|path| format!("{}/{}", config_directory, path));
@@ -247,7 +247,7 @@ impl BotConfigBundle {
         };
 
         if !valid_path {
-            return Err("Python file not found".to_string());
+            return Err("Python file not found".to_owned());
         }
 
         Ok((name, path))
@@ -286,9 +286,9 @@ impl Runnable for BotConfigBundle {
                 .join("python.exe")
                 .to_str()
                 .unwrap()
-                .to_string()
+                .to_owned()
         } else {
-            PYTHON_PATH.lock().unwrap().to_string()
+            PYTHON_PATH.lock().unwrap().to_owned()
         }
     }
 
@@ -301,9 +301,9 @@ impl Runnable for BotConfigBundle {
                 .join("python")
                 .to_str()
                 .unwrap()
-                .to_string()
+                .to_owned()
         } else {
-            PYTHON_PATH.lock().unwrap().to_string()
+            PYTHON_PATH.lock().unwrap().to_owned()
         }
     }
 
@@ -312,7 +312,7 @@ impl Runnable for BotConfigBundle {
             return Vec::new();
         }
 
-        let python = PYTHON_PATH.lock().unwrap().to_string();
+        let python = PYTHON_PATH.lock().unwrap().to_owned();
 
         let requires_tkinter = self.requires_tkinter.unwrap_or(false);
 
@@ -405,11 +405,11 @@ impl ScriptConfigBundle {
             .unwrap_or_default();
 
         if name.is_none() {
-            return Err("Bot name not found".to_string());
+            return Err("Bot name not found".to_owned());
         }
 
         if !Path::new(&script_file).exists() {
-            return Err("Script file not found".to_string());
+            return Err("Script file not found".to_owned());
         }
 
         let t_logo = config.get(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY).unwrap_or_else(|| String::from("logo.png"));
@@ -473,9 +473,9 @@ impl Runnable for ScriptConfigBundle {
                 .join("python.exe")
                 .to_str()
                 .unwrap()
-                .to_string()
+                .to_owned()
         } else {
-            PYTHON_PATH.lock().unwrap().to_string()
+            PYTHON_PATH.lock().unwrap().to_owned()
         }
     }
 
@@ -484,7 +484,7 @@ impl Runnable for ScriptConfigBundle {
         if self.use_virtual_environment() {
             Path::new(&self.config_directory).join("venv").join("bin").join("python").to_string_lossy().to_string()
         } else {
-            PYTHON_PATH.lock().unwrap().to_string()
+            PYTHON_PATH.lock().unwrap().to_owned()
         }
     }
 
@@ -493,7 +493,7 @@ impl Runnable for ScriptConfigBundle {
             return Vec::new();
         }
 
-        let python = PYTHON_PATH.lock().unwrap().to_string();
+        let python = PYTHON_PATH.lock().unwrap().to_owned();
 
         if let Some(req_file) = self.get_requirements_file() {
             let script_path = get_content_folder().join("get_missing_packages.py").to_string_lossy().to_string();

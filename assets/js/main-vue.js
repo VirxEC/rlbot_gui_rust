@@ -1,10 +1,11 @@
 import AppearanceEditor from './appearance-editor-vue.js'
-import MutatorField from './mutator-field-vue.js'
 import BotCard from './bot-card-vue.js'
-import ScriptCard from './script-card-vue.js'
 import BotPool from './bot-pool-vue.js'
-import TeamCard from './team-card-vue.js'
 import LauncherPreferenceModal from './launcher-preference-vue.js'
+import MiniConsole from "./mini-console-vue.js"
+import MutatorField from './mutator-field-vue.js'
+import ScriptCard from './script-card-vue.js'
+import TeamCard from './team-card-vue.js'
 
 const invoke = window.__TAURI__.invoke;
 const listen = window.__TAURI__.event.listen;
@@ -406,6 +407,9 @@ export default {
 			<launcher-preference-modal modal-id="launcher-modal" />
 		</b-modal>
 
+		<b-modal size="xl" class="overflow-auto" title="Checking for updated packages..." id="install-console" hide-footer centered>
+			<mini-console/>
+		</b-modal>
 	</div>
 
 	</b-container>
@@ -419,6 +423,7 @@ export default {
 		'bot-pool': BotPool,
 		'team-card': TeamCard,
 		'launcher-preference-modal': LauncherPreferenceModal,
+		'mini-console': MiniConsole
 	},
 	data () {
 		return {
@@ -504,11 +509,7 @@ export default {
 
 	methods: {
 		pythonSetup: function(event)  {
-			invoke("get_detected_python_path").then(info => {
-				console.log(info[0]);
-				console.log(info[1]);
-				this.rec_python = info[0];
-			});
+			invoke("get_detected_python_path").then(info => this.rec_python = info[0]);
 			this.$bvModal.show("python-setup");
 		},
 		quickReloadWarnings: function() {
@@ -970,7 +971,26 @@ export default {
 				}
 	
 				if (!this.init) {
-					this.startup_inner()
+					if (!this.$route.query.check_for_updates) {
+						this.showProgressSpinner = true;
+						this.$bvModal.show("install-console");
+						invoke("install_basic_packages").then((result) => {
+							let message = result.exit_code === 0 ? 'Successfully checked for updates to ' : 'Failed to check for updates to ';
+							message += result.packages.join(", ");
+							if (result.exit_code != 0) {
+								message += ` with exit code ${result.exit_code}; See Console for details.`;
+							}
+							this.snackbarContent = message;
+							this.showSnackbar = true;
+							this.showProgressSpinner = false;
+
+							this.$bvModal.hide("install-console");
+
+							this.startup_inner()
+						});
+					} else {
+						this.startup_inner()
+					}
 				}
 			});
 		},

@@ -93,28 +93,24 @@ impl MutatorSettings {
     pub fn new() -> Self {
         let conf = load_gui_config();
 
-        let match_length = conf.get("mutator_settings", "match_length").unwrap_or_else(|| MATCH_LENGTH_TYPES[0].to_string());
-        let max_score = conf.get("mutator_settings", "max_score").unwrap_or_else(|| MAX_SCORE_TYPES[0].to_string());
-        let overtime = conf.get("mutator_settings", "overtime").unwrap_or_else(|| OVERTIME_MUTATOR_TYPES[0].to_string());
-        let series_length = conf.get("mutator_settings", "series_length").unwrap_or_else(|| SERIES_LENGTH_MUTATOR_TYPES[0].to_string());
-        let game_speed = conf.get("mutator_settings", "game_speed").unwrap_or_else(|| GAME_SPEED_MUTATOR_TYPES[0].to_string());
-        let ball_max_speed = conf
-            .get("mutator_settings", "ball_max_speed")
-            .unwrap_or_else(|| BALL_MAX_SPEED_MUTATOR_TYPES[0].to_string());
-        let ball_type = conf.get("mutator_settings", "ball_type").unwrap_or_else(|| BALL_TYPE_MUTATOR_TYPES[0].to_string());
-        let ball_weight = conf.get("mutator_settings", "ball_weight").unwrap_or_else(|| BALL_WEIGHT_MUTATOR_TYPES[0].to_string());
-        let ball_size = conf.get("mutator_settings", "ball_size").unwrap_or_else(|| BALL_SIZE_MUTATOR_TYPES[0].to_string());
+        let match_length = conf.get("mutator_settings", "match_length").unwrap_or_else(|| MATCH_LENGTH_TYPES[0].to_owned());
+        let max_score = conf.get("mutator_settings", "max_score").unwrap_or_else(|| MAX_SCORE_TYPES[0].to_owned());
+        let overtime = conf.get("mutator_settings", "overtime").unwrap_or_else(|| OVERTIME_MUTATOR_TYPES[0].to_owned());
+        let series_length = conf.get("mutator_settings", "series_length").unwrap_or_else(|| SERIES_LENGTH_MUTATOR_TYPES[0].to_owned());
+        let game_speed = conf.get("mutator_settings", "game_speed").unwrap_or_else(|| GAME_SPEED_MUTATOR_TYPES[0].to_owned());
+        let ball_max_speed = conf.get("mutator_settings", "ball_max_speed").unwrap_or_else(|| BALL_MAX_SPEED_MUTATOR_TYPES[0].to_owned());
+        let ball_type = conf.get("mutator_settings", "ball_type").unwrap_or_else(|| BALL_TYPE_MUTATOR_TYPES[0].to_owned());
+        let ball_weight = conf.get("mutator_settings", "ball_weight").unwrap_or_else(|| BALL_WEIGHT_MUTATOR_TYPES[0].to_owned());
+        let ball_size = conf.get("mutator_settings", "ball_size").unwrap_or_else(|| BALL_SIZE_MUTATOR_TYPES[0].to_owned());
         let ball_bounciness = conf
             .get("mutator_settings", "ball_bounciness")
-            .unwrap_or_else(|| BALL_BOUNCINESS_MUTATOR_TYPES[0].to_string());
-        let boost_amount = conf.get("mutator_settings", "boost_amount").unwrap_or_else(|| BOOST_AMOUNT_MUTATOR_TYPES[0].to_string());
-        let rumble = conf.get("mutator_settings", "rumble").unwrap_or_else(|| RUMBLE_MUTATOR_TYPES[0].to_string());
-        let boost_strength = conf
-            .get("mutator_settings", "boost_strength")
-            .unwrap_or_else(|| BOOST_STRENGTH_MUTATOR_TYPES[0].to_string());
-        let gravity = conf.get("mutator_settings", "gravity").unwrap_or_else(|| GRAVITY_MUTATOR_TYPES[0].to_string());
-        let demolish = conf.get("mutator_settings", "demolish").unwrap_or_else(|| DEMOLISH_MUTATOR_TYPES[0].to_string());
-        let respawn_time = conf.get("mutator_settings", "respawn_time").unwrap_or_else(|| RESPAWN_TIME_MUTATOR_TYPES[0].to_string());
+            .unwrap_or_else(|| BALL_BOUNCINESS_MUTATOR_TYPES[0].to_owned());
+        let boost_amount = conf.get("mutator_settings", "boost_amount").unwrap_or_else(|| BOOST_AMOUNT_MUTATOR_TYPES[0].to_owned());
+        let rumble = conf.get("mutator_settings", "rumble").unwrap_or_else(|| RUMBLE_MUTATOR_TYPES[0].to_owned());
+        let boost_strength = conf.get("mutator_settings", "boost_strength").unwrap_or_else(|| BOOST_STRENGTH_MUTATOR_TYPES[0].to_owned());
+        let gravity = conf.get("mutator_settings", "gravity").unwrap_or_else(|| GRAVITY_MUTATOR_TYPES[0].to_owned());
+        let demolish = conf.get("mutator_settings", "demolish").unwrap_or_else(|| DEMOLISH_MUTATOR_TYPES[0].to_owned());
+        let respawn_time = conf.get("mutator_settings", "respawn_time").unwrap_or_else(|| RESPAWN_TIME_MUTATOR_TYPES[0].to_owned());
 
         Self {
             match_length,
@@ -195,9 +191,9 @@ impl MatchSettings {
     pub fn new() -> Self {
         let conf = load_gui_config();
 
-        let map = conf.get("match_settings", "map").unwrap_or_else(|| MAP_TYPES[0].to_string());
-        let game_mode = conf.get("match_settings", "game_mode").unwrap_or_else(|| GAME_MODES[0].to_string());
-        let match_behavior = conf.get("match_settings", "match_behavior").unwrap_or_else(|| EXISTING_MATCH_BEHAVIOR_TYPES[0].to_string());
+        let map = conf.get("match_settings", "map").unwrap_or_else(|| MAP_TYPES[0].to_owned());
+        let game_mode = conf.get("match_settings", "game_mode").unwrap_or_else(|| GAME_MODES[0].to_owned());
+        let match_behavior = conf.get("match_settings", "match_behavior").unwrap_or_else(|| EXISTING_MATCH_BEHAVIOR_TYPES[0].to_owned());
         let skip_replays = conf.getbool("match_settings", "skip_replays").unwrap_or(Some(false)).unwrap_or(false);
         let instant_start = conf.getbool("match_settings", "instant_start").unwrap_or(Some(false)).unwrap_or(false);
         let enable_lockstep = conf.getbool("match_settings", "enable_lockstep").unwrap_or(Some(false)).unwrap_or(false);
@@ -205,7 +201,7 @@ impl MatchSettings {
         let enable_rendering = conf.getbool("match_settings", "enable_rendering").unwrap_or(Some(false)).unwrap_or(false);
         let enable_state_setting = conf.getbool("match_settings", "enable_state_setting").unwrap_or(Some(true)).unwrap_or(true);
         let auto_save_replay = conf.getbool("match_settings", "auto_save_replay").unwrap_or(Some(false)).unwrap_or(false);
-        let scripts = serde_json::from_str(&conf.get("match_settings", "scripts").unwrap_or_else(|| "[]".to_string())).unwrap_or_default();
+        let scripts = serde_json::from_str(&conf.get("match_settings", "scripts").unwrap_or_else(|| "[]".to_owned())).unwrap_or_default();
 
         Self {
             map,
@@ -311,7 +307,7 @@ impl<T> AllRecommendations<T> {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PackageResult {
     pub exit_code: i32,
     pub packages: Vec<String>,
@@ -369,7 +365,7 @@ impl LauncherSettings {
         let config = load_gui_config();
 
         Self {
-            preferred_launcher: config.get("launcher_settings", "preferred_launcher").unwrap_or_else(|| "epic".to_string()),
+            preferred_launcher: config.get("launcher_settings", "preferred_launcher").unwrap_or_else(|| "epic".to_owned()),
             use_login_tricks: config.getbool("launcher_settings", "use_login_tricks").unwrap_or_default().unwrap_or(true),
             rocket_league_exe_path: config.get("launcher_settings", "rocket_league_exe_path"),
         }

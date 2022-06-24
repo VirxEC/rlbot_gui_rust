@@ -1,3 +1,5 @@
+import MiniConsole from "./mini-console-vue.js";
+
 const invoke = window.__TAURI__.invoke;
 
 export default {
@@ -16,20 +18,26 @@ export default {
 			</b-button>
 		</b-navbar-nav>
 	</b-navbar>
-	<b-container fluid>
-		<b-card no-body class="bot-pool p-1">
-			<b-card title="Python configuration menu" id="python-setup" hide-footer centered>
-				<b-form>
+	<br>
+	<b-container fluid="xl">
+		<b-card no-body>
+			<b-card title="Python configuration menu" id="python-setup" hide-footer centered class="text-center">
+				<b-form v-if="advanced || !is_windows">
 					<h6 class="mr-3">Path to python.exe or Python command - verison 3.7.X for best compatibility; virtual environment python.exe's also work:</h6>
-					<b-form-input :placeholder="rec_python || (rec_is_37 && is_windows) ? 'Confused? Click the button just below!' : 'Path to python.exe'" id="python-exe-path" v-model="python_path" size="md" width="100%"></b-form-input>
-					<span v-if="!rec_is_37 && is_windows"><b-button variant="success" class="mt-3" @click="installPython()">&nbsp;Download & Install Python 3.7</b-button><br></span>
-					<b-button v-if="rec_python && rec_python != python_path" :variant="(!rec_is_37 && is_windows) ? 'warning' : 'success'" class="mt-3" @click="partialPythonSetup()"><b-icon v-if="!rec_is_37 && is_windows" icon="exclamation-triangle-fill"/>&nbsp;Use found Python path</b-button>
-					<hr>
-					<p class="mr-3">RLBot <b>requires</b> some basic Python packages to be installed in order to run <b>that you do not have.</b></p>
-					<p class="mr-3">Clicking "Apply" will attempt to <b>install, repair, and/or update</b> these packages.</p>
-					<div style="display:flex; align-items: flex-end">
+					<b-form-input class="text-center" style="width: 100%" :placeholder="rec_python || (is_rec_isolated && is_windows) ? 'Confused? Click the button just below!' : 'Path to python.exe'" id="python-exe-path" v-model="python_path" size="md"></b-form-input>
+					<span v-if="!is_rec_isolated && is_windows"><b-button variant="success" class="mt-3" @click="installPython()">&nbsp;Install custom isolated Python 3.7</b-button><br></span>
+					<b-button v-if="rec_python && rec_python != python_path" :variant="(!is_rec_isolated && is_windows) ? 'warning' : 'success'" class="mt-3" @click="partialPythonSetup()"><b-icon v-if="!is_rec_isolated && is_windows" icon="exclamation-triangle-fill"/>&nbsp;Use found Python path</b-button>
+					<span v-if="python_path != '' && !showProgressSpinner">
+						<hr>
+						<p class="mr-3">RLBot <b>requires</b> some basic Python packages to be installed in order to run <b>that you do not have.</b></p>
+						<p class="mr-3">Clicking "Apply" will attempt to <b>install, repair, and/or update</b> these packages.</p>
 						<b-button variant="primary" class="mt-3" @click="applyPythonSetup()">Apply</b-button>
-					</div>
+					</span>
+				</b-form>
+				<b-form v-else>
+					<p class="mr-3">RLBot <b>requires</b> some basic Python packages to be installed in order to run <b>that you do not have.</b></p>
+					<b-button variant="success" class="mt-3" @click="applyPythonSetup()">Install, repair, and/or update required packages.</b-button>
+					<b-button variant="warning" class="mt-3" @click="advanced = true">Advanced settings</b-button>
 				</b-form>
 			</b-card>
 
@@ -38,11 +46,17 @@ export default {
 					{{snackbarContent}}
 				</template>
 			</b-toast>
+
+			<b-modal size="xl" class="overflow-auto" title="Installing required packages..." id="install-console" hide-footer centered>
+				<mini-console/>
+			</b-modal>
 		</b-card>
 	</b-container>
 	</div>
 	`,
-	components: {},
+	components: {
+		'mini-console': MiniConsole
+	},
 	data () {
 		return {
 			showSnackbar: false,
@@ -53,7 +67,8 @@ export default {
 			python_path: "",
 			rec_python: null,
 			is_windows: false,
-			rec_is_37: false,
+			is_rec_isolated: false,
+			advanced: false,
 		}
 	},
 	methods: {
@@ -64,6 +79,7 @@ export default {
 				this.showSnackbar = true;
 
 				if (result != null) {
+					this.$bvModal.show("install-console");
 					invoke("install_basic_packages").then((result) => {
 						let message = result.exit_code === 0 ? 'Successfully installed ' : 'Failed to install ';
 						message += result.packages.join(", ");
@@ -72,7 +88,6 @@ export default {
 						}
 						this.snackbarContent = message;
 						this.showSnackbar = true;
-						this.showProgressSpinner = false;
 	
 						this.startup();
 					});
@@ -89,46 +104,55 @@ export default {
 			}
 
 			invoke("set_python_path", { path: this.python_path }).then(() => {
-				invoke("install_basic_packages").then((result) => {
-					let message = result.exit_code === 0 ? 'Successfully installed ' : 'Failed to install ';
-					message += result.packages.join(", ");
-					if (result.exit_code != 0) {
-						message += " with exit code " + result.exit_code;
-					}
-					this.snackbarContent = message;
-					this.showSnackbar = true;
-					this.showProgressSpinner = false;
+				invoke("check_rlbot_python").then(support => {
+					if (support.python && !support.rlbotpython) {
+						this.$bvModal.show("install-console");
+						invoke("install_basic_packages").then((result) => {
+							let message = result.exit_code === 0 ? 'Successfully installed ' : 'Failed to install ';
+							message += result.packages.join(", ");
+							if (result.exit_code != 0) {
+								message += " with exit code " + result.exit_code;
+							}
+							this.snackbarContent = message;
+							this.showSnackbar = true;
 
-					this.startup();
+							this.startup(false);
+						});
+					} else {
+						this.startup();
+					}
 				});
 			});
 		},
 		partialPythonSetup: function () {
+			this.showProgressSpinner = true;
 			this.python_path = this.rec_python;
 			invoke("set_python_path", { path: this.python_path }).then(() => {
 				this.startup();
 			});
 		},
-		startup: function() {
+		startup: function(redirect_check_for_updates=true) {
 			invoke("check_rlbot_python").then(support => {
 				this.noPython = !support.python;
 				this.hasRLBot = support.rlbotpython;
-
+				
 				if (!this.noPython && this.hasRLBot) {
-					this.$router.replace('/');
+					this.$router.replace(`/?check_for_updates=${redirect_check_for_updates}`);
 					return
 				}
-
+				
 				this.startup_inner();
 			});
 		},
 		startup_inner: function() {
+			this.$bvModal.hide("install-console");
+			this.showProgressSpinner = false;
 			invoke("get_python_path").then(path => this.python_path = path);
 			invoke("get_detected_python_path").then(info => {
 				this.rec_python = info[0];
-				this.rec_is_37 = info[1];
+				this.is_rec_isolated = info[1];
 				console.log(this.rec_python);
-				console.log(this.rec_is_37);
+				console.log(this.is_rec_isolated);
 			});
 
 			invoke("is_windows").then(is_windows => this.is_windows = is_windows);

@@ -9,6 +9,11 @@ use zip::{result::ZipError, ZipArchive};
 
 use crate::{ccprintln, ccprintlnr};
 
+// Code taken from https://github.com/MCOfficer/zip-extract
+// License: MIT
+// Code taken due to lack up updates, a few prominent bugs & a lack of eyes from the community (potential security flaw)
+// As a result, the code has been patched and debugging as been better integrated into the GUI
+
 #[derive(Clone, Debug)]
 pub struct StripToplevel {
     pub toplevel: PathBuf,
@@ -38,7 +43,7 @@ pub fn extract<S: Read + Seek>(source: S, target_dir: &Path, strip_toplevel: boo
     let do_strip_toplevel = strip_toplevel && has_toplevel(&mut archive)?;
 
     ccprintln(format!("Extracting to {}", target_dir.to_string_lossy()));
-    ccprintln("".to_string());
+    ccprintln("".to_owned());
     for i in 0..archive.len() {
         let mut file = archive.by_index(i)?;
         let mut relative_path = match file.enclosed_name() {
@@ -98,7 +103,7 @@ fn has_toplevel<S: Read + Seek>(archive: &mut ZipArchive<S>) -> Result<bool, Zip
         let file = archive.by_index(i)?.mangled_name();
         if let Some(toplevel_dir) = &toplevel_dir {
             if !file.starts_with(toplevel_dir) {
-                ccprintln("Found different toplevel directory".to_string());
+                ccprintln("Found different toplevel directory".to_owned());
                 return Ok(false);
             }
         } else {
@@ -108,6 +113,6 @@ fn has_toplevel<S: Read + Seek>(archive: &mut ZipArchive<S>) -> Result<bool, Zip
             toplevel_dir = Some(comp);
         }
     }
-    ccprintln("Found no other toplevel directory".to_string());
+    ccprintln("Found no other toplevel directory".to_owned());
     Ok(true)
 }
