@@ -35,8 +35,14 @@ export default {
 					</span>
 				</b-form>
 				<b-form v-else>
-					<p class="mr-3">RLBot <b>requires</b> some basic Python packages to be installed in order to run <b>that you do not have.</b></p>
-					<b-button variant="success" class="mt-3" @click="applyPythonSetup()">Install, repair, and/or update required packages.</b-button>
+					<span v-if="is_rec_isolated">
+						<p class="mr-3">RLBot <b>requires</b> some basic Python packages to be installed in order to run <b>that you do not have.</b></p>
+						<b-button variant="success" class="mt-3" @click="applyPythonSetup()">Install, repair, and/or update required packages</b-button>
+					</span>
+					<span v-else>
+						<p class="mr-3">RLBot <b>requires</b> Python as well as some basic packages in order to run.</p>
+						<b-button variant="success" class="mt-3" @click="installPython()">Install isolated Python and required packages</b-button>
+					</span>
 					<b-button variant="warning" class="mt-3" @click="advanced = true">Advanced settings</b-button>
 				</b-form>
 			</b-card>

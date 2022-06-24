@@ -88,7 +88,7 @@ fn get_python_from_pip(pip: &str) -> Result<String, Box<dyn Error>> {
     if let Some(first_line) = stdout.lines().next() {
         let python_path = Path::new(first_line).parent().unwrap().parent().unwrap().join("python.exe");
         if python_path.exists() {
-            return Ok(python_path.to_string_lossy().to_owned());
+            return Ok(python_path.to_string_lossy().to_string());
         }
     }
 
@@ -155,7 +155,7 @@ fn has_chrome() -> bool {
         };
 
         if let Ok(chrome_path) = reg_key.value("") {
-            if Path::new(&chrome_path.to_owned()).is_file() {
+            if Path::new(&chrome_path.to_string()).is_file() {
                 return true;
             }
         }

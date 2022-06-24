@@ -407,7 +407,7 @@ export default {
 			<launcher-preference-modal modal-id="launcher-modal" />
 		</b-modal>
 
-		<b-modal size="xl" class="overflow-auto" title="Checking for updated packages..." id="install-console" hide-footer centered>
+		<b-modal @hide="preventConsoleClose" size="xl" class="overflow-auto" title="Checking for updated packages..." id="install-console" hide-header-close hide-footer centered>
 			<mini-console/>
 		</b-modal>
 	</div>
@@ -487,6 +487,7 @@ export default {
 			python_path: "",
 			rec_python: null,
 			init: false,
+			preventConsoleCloseOverride: false,
 			updateDownloadProgressPercent: listen("update-download-progress", event => {
 				this.downloadProgressPercent = event.payload.percent;
 				this.downloadStatus = event.payload.status;
@@ -508,6 +509,11 @@ export default {
 	},
 
 	methods: {
+		preventConsoleClose: function(event) {
+			if (this.preventConsoleCloseOverride) {
+				event.preventDefault()
+			}
+		},
 		pythonSetup: function(event)  {
 			invoke("get_detected_python_path").then(info => this.rec_python = info[0]);
 			this.$bvModal.show("python-setup");
@@ -973,6 +979,7 @@ export default {
 				if (!this.init) {
 					if (!this.$route.query.check_for_updates) {
 						this.showProgressSpinner = true;
+						this.preventConsoleCloseOverride = true;
 						this.$bvModal.show("install-console");
 						invoke("install_basic_packages").then((result) => {
 							let message = result.exit_code === 0 ? 'Successfully checked for updates to ' : 'Failed to check for updates to ';
@@ -984,6 +991,7 @@ export default {
 							this.showSnackbar = true;
 							this.showProgressSpinner = false;
 
+							this.preventConsoleCloseOverride = false;
 							this.$bvModal.hide("install-console");
 
 							this.startup_inner()
