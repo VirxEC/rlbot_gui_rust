@@ -56,6 +56,14 @@ export default {
 			<b-modal size="xl" class="overflow-auto" title="Installing required packages..." id="install-console" hide-footer centered>
 				<mini-console/>
 			</b-modal>
+
+			<b-modal id="download-modal" v-bind:title="downloadModalTitle" hide-footer centered no-close-on-backdrop no-close-on-esc hide-header-close>
+				<div class="text-center">
+					<b-icon icon="cloud-download" font-scale="3"></b-icon>
+				</div>
+				<b-progress variant="success" :value="downloadProgressPercent" animated class="mt-2 mb-2"></b-progress>
+				<p>{{ downloadStatus }}</p>
+			</b-modal>
 		</b-card>
 	</b-container>
 	</div>
@@ -75,12 +83,23 @@ export default {
 			is_windows: false,
 			is_rec_isolated: false,
 			advanced: false,
+			downloadProgressPercent: 0,
+			downloadStatus: '',
+			updateDownloadProgressPercent: listen("update-download-progress", event => {
+				this.downloadProgressPercent = event.payload.percent;
+				this.downloadStatus = event.payload.status;
+			}),
 		}
 	},
 	methods: {
 		installPython: function() {
 			this.showProgressSpinner = true;
+			this.downloadStatus = "Starting Isolated Python 3.7 installation...";
+			this.downloadProgressPercent = 0;
+			this.$bvModal.show("download-modal");
+			
 			invoke("install_python").then(result => {
+				this.$bvModal.hide("download-modal");
 				this.snackbarContent = result != null ? "Successfully installed Python to your system, installing required packages" : "Uh-oh! An error happened somewhere!";
 				this.showSnackbar = true;
 

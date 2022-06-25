@@ -64,7 +64,7 @@ async fn get_repo_size(client: &Client, repo_full_name: &str) -> Result<u64, Box
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
-struct ProgressBarUpdate {
+pub struct ProgressBarUpdate {
     pub percent: f32,
     pub status: String,
 }

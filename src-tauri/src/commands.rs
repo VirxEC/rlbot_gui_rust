@@ -305,6 +305,7 @@ pub async fn install_python() -> Option<u8> {
     let content_folder = get_content_folder();
     let folder_destination = content_folder.join("Python37");
     let file_path = content_folder.join("python-3.7.9-custom-amd64.zip");
+    let file_size_approx = 21_873_000;
 
     if !file_path.exists() {
         let response = reqwest::get("https://virxec.github.io/rlbot_gui_rust/python-3.7.9-custom-amd64.zip").await.ok()?;
