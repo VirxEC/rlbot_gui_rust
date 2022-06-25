@@ -1,6 +1,6 @@
 {
-  "name":"v1.0.3",
-  "notes": "Python management updates",
+  "name":"v1.0.4",
+  "notes": "Fix updater",
   "platforms": {
     "darwin-aarch64": {
       "signature":"",
@@ -11,8 +11,8 @@
       "url":""
     },
     "windows-x86_64": {
-      "signature":"",
-      "url":"https://github.com/VirxEC/rlbot_gui_rust/releases/download/v1.0.3/RLBotGUI_1.0.3_x64_en-US.msi.zip"
+      "signature":"dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSRUhsNHpKd29ueWt1RHpjM21SWkN6ekxhaFlLWDlNZEdkalRETGdaT0hZYTR5V0dua3prYy9DM3Z5eWdMTVBJZy9jOCtMTDZCTmhRUnFSUkhGUlBnV09vQmtibHZJWmdjPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNjU2MTc2NTc5CWZpbGU6RTpcZ2l0aHViXHJsYm90X2d1aV9ydXN0XHRhdXJpLXNyY1x0YXJnZXRccmVsZWFzZVxidW5kbGUvbXNpL1JMQm90R1VJXzEuMC40X3g2NF9lbi1VUy5tc2kuemlwClVQOTJHeGtIN0NQT3RGMGJOSEVVY1pBY09LeXYzRU5XRk5rSHk1bEo2TW1mSEQ1a1ZMbTJWYUdZNTNZUndFRzlUWlFWMGZ1eTRGdTV2NFhjbUEyQkJRPT0K",
+      "url":"https://github.com/VirxEC/rlbot_gui_rust/releases/download/v1.0.4/RLBotGUI_1.0.4_x64_en-US.msi.zip"
     }
   }
 }
