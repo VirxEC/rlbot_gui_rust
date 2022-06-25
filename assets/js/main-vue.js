@@ -407,7 +407,7 @@ export default {
 			<launcher-preference-modal modal-id="launcher-modal" />
 		</b-modal>
 
-		<b-modal size="xl" class="overflow-auto" title="Checking for updated packages..." id="install-console"  hide-footer centered no-close-on-backdrop no-close-on-esc hide-header-close>
+		<b-modal size="xl" id="install-console" title="Checking for updated packages..." hide-footer centered no-close-on-backdrop no-close-on-esc hide-header-close>
 			<mini-console/>
 		</b-modal>
 	</div>

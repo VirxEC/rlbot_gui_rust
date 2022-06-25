@@ -65,7 +65,7 @@ pub fn load_gui_config() -> Ini {
 
         conf.write(&config_path).unwrap();
     } else if let Err(e) = conf.load(config_path) {
-        ccprintlne(format!("Failed to load config: {}", e));
+        nwprintlne(format!("Failed to load config: {}", e));
     }
 
     conf
@@ -266,7 +266,7 @@ pub async fn pick_appearance_file(window: Window) {
     });
 }
 
-fn get_recommendations_json() -> Option<AllRecommendations<String>> {
+fn get_recommendations_json(window: &Window) -> Option<AllRecommendations<String>> {
     // Search for and load the json file
     for path in BOT_FOLDER_SETTINGS.lock().unwrap().folders.keys() {
         let pattern = Path::new(path).join("**/recommendations.json");
@@ -275,7 +275,7 @@ fn get_recommendations_json() -> Option<AllRecommendations<String>> {
             let raw_json = match read_to_string(&path2) {
                 Ok(s) => s,
                 Err(_) => {
-                    ccprintlne(format!("Failed to read {}", path2.to_string_lossy()));
+                    ccprintlne(window, format!("Failed to read {}", path2.to_string_lossy()));
                     continue;
                 }
             };
@@ -283,7 +283,7 @@ fn get_recommendations_json() -> Option<AllRecommendations<String>> {
             match serde_json::from_str(&raw_json) {
                 Ok(j) => return Some(j),
                 Err(e) => {
-                    ccprintlne(format!("Failed to parse file {}: {}", path2.to_string_lossy(), e));
+                    ccprintlne(window, format!("Failed to parse file {}: {}", path2.to_string_lossy(), e));
                     continue;
                 }
             }
@@ -294,9 +294,9 @@ fn get_recommendations_json() -> Option<AllRecommendations<String>> {
 }
 
 #[tauri::command]
-pub async fn get_recommendations() -> Option<AllRecommendations<BotConfigBundle>> {
+pub async fn get_recommendations(window: Window) -> Option<AllRecommendations<BotConfigBundle>> {
     // If we found the json, return the corresponding BotConfigBundles for the bots
-    get_recommendations_json().map(|j| {
+    get_recommendations_json(&window).map(|j| {
         // Get a list of all the bots in (bot name, bot config file path) pairs
         let name_path_pairs = {
             let bfs = BOT_FOLDER_SETTINGS.lock().unwrap();

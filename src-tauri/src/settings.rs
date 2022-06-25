@@ -11,6 +11,7 @@ use crate::{
 use core::fmt;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, str::FromStr};
+use tauri::Window;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BotFolder {
@@ -255,7 +256,7 @@ impl MatchSettings {
         new
     }
 
-    pub fn setup_for_start_match(&self, bf: &HashMap<String, BotFolder>) -> Option<Self> {
+    pub fn setup_for_start_match(&self, window: &Window, bf: &HashMap<String, BotFolder>) -> Option<Self> {
         let mut new = self.clone();
 
         for script in &mut new.scripts {
@@ -267,7 +268,7 @@ impl MatchSettings {
             new.map = match convert_custom_map_to_path(&new.map, bf) {
                 Some(path) => path,
                 None => {
-                    ccprintlne(format!("Failed to find custom map {}", new.map));
+                    ccprintlne(window, format!("Failed to find custom map {}", new.map));
                     return None;
                 }
             };
@@ -345,11 +346,28 @@ pub struct ConsoleTextUpdate {
 }
 
 impl ConsoleTextUpdate {
-    pub const fn from(text: String, color: Option<String>, replace_last: bool) -> Self {
+    const fn new(text: String, color: Option<String>, replace_last: bool) -> Self {
         ConsoleTextUpdate {
             content: ConsoleText::from(text, color),
             replace_last,
         }
+    }
+
+    pub fn from(text: String, replace_last: bool) -> Self {
+        let color = {
+            let text = text.to_ascii_lowercase();
+            if text.contains("error") {
+                Some("red".to_owned())
+            } else if text.contains("warning") {
+                Some("#A1761B".to_owned())
+            } else if text.contains("info") {
+                Some("blue".to_owned())
+            } else {
+                None
+            }
+        };
+
+        ConsoleTextUpdate::new(text, color, replace_last)
     }
 }
 

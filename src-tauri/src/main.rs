@@ -28,6 +28,7 @@ use std::{
 };
 use tauri::Manager;
 use tauri::Menu;
+use tauri::Window;
 
 const BOTPACK_FOLDER: &str = "RLBotPackDeletable";
 const MAPPACK_FOLDER: &str = "RLBotMapPackDeletable";
@@ -126,21 +127,29 @@ fn get_config_path() -> PathBuf {
     get_content_folder().join("config.ini")
 }
 
-pub fn ccprintln(text: String) {
+pub fn ccprintln(window: &Window, text: String) {
     println!("{}", &text);
-    CONSOLE_TEXT.lock().unwrap().push(ConsoleText::from(text, None));
+    issue_console_update(window, text, false);
 }
 
-pub fn ccprintlnr(text: String) {
+pub fn nwprintln(text: String) {
+    println!("{}", &text);
+    update_internet_console(&ConsoleTextUpdate::from(text, false));
+}
+
+pub fn ccprintlnr(window: &Window, text: String) {
     println!("\r{}", &text);
-    let mut ct = CONSOLE_TEXT.lock().unwrap();
-    ct.pop();
-    ct.push(ConsoleText::from(text, None));
+    issue_console_update(window, text, true);
 }
 
-pub fn ccprintlne(text: String) {
+pub fn ccprintlne(window: &Window, text: String) {
     eprintln!("{}", &text);
-    CONSOLE_TEXT.lock().unwrap().push(ConsoleText::from(text, Some("red".to_owned())));
+    issue_console_update(window, text, false);
+}
+
+pub fn nwprintlne(text: String) {
+    eprintln!("{}", &text);
+    update_internet_console(&ConsoleTextUpdate::from(text, false));
 }
 
 #[cfg(windows)]
@@ -256,6 +265,24 @@ fn bootstrap_python_script<T: AsRef<Path>, C: AsRef<[u8]>>(content_folder: T, fi
     write(full_path, file_contents).unwrap();
 }
 
+fn update_internet_console(update: &ConsoleTextUpdate) {
+    let mut console_text = CONSOLE_TEXT.lock().unwrap();
+    if update.replace_last {
+        console_text.pop();
+    }
+    console_text.push(update.content.clone());
+
+    if console_text.len() > 1200 {
+        console_text.drain(1200..);
+    }
+}
+
+fn issue_console_update(window: &Window, text: String, replace_last: bool) {
+    let update = ConsoleTextUpdate::from(text, replace_last);
+    update_internet_console(&update);
+    window.emit("new-console-text", vec![update]).unwrap();
+}
+
 fn main() {
     println!("Config path: {}", get_config_path().display());
     load_gui_config();
@@ -321,32 +348,7 @@ fn main() {
                     eprintln!("MATCH STARTED");
                     main_window.emit("match-started", ()).unwrap();
                 } else {
-                    let color = {
-                        let text = text.to_ascii_lowercase();
-                        if text.contains("error") {
-                            Some("red".to_owned())
-                        } else if text.contains("warning") {
-                            Some("#A1761B".to_owned())
-                        } else if text.contains("info") {
-                            Some("blue".to_owned())
-                        } else {
-                            None
-                        }
-                    };
-
-                    let update = ConsoleTextUpdate::from(text, color, will_replace_last);
-
-                    let mut console_text = CONSOLE_TEXT.lock().unwrap();
-                    if update.replace_last {
-                        console_text.pop();
-                    }
-                    console_text.push(update.content.clone());
-
-                    if console_text.len() > 1200 {
-                        console_text.drain(1200..);
-                    }
-
-                    main_window.emit("new-console-text", vec![update]).unwrap();
+                    issue_console_update(&main_window, text, will_replace_last);
                 }
             }
         });

@@ -1,6 +1,7 @@
 use crate::bot_management::{
     bot_creation::{bootstrap_python_bot, bootstrap_python_hivemind, bootstrap_rust_bot, bootstrap_scratch_bot, CREATED_BOTS_FOLDER},
-    downloader, zip_extract_fixed,
+    downloader::{self, ProgressBarUpdate},
+    zip_extract_fixed,
 };
 use crate::rlbot::{
     agents::runnable::Runnable,
@@ -10,12 +11,14 @@ use crate::rlbot::{
 };
 use crate::settings::*;
 use crate::*;
+use futures_util::StreamExt;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::{
     collections::HashMap,
     fs::{create_dir_all, File},
     io::{copy, Cursor, Write},
     path::Path,
+    time::Instant,
 };
 use tauri::Window;
 
@@ -51,32 +54,32 @@ fn ensure_bot_directory() -> String {
 }
 
 #[tauri::command]
-pub async fn begin_python_bot(bot_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
-    match bootstrap_python_bot(bot_name, &ensure_bot_directory()).await {
+pub async fn begin_python_bot(window: Window, bot_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
+    match bootstrap_python_bot(&window, bot_name, &ensure_bot_directory()).await {
         Ok(config_file) => Ok(HashMap::from([("bot".to_owned(), BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap())])),
         Err(e) => Err(HashMap::from([("error".to_owned(), e)])),
     }
 }
 
 #[tauri::command]
-pub async fn begin_python_hivemind(hive_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
-    match bootstrap_python_hivemind(hive_name, &ensure_bot_directory()).await {
+pub async fn begin_python_hivemind(window: Window, hive_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
+    match bootstrap_python_hivemind(&window, hive_name, &ensure_bot_directory()).await {
         Ok(config_file) => Ok(HashMap::from([("bot".to_owned(), BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap())])),
         Err(e) => Err(HashMap::from([("error".to_owned(), e)])),
     }
 }
 
 #[tauri::command]
-pub async fn begin_rust_bot(bot_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
-    match bootstrap_rust_bot(bot_name, &ensure_bot_directory()).await {
+pub async fn begin_rust_bot(window: Window, bot_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
+    match bootstrap_rust_bot(&window, bot_name, &ensure_bot_directory()).await {
         Ok(config_file) => Ok(HashMap::from([("bot".to_owned(), BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap())])),
         Err(e) => Err(HashMap::from([("error".to_owned(), e)])),
     }
 }
 
 #[tauri::command]
-pub async fn begin_scratch_bot(bot_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
-    match bootstrap_scratch_bot(bot_name, &ensure_bot_directory()).await {
+pub async fn begin_scratch_bot(window: Window, bot_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
+    match bootstrap_scratch_bot(&window, bot_name, &ensure_bot_directory()).await {
         Ok(config_file) => Ok(HashMap::from([("bot".to_owned(), BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap())])),
         Err(e) => Err(HashMap::from([("error".to_owned(), e)])),
     }
@@ -113,7 +116,7 @@ pub async fn install_requirements(config_path: String) -> PackageResult {
     }
 }
 
-async fn install_upgrade_basic_packages() -> PackageResult {
+async fn install_upgrade_basic_packages(window: &Window) -> PackageResult {
     let packages = vec![
         String::from("pip"),
         String::from("setuptools"),
@@ -126,7 +129,10 @@ async fn install_upgrade_basic_packages() -> PackageResult {
     ];
 
     if !is_online::check().await {
-        ccprintlne("Could not connect to the internet to install/update basic packages. Please check your internet connection and try again.".to_string());
+        ccprintlne(
+            window,
+            "Could not connect to the internet to install/update basic packages. Please check your internet connection and try again.".to_string(),
+        );
 
         return PackageResult { exit_code: 3, packages };
     }
@@ -149,8 +155,8 @@ async fn install_upgrade_basic_packages() -> PackageResult {
 }
 
 #[tauri::command]
-pub async fn install_basic_packages() -> PackageResult {
-    install_upgrade_basic_packages().await
+pub async fn install_basic_packages(window: Window) -> PackageResult {
+    install_upgrade_basic_packages(&window).await
 }
 
 #[tauri::command]
@@ -301,22 +307,48 @@ pub fn is_windows() -> bool {
 }
 
 #[tauri::command]
-pub async fn install_python() -> Option<u8> {
+pub async fn install_python(window: Window) -> Option<u8> {
     let content_folder = get_content_folder();
     let folder_destination = content_folder.join("Python37");
     let file_path = content_folder.join("python-3.7.9-custom-amd64.zip");
-    let file_size_approx = 21_873_000;
+
+    let download_url = "https://virxec.github.io/rlbot_gui_rust/python-3.7.9-custom-amd64.zip";
+    let res = reqwest::Client::new().get(download_url).send().await.ok()?;
+    let total_size = 21_873_000;
+    let mut stream = res.bytes_stream();
+    let mut bytes = Vec::with_capacity(total_size);
+    let mut last_update = Instant::now();
 
     if !file_path.exists() {
-        let response = reqwest::get("https://virxec.github.io/rlbot_gui_rust/python-3.7.9-custom-amd64.zip").await.ok()?;
+        while let Some(new_bytes) = stream.next().await {
+            // put the new bytes into bytes
+            bytes.extend_from_slice(&new_bytes.ok()?);
+
+            if last_update.elapsed().as_secs_f32() >= 0.1 {
+                let progress = bytes.len() as f32 / total_size as f32 * 100.0;
+                if let Err(e) = window.emit("update-download-progress", ProgressBarUpdate::new(progress, "Downloading zip...".to_owned())) {
+                    ccprintlne(&window, format!("Error when updating progress bar: {}", e));
+                }
+                last_update = Instant::now();
+            }
+        }
+
+        if let Err(e) = window.emit("update-download-progress", ProgressBarUpdate::new(100., "Writing zip to disk...".to_owned())) {
+            ccprintlne(&window, format!("Error when updating progress bar: {}", e));
+        }
+
         let mut file = File::create(&file_path).ok()?;
-        let mut content = Cursor::new(response.bytes().await.ok()?);
+        let mut content = Cursor::new(bytes);
         copy(&mut content, &mut file).ok()?;
+    }
+
+    if let Err(e) = window.emit("update-download-progress", ProgressBarUpdate::new(100., "Extracting zip...".to_owned())) {
+        ccprintlne(&window, format!("Error when updating progress bar: {}", e));
     }
 
     // Extract the zip file
     let file = File::open(&file_path).ok()?;
-    zip_extract_fixed::extract(&file, folder_destination.as_path(), false).ok()?;
+    zip_extract_fixed::extract(&window, &file, folder_destination.as_path(), false, false).ok()?;
 
     // Updat the Python path
     *PYTHON_PATH.lock().unwrap() = folder_destination.join("python.exe").to_string_lossy().to_string();
@@ -374,7 +406,7 @@ pub async fn update_map_pack(window: Window) -> String {
     let location = mappack_location.to_string_lossy().to_string();
     let map_index_old = updater.get_map_index();
 
-    match updater.needs_update().await {
+    match updater.needs_update(&window).await {
         downloader::BotpackStatus::Skipped(message) => {
             BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(location);
             message
@@ -392,11 +424,11 @@ pub async fn update_map_pack(window: Window) -> String {
                     BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(location);
 
                     if updater.get_map_index().is_none() {
-                        ccprintlne("Couldn't find revision number in map pack".to_owned());
+                        ccprintlne(&window, "Couldn't find revision number in map pack".to_owned());
                         return "Couldn't find revision number in map pack".to_owned();
                     }
 
-                    updater.hydrate_map_pack(map_index_old).await;
+                    updater.hydrate_map_pack(&window, map_index_old).await;
 
                     message
                 }
@@ -408,9 +440,9 @@ pub async fn update_map_pack(window: Window) -> String {
 }
 
 #[tauri::command]
-pub async fn is_botpack_up_to_date() -> bool {
+pub async fn is_botpack_up_to_date(window: Window) -> bool {
     let repo_full_name = format!("{}/{}", BOTPACK_REPO_OWNER, BOTPACK_REPO_NAME);
-    bot_management::downloader::is_botpack_up_to_date(&repo_full_name).await
+    bot_management::downloader::is_botpack_up_to_date(&window, &repo_full_name).await
 }
 
 #[tauri::command]
@@ -423,28 +455,28 @@ pub async fn save_launcher_settings(settings: LauncherSettings) {
     settings.write_to_file();
 }
 
-fn create_match_handler() -> Option<ChildStdin> {
+fn create_match_handler(window: &Window) -> Option<ChildStdin> {
     let program = PYTHON_PATH.lock().unwrap().clone();
     let script_path = get_content_folder().join("match_handler.py").to_string_lossy().to_string();
 
     match get_capture_command(program, &[&script_path]).stdin(Stdio::piped()).spawn() {
         Ok(mut child) => child.stdin.take(),
         Err(err) => {
-            ccprintlne(format!("Failed to start match handler: {}", err));
+            ccprintlne(window, format!("Failed to start match handler: {}", err));
             None
         }
     }
 }
 
-pub fn issue_match_handler_command(command_parts: &[String], create_handler: bool) {
+pub fn issue_match_handler_command(window: &Window, command_parts: &[String], create_handler: bool) {
     let mut match_handler_stdin = MATCH_HANDLER_STDIN.lock().unwrap();
 
     if match_handler_stdin.is_none() {
         if create_handler {
-            ccprintln("Starting match handler!".to_owned());
-            *match_handler_stdin = create_match_handler();
+            ccprintln(window, "Starting match handler!".to_owned());
+            *match_handler_stdin = create_match_handler(window);
         } else {
-            ccprintln("Not issuing command to handler as it's down and I was told to not start it".to_owned());
+            ccprintln(window, "Not issuing command to handler as it's down and I was told to not start it".to_owned());
             return;
         }
     }
@@ -464,26 +496,26 @@ pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_set
 
     match setup_manager::is_rocket_league_running(port.unwrap_or(gateway_util::IDEAL_RLBOT_PORT)) {
         Ok(rl_is_running) => {
-            ccprintln(format!(
-                "Rocket League is {}",
-                if rl_is_running { "already running with RLBot args!" } else { "not running yet..." }
-            ));
+            ccprintln(
+                &window,
+                format!("Rocket League is {}", if rl_is_running { "already running with RLBot args!" } else { "not running yet..." }),
+            );
 
             // kill RLBot if it's running but Rocket League isn't
             if !rl_is_running && port.is_some() {
-                kill_bots().await;
+                kill_bots(window.clone()).await;
                 gateway_util::kill_existing_processes();
             }
         }
         Err(err) => {
-            ccprintlne(err);
+            ccprintlne(&window, err);
             return false;
         }
     }
 
     let launcher_settings = LauncherSettings::new();
 
-    let match_settings = match match_settings.setup_for_start_match(&BOT_FOLDER_SETTINGS.lock().unwrap().folders) {
+    let match_settings = match match_settings.setup_for_start_match(&window, &BOT_FOLDER_SETTINGS.lock().unwrap().folders) {
         Some(match_settings) => match_settings,
         None => {
             window.emit("match-start-failed", ()).unwrap();
@@ -500,14 +532,14 @@ pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_set
         launcher_settings.rocket_league_exe_path.unwrap_or_default(),
     ];
 
-    issue_match_handler_command(&args, true);
+    issue_match_handler_command(&window, &args, true);
 
     true
 }
 
 #[tauri::command]
-pub async fn kill_bots() {
-    issue_match_handler_command(&["shut_down".to_owned()], false);
+pub async fn kill_bots(window: Window) {
+    issue_match_handler_command(&window, &["shut_down".to_owned()], false);
 
     let mut match_handler_stdin = MATCH_HANDLER_STDIN.lock().unwrap();
     if match_handler_stdin.is_some() {

@@ -5,9 +5,10 @@ use std::{
     path::{Path, PathBuf, StripPrefixError},
 };
 
+use tauri::Window;
 use zip::{result::ZipError, ZipArchive};
 
-use crate::{ccprintln, ccprintlnr};
+use crate::{ccprintln, ccprintlne, ccprintlnr};
 
 // Code taken from https://github.com/MCOfficer/zip-extract
 // License: MIT
@@ -33,17 +34,17 @@ impl Error for StripToplevel {
     }
 }
 
-pub fn extract<S: Read + Seek>(source: S, target_dir: &Path, strip_toplevel: bool) -> Result<(), Box<dyn Error>> {
+pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, strip_toplevel: bool, replace: bool) -> Result<(), Box<dyn Error>> {
     if !target_dir.exists() {
         fs::create_dir_all(&target_dir)?;
     }
 
     let mut archive = ZipArchive::new(source)?;
 
-    let do_strip_toplevel = strip_toplevel && has_toplevel(&mut archive)?;
+    let do_strip_toplevel = strip_toplevel && has_toplevel(window, &mut archive)?;
 
-    ccprintln(format!("Extracting to {}", target_dir.to_string_lossy()));
-    ccprintln("".to_owned());
+    ccprintln(window, format!("Extracting to {}", target_dir.to_string_lossy()));
+    ccprintln(window, "".to_owned());
     for i in 0..archive.len() {
         let mut file = archive.by_index(i)?;
         let mut relative_path = match file.enclosed_name() {
@@ -71,7 +72,7 @@ pub fn extract<S: Read + Seek>(source: S, target_dir: &Path, strip_toplevel: boo
         let outpath = target_dir.join(relative_path);
         let outpath_str = outpath.to_string_lossy();
 
-        ccprintlnr(format!("Creating {} from {}", outpath_str, relative_path.display()));
+        ccprintlnr(window, format!("Creating {} from {}", outpath_str, relative_path.display()));
         if outpath_str.ends_with('/') || outpath_str.ends_with('\\') {
             if !outpath.exists() {
                 fs::create_dir_all(&outpath)?;
@@ -80,20 +81,28 @@ pub fn extract<S: Read + Seek>(source: S, target_dir: &Path, strip_toplevel: boo
         }
 
         if outpath.exists() {
-            fs::remove_file(&outpath)?;
+            if replace {
+                fs::remove_file(&outpath)?;
+            } else {
+                continue;
+            }
         } else if let Some(p) = outpath.parent() {
-            fs::create_dir_all(&p).ok();
+            if !p.exists() {
+                if let Err(e) = fs::create_dir_all(p) {
+                    ccprintlne(window, format!("Failed to create directory {}: {}", p.display(), e));
+                }
+            }
         }
 
         let mut outfile = fs::File::create(&outpath)?;
         copy(&mut file, &mut outfile)?;
     }
 
-    ccprintlnr(format!("Extracted {} files", archive.len()));
+    ccprintlnr(window, format!("Extracted {} files", archive.len()));
     Ok(())
 }
 
-fn has_toplevel<S: Read + Seek>(archive: &mut ZipArchive<S>) -> Result<bool, ZipError> {
+fn has_toplevel<S: Read + Seek>(window: &Window, archive: &mut ZipArchive<S>) -> Result<bool, ZipError> {
     let mut toplevel_dir: Option<PathBuf> = None;
     if archive.len() < 2 {
         return Ok(false);
@@ -103,16 +112,16 @@ fn has_toplevel<S: Read + Seek>(archive: &mut ZipArchive<S>) -> Result<bool, Zip
         let file = archive.by_index(i)?.mangled_name();
         if let Some(toplevel_dir) = &toplevel_dir {
             if !file.starts_with(toplevel_dir) {
-                ccprintln("Found different toplevel directory".to_owned());
+                ccprintln(window, "Found different toplevel directory".to_owned());
                 return Ok(false);
             }
         } else {
             // First iteration
             let comp: PathBuf = file.components().take(1).collect();
-            ccprintln(format!("Checking if path component {} is the only toplevel directory", comp.display()));
+            ccprintln(window, format!("Checking if path component {} is the only toplevel directory", comp.display()));
             toplevel_dir = Some(comp);
         }
     }
-    ccprintln("Found no other toplevel directory".to_owned());
+    ccprintln(window, "Found no other toplevel directory".to_owned());
     Ok(true)
 }

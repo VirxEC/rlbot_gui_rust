@@ -1,6 +1,7 @@
 import MiniConsole from "./mini-console-vue.js";
 
 const invoke = window.__TAURI__.invoke;
+const listen = window.__TAURI__.event.listen;
 
 export default {
 	name: 'console',
@@ -57,12 +58,16 @@ export default {
 				<mini-console/>
 			</b-modal>
 
-			<b-modal id="download-modal" v-bind:title="downloadModalTitle" hide-footer centered no-close-on-backdrop no-close-on-esc hide-header-close>
+			<b-modal size="xl" id="download-modal" v-bind:title="downloadModalTitle" hide-footer centered no-close-on-backdrop no-close-on-esc hide-header-close>
 				<div class="text-center">
 					<b-icon icon="cloud-download" font-scale="3"></b-icon>
 				</div>
 				<b-progress variant="success" :value="downloadProgressPercent" animated class="mt-2 mb-2"></b-progress>
 				<p>{{ downloadStatus }}</p>
+				<span v-if="downloadProgressPercent > 99.9">
+					<hr>
+					<mini-console/>
+				</span>
 			</b-modal>
 		</b-card>
 	</b-container>
@@ -83,6 +88,7 @@ export default {
 			is_windows: false,
 			is_rec_isolated: false,
 			advanced: false,
+			downloadModalTitle: "",
 			downloadProgressPercent: 0,
 			downloadStatus: '',
 			updateDownloadProgressPercent: listen("update-download-progress", event => {
@@ -94,7 +100,8 @@ export default {
 	methods: {
 		installPython: function() {
 			this.showProgressSpinner = true;
-			this.downloadStatus = "Starting Isolated Python 3.7 installation...";
+			this.downloadModalTitle = "Installing Isolated Python 3.7"
+			this.downloadStatus = "Starting installation...";
 			this.downloadProgressPercent = 0;
 			this.$bvModal.show("download-modal");
 			
@@ -160,6 +167,8 @@ export default {
 			invoke("check_rlbot_python").then(support => {
 				this.noPython = !support.python;
 				this.hasRLBot = support.rlbotpython;
+
+				this.$bvModal.hide("install-console");
 				
 				if (!this.noPython && this.hasRLBot) {
 					this.$router.replace(`/?check_for_updates=${redirect_check_for_updates}`);
@@ -170,7 +179,6 @@ export default {
 			});
 		},
 		startup_inner: function() {
-			this.$bvModal.hide("install-console");
 			this.showProgressSpinner = false;
 			invoke("get_python_path").then(path => this.python_path = path);
 			invoke("get_detected_python_path").then(info => {

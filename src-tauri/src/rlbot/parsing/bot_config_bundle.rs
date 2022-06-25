@@ -1,5 +1,5 @@
 use crate::rlbot::agents::{base_script::SCRIPT_FILE_KEY, runnable::Runnable};
-use crate::{ccprintln, get_command_status, get_content_folder, PYTHON_PATH};
+use crate::{get_command_status, get_content_folder, nwprintln, PYTHON_PATH};
 use configparser::ini::Ini;
 use imghdr::Type;
 use serde::{Deserialize, Serialize};
@@ -344,7 +344,7 @@ impl Runnable for BotConfigBundle {
                         return packages;
                     }
                 }
-                Err(e) => ccprintln(format!("Failed to calculate missing packages: {}", e)),
+                Err(e) => nwprintln(format!("Failed to calculate missing packages: {}", e)),
             }
         } else if requires_tkinter && !get_command_status(&python, vec!["-c", "import tkinter"]) {
             return vec![String::from("tkinter")];
@@ -523,7 +523,7 @@ impl Runnable for ScriptConfigBundle {
                         return packages;
                     }
                 }
-                Err(e) => ccprintln(format!("Failed to calculate missing packages: {}", e)),
+                Err(e) => nwprintln(format!("Failed to calculate missing packages: {}", e)),
             }
         } else if self.requires_tkinter && !get_command_status(&python, vec!["-c", "import tkinter"]) {
             return vec![String::from("tkinter")];

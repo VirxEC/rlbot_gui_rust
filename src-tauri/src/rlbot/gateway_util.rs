@@ -1,4 +1,4 @@
-use crate::ccprintln;
+use crate::nwprintln;
 use sysinfo::{ProcessExt, ProcessRefreshKind, RefreshKind, System, SystemExt};
 
 pub const IDEAL_RLBOT_PORT: u16 = 23233;
@@ -16,12 +16,12 @@ pub fn find_existing_process() -> Option<u16> {
     if let Some(process_info) = system.processes_by_name(EXECUTABLE_NAME).next() {
         if process_info.cmd().len() > 1 {
             let port = process_info.cmd()[1].parse::<u16>().unwrap();
-            ccprintln(format!("Found existing RLBot process listening on port {}", port));
+            nwprintln(format!("Found existing RLBot process listening on port {}", port));
             return Some(port);
         }
     }
 
-    ccprintln("No existing RLBot process found...".to_owned());
+    nwprintln("No existing RLBot process found...".to_owned());
     None
 }
 
@@ -31,12 +31,12 @@ pub fn kill_existing_processes() {
     let mut found = false;
     // there might be multiple processes, so just be able to kill them all encase
     for process_info in system.processes_by_name(EXECUTABLE_NAME) {
-        ccprintln("Killing existing RLBot process".to_owned());
+        nwprintln("Killing existing RLBot process".to_owned());
         process_info.kill();
         found = true;
     }
 
     if !found {
-        ccprintln("No existing RLBot process found".to_owned());
+        nwprintln("No existing RLBot process found".to_owned());
     }
 }

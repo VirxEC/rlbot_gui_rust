@@ -9,6 +9,7 @@ use fs_extra::dir::{move_dir, CopyOptions};
 use rand::Rng;
 use regex::{Regex, Replacer};
 use sanitize_filename::sanitize;
+use tauri::Window;
 
 use crate::rlbot::parsing::bot_config_bundle::{BOT_CONFIG_MODULE_HEADER, BOT_CONFIG_PARAMS_HEADER, EXECUTABLE_PATH_KEY, NAME_KEY};
 use crate::rlbot::parsing::directory_scanner::scan_directory_for_bot_configs;
@@ -18,7 +19,7 @@ use super::zip_extract_fixed;
 
 pub const CREATED_BOTS_FOLDER: &str = "MyBots";
 
-pub async fn bootstrap_python_bot(bot_name: String, directory: &str) -> Result<String, String> {
+pub async fn bootstrap_python_bot(window: &Window, bot_name: String, directory: &str) -> Result<String, String> {
     let sanitized_name = sanitize(&bot_name);
     let top_dir = Path::new(directory).join(CREATED_BOTS_FOLDER).join(&sanitized_name);
 
@@ -28,7 +29,7 @@ pub async fn bootstrap_python_bot(bot_name: String, directory: &str) -> Result<S
 
     match reqwest::get("https://github.com/RLBot/RLBotPythonExample/archive/master.zip").await {
         Ok(res) => {
-            zip_extract_fixed::extract(Cursor::new(&res.bytes().await.unwrap()), top_dir.as_path(), true).unwrap();
+            zip_extract_fixed::extract(window, Cursor::new(&res.bytes().await.unwrap()), top_dir.as_path(), true, true).unwrap();
         }
         Err(e) => {
             return Err(format!("Failed to download python bot: {}", e));
@@ -48,10 +49,10 @@ pub async fn bootstrap_python_bot(bot_name: String, directory: &str) -> Result<S
     BOT_FOLDER_SETTINGS.lock().unwrap().add_file(config_file.clone());
 
     if open::that(python_file).is_err() {
-        ccprintln(format!(
-            "You have no default program to open .py files. Your new bot is located at {}",
-            top_dir.to_string_lossy()
-        ));
+        ccprintln(
+            window,
+            format!("You have no default program to open .py files. Your new bot is located at {}", top_dir.to_string_lossy()),
+        );
     }
 
     Ok(config_file)
@@ -65,7 +66,7 @@ fn replace_all_regex_in_file<R: Replacer>(file_path: &Path, regex: &Regex, repla
     write(file_path, new_contents.as_bytes()).unwrap();
 }
 
-pub async fn bootstrap_python_hivemind(hive_name: String, directory: &str) -> Result<String, String> {
+pub async fn bootstrap_python_hivemind(window: &Window, hive_name: String, directory: &str) -> Result<String, String> {
     let sanitized_name = sanitize(&hive_name);
     let top_dir = Path::new(directory).join(CREATED_BOTS_FOLDER).join(&sanitized_name);
 
@@ -75,7 +76,7 @@ pub async fn bootstrap_python_hivemind(hive_name: String, directory: &str) -> Re
 
     match reqwest::get("https://github.com/RLBot/RLBotPythonHivemindExample/archive/master.zip").await {
         Ok(res) => {
-            zip_extract_fixed::extract(Cursor::new(&res.bytes().await.unwrap()), top_dir.as_path(), true).unwrap();
+            zip_extract_fixed::extract(window, Cursor::new(&res.bytes().await.unwrap()), top_dir.as_path(), true, true).unwrap();
         }
         Err(e) => {
             return Err(format!("Failed to download python hivemind: {}", e));
@@ -111,16 +112,16 @@ pub async fn bootstrap_python_hivemind(hive_name: String, directory: &str) -> Re
     BOT_FOLDER_SETTINGS.lock().unwrap().add_file(config_file.to_string());
 
     if open::that(hive_file).is_err() {
-        ccprintln(format!(
-            "You have no default program to open .py files. Your new bot is located at {}",
-            top_dir.to_string_lossy()
-        ));
+        ccprintln(
+            window,
+            format!("You have no default program to open .py files. Your new bot is located at {}", top_dir.to_string_lossy()),
+        );
     }
 
     Ok(config_file.to_string())
 }
 
-pub async fn bootstrap_rust_bot(bot_name: String, directory: &str) -> Result<String, String> {
+pub async fn bootstrap_rust_bot(window: &Window, bot_name: String, directory: &str) -> Result<String, String> {
     let sanitized_name = sanitize(&bot_name);
     let top_dir = Path::new(directory).join(CREATED_BOTS_FOLDER).join(&sanitized_name);
 
@@ -130,7 +131,7 @@ pub async fn bootstrap_rust_bot(bot_name: String, directory: &str) -> Result<Str
 
     match reqwest::get("https://github.com/NicEastvillage/RLBotRustTemplateBot/archive/master.zip").await {
         Ok(res) => {
-            zip_extract_fixed::extract(Cursor::new(&res.bytes().await.unwrap()), top_dir.as_path(), true).unwrap();
+            zip_extract_fixed::extract(window, Cursor::new(&res.bytes().await.unwrap()), top_dir.as_path(), true, true).unwrap();
         }
         Err(e) => {
             return Err(format!("Failed to download rust bot: {}", e));
@@ -152,16 +153,16 @@ pub async fn bootstrap_rust_bot(bot_name: String, directory: &str) -> Result<Str
     replace_all_regex_in_file(&cargo_toml_file, &Regex::new(r"authors = .*$").unwrap(), "authors = []".to_owned());
 
     if open::that(top_dir.join("src").join("main.rs")).is_err() {
-        ccprintln(format!(
-            "You have no default program to open .rs files. Your new bot is located at {}",
-            top_dir.to_string_lossy()
-        ));
+        ccprintln(
+            window,
+            format!("You have no default program to open .rs files. Your new bot is located at {}", top_dir.to_string_lossy()),
+        );
     }
 
     Ok(config_file)
 }
 
-pub async fn bootstrap_scratch_bot(bot_name: String, directory: &str) -> Result<String, String> {
+pub async fn bootstrap_scratch_bot(window: &Window, bot_name: String, directory: &str) -> Result<String, String> {
     let sanitized_name = sanitize(&bot_name);
     let top_dir = Path::new(directory).join(CREATED_BOTS_FOLDER).join(&sanitized_name);
 
@@ -171,7 +172,7 @@ pub async fn bootstrap_scratch_bot(bot_name: String, directory: &str) -> Result<
 
     match reqwest::get("https://github.com/RLBot/RLBotScratchInterface/archive/gui-friendly.zip").await {
         Ok(res) => {
-            zip_extract_fixed::extract(Cursor::new(&res.bytes().await.unwrap()), top_dir.as_path(), true).unwrap();
+            zip_extract_fixed::extract(window, Cursor::new(&res.bytes().await.unwrap()), top_dir.as_path(), true, true).unwrap();
         }
         Err(e) => {
             return Err(format!("Failed to download scratch bot: {}", e));
@@ -202,7 +203,7 @@ pub async fn bootstrap_scratch_bot(bot_name: String, directory: &str) -> Result<
         ..Default::default()
     };
     if let Err(e) = move_dir(top_dir.join("scratch_bot"), &code_dir, &copy_options) {
-        ccprintlne(e.to_string());
+        ccprintlne(window, e.to_string());
         return Err(format!("Failed to move scratch bot: {}", e));
     }
     rename(code_dir.join("my_scratch_bot.sb3"), sb3_file).unwrap();
@@ -219,7 +220,7 @@ pub async fn bootstrap_scratch_bot(bot_name: String, directory: &str) -> Result<
     // delete the old config file
     remove_file(old_config_file).unwrap();
 
-    ccprintln(format!("Your new bot is located at {}", top_dir.to_string_lossy()));
+    ccprintln(window, format!("Your new bot is located at {}", top_dir.to_string_lossy()));
 
     Ok(config_file.to_string_lossy().to_string())
 }
