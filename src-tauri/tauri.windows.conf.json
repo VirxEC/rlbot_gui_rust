@@ -1,0 +1,15 @@
+{
+    "tauri": {
+      "bundle": {
+        "targets": ["msi", "updater"]
+      },
+      "updater": {
+        "active": true,
+        "endpoints": [
+          "https://virxec.github.io/rlbot_gui_rust/latest.json"
+        ],
+        "dialog": true,
+        "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENBMjcwQTI3MzM1RTFFNDQKUldSRUhsNHpKd29ueXRTYlUzRldLTlAzZ3p5N3djRFNwZmVLV252a1YvR2JSSDYzU2ZUOE5XU3MK"
+      }
+    }
+  }
