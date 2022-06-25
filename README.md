@@ -68,7 +68,7 @@ You're going to have build the GUI from scratch.
 1. Follow the [Tauri prerequisites guide](https://tauri.app/v1/guides/getting-started/prerequisites).
 2. A system with at least 8GB of RAM is required. 4GB will not work.
 3. Clone this repository into your home directory: `git clone https://github.com/VirxEC/rlbot_gui_rust.git`
-4. Navigate to the right folder: `cd rlbot_gui_rust/tauri-src`
+4. Navigate to the right folder: `cd rlbot_gui_rust/src-tauri`
 5. Build the GUI: `cargo build --release`
 6. The compiled binary is `target/release/rl-bot-gui`
 7. To check for updates, run `git fetch` then `git pull` and if there's updates re-run `cargo build --release` to compile the new binary.
@@ -83,7 +83,7 @@ You're going to have build the GUI from scratch.
 ### Setup
 
 1. Clone this repository
-2. Navigate to the `tauri-src` folder
+2. Navigate to the `src-tauri` folder
 2. Running via:
    - `cargo run` - the GUI will compile and launch.
    - `cargo run --release` - the GUI will compile with optimizations (like production) and launch. 
@@ -97,22 +97,22 @@ You're going to have build the GUI from scratch.
          {
             "liveServer.settings.host": "localhost",
             "liveServer.settings.ignoreFiles": [
-               "tauri-src/**",
+               "src-tauri/**",
                ".vscode/**",
             ]
          }
          ```
       - Run the `Open with Live Server` command
-   - In the `tauri-src` folder, run `cargo tauri dev`. The GUI will now:
+   - In the `src-tauri` folder, run `cargo tauri dev`. The GUI will now:
       - Auto-reload when something changes in the `assets` folder
-      - Auto-recompile when your code changes in the `tauri-src/src` folder
+      - Auto-recompile when your code changes in the `src-tauri/src` folder
       - You should also now have two windows, one with the `assets` folder open for HTML/CSS/JS dev work and the other for Rust dev work
 
 ### Building the GUI installer for users
 
 Taken from the [Tauri guide](https://tauri.app/v1/guides/):
 
-1. Navigate to the `tauri-src` folder
+1. Navigate to the `src-tauri` folder
 1. Run `cargo install tauri-cli --version "^1.0.0"`
 2. In the project directory, run `cargo tauri build`
 
@@ -127,4 +127,4 @@ Note that for Linux, you should build on the oldest version of Ubuntu possible. 
    - use the _Change File Encoding_ command (or click the UTF-8 button in the bottom right)
    - select _Reopen with Encoding_, select the one with _Guessed from content_
    - now do that again, but _Save with Encoding_ and _UTF-8_
-6. Don't forget to bump the version number in `tauri-src/Cargo.toml`
+6. Don't forget to bump the version number in `src-tauri/Cargo.toml`

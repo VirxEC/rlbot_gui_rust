@@ -201,3 +201,4 @@ rlbot_gui/gui/imgs/logos
 /target/
 WixTools
 /rlbot_gui/
+.tauri/
