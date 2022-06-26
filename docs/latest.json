@@ -2,14 +2,6 @@
   "name":"v1.0.5",
   "notes": "Mini console",
   "platforms": {
-    "darwin-aarch64": {
-      "signature":"",
-      "url":""
-    },
-    "darwin-intel": {
-      "signature":"",
-      "url":""
-    },
     "windows-x86_64": {
       "signature":"dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSRUhsNHpKd29ueWk2QmxuWjE5dGNYVjhWeXNLM0hQSkJ5T3NvVnNuZ0ZaYVJ1UUNia2p1SVI2UjFjdk1qUVcwc0VJNWIzMjloblZFaUFxcWp1WHJydEhiTTlUeFBGb1FVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNjU2MjA0OTc2CWZpbGU6RTpcZ2l0aHViXHJsYm90X2d1aV9ydXN0XHNyYy10YXVyaVx0YXJnZXRccmVsZWFzZVxidW5kbGUvbXNpL1JMQm90R1VJXzEuMC41X3g2NF9lbi1VUy5tc2kuemlwCkxjTEo1L2VMN1dFb2gybnk1QnlCZnJqQlVCSk5kQmFXYjVpSG5sQStuUm9hSXAzRjg1ZlNJWjR6OWdCa25DMDcrMWFCaWgvZUkvVnBaeW9KVll6eUJBPT0K",
       "url":"https://github.com/VirxEC/rlbot_gui_rust/releases/download/v1.0.5/RLBotGUI_1.0.5_x64_en-US.msi.zip"
