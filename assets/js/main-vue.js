@@ -407,7 +407,7 @@ export default {
 			<launcher-preference-modal modal-id="launcher-modal" />
 		</b-modal>
 
-		<b-modal size="xl" id="install-console" title="Checking for updated packages..." hide-footer centered no-close-on-backdrop no-close-on-esc hide-header-close>
+		<b-modal size="xl" id="mini-console" v-bind:title="miniConsoleTitle" hide-footer centered no-close-on-backdrop no-close-on-esc hide-header-close>
 			<mini-console/>
 		</b-modal>
 	</div>
@@ -487,6 +487,7 @@ export default {
 			python_path: "",
 			rec_python: null,
 			init: false,
+			miniConsoleTitle: "",
 			updateDownloadProgressPercent: listen("update-download-progress", event => {
 				this.downloadProgressPercent = event.payload.percent;
 				this.downloadStatus = event.payload.status;
@@ -938,15 +939,21 @@ export default {
 			
 			if (result.exit_code === 0) {
 				this.quickReloadWarnings();
-				this.$bvModal.hide('language-warning-modal');
 			}
+
+			this.$bvModal.hide("mini-console");
 		},
 		installPackage: function () {
 			this.showProgressSpinner = true;
+			this.miniConsoleTitle = "Installing the package " + this.packageString;
+			this.$bvModal.show("mini-console");
 			invoke("install_package", { packageString: this.packageString }).then(this.onInstallationComplete);
 		},
 		installRequirements: function (configPath) {
 			this.showProgressSpinner = true;
+			this.$bvModal.hide('language-warning-modal');
+			this.miniConsoleTitle = "Installing all requirements for bot...";
+			this.$bvModal.show("mini-console");
 			invoke("install_requirements", { configPath: configPath }).then(this.onInstallationComplete);
 		},
 		selectRecommendation: function(bots) {
@@ -973,7 +980,8 @@ export default {
 				if (!this.init) {
 					if (!this.$route.query.check_for_updates) {
 						this.showProgressSpinner = true;
-						this.$bvModal.show("install-console");
+						this.miniConsoleTitle = "Checking for updated packages...";
+						this.$bvModal.show("mini-console");
 						invoke("install_basic_packages").then((result) => {
 							let message = result.exit_code === 0 ? 'Successfully checked for updates to ' : 'Failed to check for updates to ';
 							message += result.packages.join(", ");
@@ -984,7 +992,7 @@ export default {
 							this.showSnackbar = true;
 							this.showProgressSpinner = false;
 
-							this.$bvModal.hide("install-console");
+							this.$bvModal.hide("mini-console");
 
 							this.startup_inner()
 						});
