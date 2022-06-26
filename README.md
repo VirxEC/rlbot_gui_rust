@@ -16,20 +16,24 @@ This hasn't been implemented, but it's easy to do.
 
 ## Features & fixes unqiue to the Rust port
 
-NOTE: "FCBP" stands for "Feature/fix could be backported"
+### Back-portable
+
+- Add new bots into their proper place in the bot list instead of the end
+- Defered bundle logo loading and missing python package checking
+- Concurrent loading that utilizes all threads
+- Better error messages when downloading or upgrading the botpack
+- Letting the user close Rocket League in between matches without restarting the GUI
+- Full self-updating of the GUI: Implemented for Windows and Ubunutu users & reserved spot on AUR
+
+### Unique to this version
 
 - Launching of the GUI without Python
 - Managing Python from within the GUI
 - Running RLBot with a custom Python executable
-- Add new bots into their proper place in the bot list instead of the end (FCBP)
 - Easy Python pip fixing if something breaks; top right -> menu -> "Edit/Repair Python Settings"
 - Real-time non-blocking subprocess stdout & stderr capture redirected to built-in GUI console for debugging purposes
-- Defered bundle logo loading and missing python package checking (FCBP)
-- Concurrent loading that utilizes all threads (FCBP)
-- In-GUI Python installation for Windows users
-- Better error messages when downloading or upgrading the botpack (FCBP)
-- Letting the user close Rocket League in between matches without restarting the GUI (FCBP)
-- Full self-updating of the GUI: Implemented for Windows and Ubunutu users. Reserved spot on AUR. (FCBP)
+- In-GUI completely isolated Python installation for Windows users
+- Mini-console for quick & easy user status updates (installing packages, etc.)
 
 ## User Installation
 
