@@ -1,10 +1,10 @@
 {
-  "name":"v1.0.5",
-  "notes": "Mini console",
+  "name":"v1.0.6",
+  "notes": "Many crash-fixes (remove unwraps in favor of actual error handling)",
   "platforms": {
     "windows-x86_64": {
-      "signature":"dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSRUhsNHpKd29ueWk2QmxuWjE5dGNYVjhWeXNLM0hQSkJ5T3NvVnNuZ0ZaYVJ1UUNia2p1SVI2UjFjdk1qUVcwc0VJNWIzMjloblZFaUFxcWp1WHJydEhiTTlUeFBGb1FVPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNjU2MjA0OTc2CWZpbGU6RTpcZ2l0aHViXHJsYm90X2d1aV9ydXN0XHNyYy10YXVyaVx0YXJnZXRccmVsZWFzZVxidW5kbGUvbXNpL1JMQm90R1VJXzEuMC41X3g2NF9lbi1VUy5tc2kuemlwCkxjTEo1L2VMN1dFb2gybnk1QnlCZnJqQlVCSk5kQmFXYjVpSG5sQStuUm9hSXAzRjg1ZlNJWjR6OWdCa25DMDcrMWFCaWgvZUkvVnBaeW9KVll6eUJBPT0K",
-      "url":"https://github.com/VirxEC/rlbot_gui_rust/releases/download/v1.0.5/RLBotGUI_1.0.5_x64_en-US.msi.zip"
+      "signature":"dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSRUhsNHpKd29ueXFTT0k0M3c0QitOK2lxd3NZYkdVWFBlQkgrRzkyU2FPRW0yTzNxY0RjbHpGd1EwM2NEUHplQVNMNjVaazVBMXN2Qk92dUxtYmhxZTlRZEw5VlJHOGdFPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNjU2MzcyNDM5CWZpbGU6RTpcZ2l0aHViXHJsYm90X2d1aV9ydXN0XHNyYy10YXVyaVx0YXJnZXRccmVsZWFzZVxidW5kbGUvbXNpL3JsLWJvdC1ndWlfMS4wLjZfeDY0X2VuLVVTLm1zaS56aXAKdm5GZFRoblBTWXhuYS9yN0Z0RjdhYlhjb0VlNkN3aFpOdTcwVit1aDZyeXJQbkdHUW1wd2xWZHpHUHhyZVZZZStZUWkrRlpGL3g4K0JKYjdGTnFsRHc9PQo=",
+      "url":"https://github.com/VirxEC/rlbot_gui_rust/releases/download/v1.0.6/rl-bot-gui_1.0.6_x64_en-US.msi.zip"
     }
   }
 }
