@@ -2,7 +2,7 @@ use std::{
     collections::{HashMap, HashSet},
     error::Error,
     fs::{read_dir, remove_dir, remove_file, File},
-    io::{BufRead, BufReader, Cursor, Read, Write},
+    io::{BufRead, BufReader, Cursor, Error as IoError, ErrorKind as IoErrorKind, Read, Write},
     path::{Path, PathBuf},
     time::Instant,
 };
@@ -60,7 +60,10 @@ async fn get_json_from_url(client: &Client, url: &str) -> Result<serde_json::Val
 /// * `repo_full_name` Full name of a repository. Example: 'RLBot/RLBotPack'
 async fn get_repo_size(client: &Client, repo_full_name: &str) -> Result<u64, Box<dyn Error>> {
     let data = get_json_from_url(client, &format!("https://api.github.com/repos/{}", repo_full_name)).await?;
-    Ok(data["size"].as_u64().unwrap() * 1000)
+    match data["size"].as_u64() {
+        Some(size) => Ok(size * 1000),
+        None => Err(Box::new(IoError::new(IoErrorKind::Other, "Failed to get repository size"))),
+    }
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -106,14 +109,19 @@ async fn download_and_extract_repo_zip<T: IntoUrl, J: AsRef<Path>>(
     }
 
     if clobber && local_folder_path.exists() {
-        dir::remove(local_folder_path).unwrap();
+        if let Err(e) = dir::remove(local_folder_path) {
+            ccprintlne(window, format!("Error when removing existing folder: {}", e));
+        }
     }
 
     if let Err(e) = window.emit("update-download-progress", ProgressBarUpdate::new(100., "Extracting zip...".to_owned())) {
         ccprintlne(window, format!("Error when updating progress bar: {}", e));
     }
 
-    zip_extract_fixed::extract(window, Cursor::new(bytes), local_folder_path, false, true).unwrap();
+    if let Err(e) = zip_extract_fixed::extract(window, Cursor::new(bytes), local_folder_path, false, true) {
+        ccprintlne(window, format!("Error when extracting zip: {}", e));
+    }
+
     Ok(())
 }
 
@@ -141,7 +149,7 @@ pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, c
         };
 
         let config_path = get_config_path();
-        let mut config = load_gui_config();
+        let mut config = load_gui_config(window);
 
         config.set("bot_folder_settings", "incr", Some(latest_release_tag_name));
 
@@ -162,10 +170,11 @@ pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, c
 
 fn get_current_tag_name() -> Option<u32> {
     let config_path = get_config_path();
-    let mut config = Ini::new();
-    config.load(&config_path).ok()?;
+    let mut conf = Ini::new();
+    conf.set_comment_symbols(&[';']);
+    conf.load(&config_path).ok()?;
 
-    config.get("bot_folder_settings", "incr")?.replace("incr-", "").parse::<u32>().ok()
+    conf.get("bot_folder_settings", "incr")?.replace("incr-", "").parse::<u32>().ok()
 }
 
 fn get_url_from_tag(repo_full_name: &str, tag: u32) -> String {
@@ -228,7 +237,7 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
     let mut next_download = Some(client.get(get_url_from_tag(&repo_full_name, tag)).send());
 
     let config_path = get_config_path();
-    let mut config = load_gui_config();
+    let mut config = load_gui_config(window);
 
     let tag_deleted_files_path = local_folder_path.join(".deleted");
 
@@ -259,7 +268,15 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
             ccprintlne(window, format!("Error when updating progress bar: {}", e));
         }
 
-        if let Err(e) = zip_extract_fixed::extract(window, Cursor::new(&download.bytes().await.unwrap()), local_folder_path.as_path(), false, true) {
+        let bytes = match download.bytes().await {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                ccprintlne(window, format!("Failed to download upgrade zip: {}", e));
+                break;
+            }
+        };
+
+        if let Err(e) = zip_extract_fixed::extract(window, Cursor::new(&bytes), local_folder_path.as_path(), false, true) {
             ccprintlne(window, format!("Failed to extract upgrade zip: {}", e));
             break;
         }
@@ -346,24 +363,42 @@ impl MapPackUpdater {
     }
 
     /// For a map pack, gets you the index.json data
-    pub fn get_map_index(&self) -> Option<serde_json::Value> {
+    pub fn get_map_index(&self, window: &Window) -> Option<serde_json::Value> {
         let index_path = self.full_path.join("index.json");
 
         if index_path.exists() {
-            let mut file = File::open(index_path).unwrap();
-            let mut contents = String::new();
-            file.read_to_string(&mut contents).unwrap();
-            return Some(serde_json::from_str(&contents).unwrap());
-        }
+            let mut file = match File::open(index_path) {
+                Ok(file) => file,
+                Err(e) => {
+                    ccprintlne(window, format!("Failed to open index.json: {}", e));
+                    return None;
+                }
+            };
 
-        None
+            let mut contents = String::new();
+
+            if let Err(e) = file.read_to_string(&mut contents) {
+                ccprintlne(window, format!("Failed to read index.json: {}", e));
+                return None;
+            }
+
+            match serde_json::from_str(&contents) {
+                Ok(json) => Some(json),
+                Err(e) => {
+                    ccprintlne(window, format!("Failed to parse index.json: {}", e));
+                    None
+                }
+            }
+        } else {
+            None
+        }
     }
 
     /// Compares the old_index with current index and for any
     /// maps that have updated the revision, we grab them
     /// from the latest revision
     pub async fn needs_update(&self, window: &Window) -> BotpackStatus {
-        let index = match self.get_map_index() {
+        let index = match self.get_map_index(window) {
             Some(index) => index,
             None => return BotpackStatus::RequiresFullDownload,
         };
@@ -403,7 +438,7 @@ impl MapPackUpdater {
     /// maps that have updated the revision, we grab them
     /// from the latest revision
     pub async fn hydrate_map_pack(&self, window: &Window, old_index: Option<serde_json::Value>) {
-        let new_maps = match self.get_map_index() {
+        let new_maps = match self.get_map_index(window) {
             Some(index) => Self::extract_maps_from_index(index),
             None => {
                 ccprintlne(window, "Failed to get index.json".to_owned());

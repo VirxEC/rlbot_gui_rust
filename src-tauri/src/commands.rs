@@ -42,12 +42,14 @@ pub async fn check_rlbot_python() -> HashMap<String, bool> {
     dbg!(python_support)
 }
 
-fn ensure_bot_directory() -> String {
+fn ensure_bot_directory(window: &Window) -> String {
     let bot_directory = get_content_folder();
     let bot_directory_path = Path::new(&bot_directory).join(CREATED_BOTS_FOLDER);
 
     if !bot_directory_path.exists() {
-        create_dir_all(&bot_directory_path).unwrap();
+        if let Err(e) = create_dir_all(&bot_directory_path) {
+            ccprintlne(window, format!("Error creating bot directory: {}", e));
+        }
     }
 
     bot_directory.to_string_lossy().to_string()
@@ -55,7 +57,7 @@ fn ensure_bot_directory() -> String {
 
 #[tauri::command]
 pub async fn begin_python_bot(window: Window, bot_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
-    match bootstrap_python_bot(&window, bot_name, &ensure_bot_directory()).await {
+    match bootstrap_python_bot(&window, bot_name, &ensure_bot_directory(&window)).await {
         Ok(config_file) => Ok(HashMap::from([("bot".to_owned(), BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap())])),
         Err(e) => Err(HashMap::from([("error".to_owned(), e)])),
     }
@@ -63,7 +65,7 @@ pub async fn begin_python_bot(window: Window, bot_name: String) -> Result<HashMa
 
 #[tauri::command]
 pub async fn begin_python_hivemind(window: Window, hive_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
-    match bootstrap_python_hivemind(&window, hive_name, &ensure_bot_directory()).await {
+    match bootstrap_python_hivemind(&window, hive_name, &ensure_bot_directory(&window)).await {
         Ok(config_file) => Ok(HashMap::from([("bot".to_owned(), BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap())])),
         Err(e) => Err(HashMap::from([("error".to_owned(), e)])),
     }
@@ -71,7 +73,7 @@ pub async fn begin_python_hivemind(window: Window, hive_name: String) -> Result<
 
 #[tauri::command]
 pub async fn begin_rust_bot(window: Window, bot_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
-    match bootstrap_rust_bot(&window, bot_name, &ensure_bot_directory()).await {
+    match bootstrap_rust_bot(&window, bot_name, &ensure_bot_directory(&window)).await {
         Ok(config_file) => Ok(HashMap::from([("bot".to_owned(), BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap())])),
         Err(e) => Err(HashMap::from([("error".to_owned(), e)])),
     }
@@ -79,7 +81,7 @@ pub async fn begin_rust_bot(window: Window, bot_name: String) -> Result<HashMap<
 
 #[tauri::command]
 pub async fn begin_scratch_bot(window: Window, bot_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
-    match bootstrap_scratch_bot(&window, bot_name, &ensure_bot_directory()).await {
+    match bootstrap_scratch_bot(&window, bot_name, &ensure_bot_directory(&window)).await {
         Ok(config_file) => Ok(HashMap::from([("bot".to_owned(), BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap())])),
         Err(e) => Err(HashMap::from([("error".to_owned(), e)])),
     }
@@ -99,11 +101,11 @@ pub async fn install_package(package_string: String) -> PackageResult {
 }
 
 #[tauri::command]
-pub async fn install_requirements(config_path: String) -> PackageResult {
+pub async fn install_requirements(window: Window, config_path: String) -> PackageResult {
     let bundle = BotConfigBundle::minimal_from_path(Path::new(&config_path)).unwrap();
 
     if let Some(file) = bundle.get_requirements_file() {
-        let packages = bundle.get_missing_packages();
+        let packages = bundle.get_missing_packages(&window);
         let python = PYTHON_PATH.lock().unwrap().to_owned();
         let exit_code = spawn_capture_process_and_get_exit_code(&python, &["-m", "pip", "install", "-U", "--no-warn-script-location", "-r", file]);
 
@@ -165,7 +167,7 @@ pub async fn get_console_texts() -> Vec<ConsoleText> {
 }
 
 #[tauri::command]
-pub async fn get_missing_bot_packages(bots: Vec<BotConfigBundle>) -> Vec<MissingPackagesUpdate> {
+pub async fn get_missing_bot_packages(window: Window, bots: Vec<BotConfigBundle>) -> Vec<MissingPackagesUpdate> {
     if check_has_rlbot() {
         bots.par_iter()
             .enumerate()
@@ -179,7 +181,7 @@ pub async fn get_missing_bot_packages(bots: Vec<BotConfigBundle>) -> Vec<Missing
                             warn = None;
                         }
                     } else {
-                        let bot_missing_packages = bot.get_missing_packages();
+                        let bot_missing_packages = bot.get_missing_packages(&window);
 
                         if !bot_missing_packages.is_empty() {
                             warn = Some("pythonpkg".to_owned());
@@ -217,7 +219,7 @@ pub async fn get_missing_bot_packages(bots: Vec<BotConfigBundle>) -> Vec<Missing
 }
 
 #[tauri::command]
-pub async fn get_missing_script_packages(scripts: Vec<ScriptConfigBundle>) -> Vec<MissingPackagesUpdate> {
+pub async fn get_missing_script_packages(window: Window, scripts: Vec<ScriptConfigBundle>) -> Vec<MissingPackagesUpdate> {
     if check_has_rlbot() {
         scripts
             .par_iter()
@@ -231,7 +233,7 @@ pub async fn get_missing_script_packages(scripts: Vec<ScriptConfigBundle>) -> Ve
                         warn = None;
                     }
                 } else {
-                    let script_missing_packages = script.get_missing_packages();
+                    let script_missing_packages = script.get_missing_packages(&window);
 
                     if !script_missing_packages.is_empty() {
                         warn = Some("pythonpkg".to_owned());
@@ -364,7 +366,7 @@ pub async fn download_bot_pack(window: Window) -> String {
     match botpack_status {
         downloader::BotpackStatus::Success(message) => {
             // Configure the folder settings
-            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(botpack_location);
+            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(&window, botpack_location);
             message
         }
         downloader::BotpackStatus::Skipped(message) => message,
@@ -381,7 +383,7 @@ pub async fn update_bot_pack(window: Window) -> String {
         downloader::BotpackStatus::Skipped(message) => message,
         downloader::BotpackStatus::Success(message) => {
             // Configure the folder settings
-            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(botpack_location);
+            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(&window, botpack_location);
             message
         }
         downloader::BotpackStatus::RequiresFullDownload => {
@@ -389,7 +391,7 @@ pub async fn update_bot_pack(window: Window) -> String {
             // the most likely cause is the botpack not existing in the first place
             match downloader::download_repo(&window, BOTPACK_REPO_OWNER, BOTPACK_REPO_NAME, &botpack_location, true).await {
                 downloader::BotpackStatus::Success(message) => {
-                    BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(botpack_location);
+                    BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(&window, botpack_location);
                     message
                 }
                 downloader::BotpackStatus::Skipped(message) => message,
@@ -404,16 +406,16 @@ pub async fn update_map_pack(window: Window) -> String {
     let mappack_location = get_content_folder().join(MAPPACK_FOLDER);
     let updater = downloader::MapPackUpdater::new(&mappack_location, MAPPACK_REPO.0.to_owned(), MAPPACK_REPO.1.to_owned());
     let location = mappack_location.to_string_lossy().to_string();
-    let map_index_old = updater.get_map_index();
+    let map_index_old = updater.get_map_index(&window);
 
     match updater.needs_update(&window).await {
         downloader::BotpackStatus::Skipped(message) => {
-            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(location);
+            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(&window, location);
             message
         }
         downloader::BotpackStatus::Success(message) => {
             // Configure the folder settings
-            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(location);
+            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(&window, location);
             message
         }
         downloader::BotpackStatus::RequiresFullDownload => {
@@ -421,9 +423,9 @@ pub async fn update_map_pack(window: Window) -> String {
             // the most likely cause is the botpack not existing in the first place
             match downloader::download_repo(&window, MAPPACK_REPO.0, MAPPACK_REPO.1, &location, false).await {
                 downloader::BotpackStatus::Success(message) => {
-                    BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(location);
+                    BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(&window, location);
 
-                    if updater.get_map_index().is_none() {
+                    if updater.get_map_index(&window).is_none() {
                         ccprintlne(&window, "Couldn't find revision number in map pack".to_owned());
                         return "Couldn't find revision number in map pack".to_owned();
                     }
@@ -446,13 +448,13 @@ pub async fn is_botpack_up_to_date(window: Window) -> bool {
 }
 
 #[tauri::command]
-pub async fn get_launcher_settings() -> LauncherSettings {
-    LauncherSettings::new()
+pub async fn get_launcher_settings(window: Window) -> LauncherSettings {
+    LauncherSettings::load(&window)
 }
 
 #[tauri::command]
-pub async fn save_launcher_settings(settings: LauncherSettings) {
-    settings.write_to_file();
+pub async fn save_launcher_settings(window: Window, settings: LauncherSettings) {
+    settings.write_to_file(&window);
 }
 
 fn create_match_handler(window: &Window) -> Option<ChildStdin> {
@@ -492,7 +494,7 @@ pub fn issue_match_handler_command(window: &Window, command_parts: &[String], cr
 
 #[tauri::command]
 pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_settings: MatchSettings) -> bool {
-    let port = gateway_util::find_existing_process();
+    let port = gateway_util::find_existing_process(&window);
 
     match setup_manager::is_rocket_league_running(port.unwrap_or(gateway_util::IDEAL_RLBOT_PORT)) {
         Ok(rl_is_running) => {
@@ -504,7 +506,7 @@ pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_set
             // kill RLBot if it's running but Rocket League isn't
             if !rl_is_running && port.is_some() {
                 kill_bots(window.clone()).await;
-                gateway_util::kill_existing_processes();
+                gateway_util::kill_existing_processes(&window);
             }
         }
         Err(err) => {
@@ -513,12 +515,15 @@ pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_set
         }
     }
 
-    let launcher_settings = LauncherSettings::new();
+    let launcher_settings = LauncherSettings::load(&window);
 
     let match_settings = match match_settings.setup_for_start_match(&window, &BOT_FOLDER_SETTINGS.lock().unwrap().folders) {
         Some(match_settings) => match_settings,
         None => {
-            window.emit("match-start-failed", ()).unwrap();
+            if let Err(e) = window.emit("match-start-failed", ()) {
+                ccprintlne(&window, format!("Failed to emit match-start-failed: {}", e));
+            }
+
             return false;
         }
     };

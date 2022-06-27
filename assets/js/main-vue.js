@@ -718,17 +718,29 @@ export default {
 			if (!bot_name) {
 				this.snackbarContent = "Please choose a proper name!";
 				this.showSnackbar = true;
-			} else if (language === 'python') {
+				return;
+			}
+			
+			this.$bvModal.hide('new-bot-modal');
+			if (language === 'python') {
 				this.showProgressSpinner = true;
+				this.miniConsoleTitle = "Creating Python Bot";
+				this.$bvModal.show("mini-console");
 				invoke("begin_python_bot", { botName: bot_name }).then(this.botLoadHandler);
 			} else if (language === 'scratch') {
 				this.showProgressSpinner = true;
+				this.miniConsoleTitle = "Creating Scratch Bot";
+				this.$bvModal.show("mini-console");
 				invoke("begin_scratch_bot", { botName: bot_name }).then(this.botLoadHandler);
 			} else if (language === 'python_hive') {
 				this.showProgressSpinner = true;
+				this.miniConsoleTitle = "Creating Python Hivemind Bot";
+				this.$bvModal.show("mini-console");
 				invoke("begin_python_hivemind", { hiveName: bot_name }).then(this.botLoadHandler);
 			} else if (language === 'rust') {
 				this.showProgressSpinner = true;
+				this.miniConsoleTitle = "Creating Rust Bot";
+				this.$bvModal.show("mini-console");
 				invoke("begin_rust_bot", { botName: bot_name }).then(this.botLoadHandler);
 			}
 		},
@@ -745,7 +757,7 @@ export default {
 			});
 		},
 		botLoadHandler: function (response) {
-			this.$bvModal.hide('new-bot-modal');
+			this.$bvModal.hide("mini-console");
 			this.showProgressSpinner = false;
 			if (response.error) {
 				this.snackbarContent = response.error;
@@ -963,10 +975,6 @@ export default {
 			this.$bvModal.hide('recommendations-modal');
 		},
 		startup: function() {
-			if (this.$route.path != "/") {
-				return
-			}
-
 			invoke("check_rlbot_python").then(support => {
 				let noPython = !support.python;
 				let hasRLBot = support.rlbotpython;
@@ -974,6 +982,10 @@ export default {
 				if (noPython || !hasRLBot) {
 					this.init = false;
 					this.$router.replace('/python-config')
+					return
+				}
+
+				if (this.$route.path != "/") {
 					return
 				}
 	

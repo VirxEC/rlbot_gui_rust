@@ -1,33 +1,38 @@
-use crate::custom_maps::find_all_custom_maps;
-use crate::rlbot::{
-    agents::runnable::Runnable,
-    parsing::{
-        agent_config_parser::BotLooksConfig,
-        bot_config_bundle::{BotConfigBundle, ScriptConfigBundle},
-        directory_scanner::{scan_directory_for_bot_configs, scan_directory_for_script_configs},
-        match_settings_config_parser::*,
+use crate::{
+    custom_maps::find_all_custom_maps,
+    rlbot::{
+        agents::runnable::Runnable,
+        parsing::{
+            agent_config_parser::BotLooksConfig,
+            bot_config_bundle::{BotConfigBundle, ScriptConfigBundle},
+            directory_scanner::{scan_directory_for_bot_configs, scan_directory_for_script_configs},
+            match_settings_config_parser::*,
+        },
     },
+    settings::*,
+    *,
 };
-use crate::settings::*;
-use crate::*;
 use configparser::ini::Ini;
 use glob::glob;
 use rayon::iter::{IntoParallelRefIterator, ParallelExtend, ParallelIterator};
 use std::{
     collections::{HashMap, HashSet},
-    fs::read_to_string,
+    fs::{create_dir_all, read_to_string},
     path::Path,
     process::Command,
 };
-use tauri::api::dialog::FileDialogBuilder;
-use tauri::Window;
+use tauri::{api::dialog::FileDialogBuilder, Window};
 
-pub fn load_gui_config() -> Ini {
+pub fn load_gui_config(window: &Window) -> Ini {
     let mut conf = Ini::new();
+    conf.set_comment_symbols(&[';']);
     let config_path = get_config_path();
 
     if !config_path.exists() {
-        create_dir_all(config_path.parent().unwrap()).unwrap();
+        if let Err(e) = create_dir_all(config_path.parent().unwrap()) {
+            ccprintlne(window, format!("Failed to create config directory: {}", e));
+        }
+
         conf.set("bot_folder_settings", "files", Some("{}".to_owned()));
         conf.set("bot_folder_settings", "folders", Some("{}".to_owned()));
         conf.set("bot_folder_settings", "incr", None);
@@ -63,17 +68,19 @@ pub fn load_gui_config() -> Ini {
         conf.set("launcher_settings", "use_login_tricks", Some("true".to_owned()));
         conf.set("launcher_settings", "rocket_league_exe_path", None);
 
-        conf.write(&config_path).unwrap();
+        if let Err(e) = conf.write(&config_path) {
+            ccprintlne(window, format!("Failed to write config file: {}", e));
+        }
     } else if let Err(e) = conf.load(config_path) {
-        nwprintlne(format!("Failed to load config: {}", e));
+        ccprintlne(window, format!("Failed to load config: {}", e));
     }
 
     conf
 }
 
 #[tauri::command]
-pub async fn save_folder_settings(bot_folder_settings: BotFolderSettings) {
-    BOT_FOLDER_SETTINGS.lock().unwrap().update_config(bot_folder_settings)
+pub async fn save_folder_settings(window: Window, bot_folder_settings: BotFolderSettings) {
+    BOT_FOLDER_SETTINGS.lock().unwrap().update_config(&window, bot_folder_settings)
 }
 
 #[tauri::command]
@@ -138,25 +145,25 @@ pub async fn scan_for_scripts() -> Vec<ScriptConfigBundle> {
 }
 
 #[tauri::command]
-pub async fn pick_bot_folder() {
-    FileDialogBuilder::new().pick_folder(|folder_path| {
+pub async fn pick_bot_folder(window: Window) {
+    FileDialogBuilder::new().pick_folder(move |folder_path| {
         if let Some(path) = folder_path {
-            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(path.to_string_lossy().to_string());
+            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(&window, path.to_string_lossy().to_string());
         }
     });
 }
 
 #[tauri::command]
-pub async fn pick_bot_config() {
-    FileDialogBuilder::new().add_filter("Bot Cfg File", &["cfg"]).pick_file(|path| {
+pub async fn pick_bot_config(window: Window) {
+    FileDialogBuilder::new().add_filter("Bot Cfg File", &["cfg"]).pick_file(move |path| {
         if let Some(path) = path {
-            BOT_FOLDER_SETTINGS.lock().unwrap().add_file(path.to_string_lossy().to_string());
+            BOT_FOLDER_SETTINGS.lock().unwrap().add_file(&window, path.to_string_lossy().to_string());
         }
     });
 }
 
 #[tauri::command]
-pub async fn show_path_in_explorer(path: String) {
+pub async fn show_path_in_explorer(window: Window, path: String) {
     let command = if cfg!(target_os = "windows") {
         "explorer.exe"
     } else if cfg!(target_os = "macos") {
@@ -168,7 +175,9 @@ pub async fn show_path_in_explorer(path: String) {
     let ppath = Path::new(&*path);
     let path = if ppath.is_file() { ppath.parent().unwrap().to_string_lossy().to_string() } else { path };
 
-    Command::new(command).arg(&path).spawn().unwrap();
+    if let Err(e) = Command::new(command).arg(&path).spawn() {
+        ccprintlne(&window, format!("Failed to open path: {}", e));
+    }
 }
 
 #[tauri::command]
@@ -180,8 +189,8 @@ pub async fn get_looks(path: String) -> Option<BotLooksConfig> {
 }
 
 #[tauri::command]
-pub async fn save_looks(path: String, config: BotLooksConfig) {
-    config.save_to_path(&*path);
+pub async fn save_looks(window: Window, path: String, config: BotLooksConfig) {
+    config.save_to_path(&window, &*path);
 }
 
 #[tauri::command]
@@ -197,13 +206,13 @@ pub async fn get_match_settings() -> MatchSettings {
 }
 
 #[tauri::command]
-pub async fn save_match_settings(settings: MatchSettings) {
-    MATCH_SETTINGS.lock().unwrap().update_config(settings.cleaned_scripts());
+pub async fn save_match_settings(window: Window, settings: MatchSettings) {
+    MATCH_SETTINGS.lock().unwrap().update_config(&window, settings.cleaned_scripts());
 }
 
 #[tauri::command]
-pub async fn get_team_settings() -> HashMap<String, Vec<BotConfigBundle>> {
-    let config = load_gui_config();
+pub async fn get_team_settings(window: Window) -> HashMap<String, Vec<BotConfigBundle>> {
+    let config = load_gui_config(&window);
     let blue_team = serde_json::from_str(
         &config
             .get("team_settings", "blue_team")
@@ -220,11 +229,14 @@ pub async fn get_team_settings() -> HashMap<String, Vec<BotConfigBundle>> {
 }
 
 #[tauri::command]
-pub async fn save_team_settings(blue_team: Vec<BotConfigBundle>, orange_team: Vec<BotConfigBundle>) {
-    let mut config = load_gui_config();
+pub async fn save_team_settings(window: Window, blue_team: Vec<BotConfigBundle>, orange_team: Vec<BotConfigBundle>) {
+    let mut config = load_gui_config(&window);
     config.set("team_settings", "blue_team", Some(serde_json::to_string(&clean(blue_team)).unwrap()));
     config.set("team_settings", "orange_team", Some(serde_json::to_string(&clean(orange_team)).unwrap()));
-    config.write(get_config_path()).unwrap();
+
+    if let Err(e) = config.write(get_config_path()) {
+        ccprintlne(&window, format!("Failed to save team settings: {}", e));
+    }
 }
 
 #[tauri::command]
@@ -250,18 +262,23 @@ pub async fn get_python_path() -> String {
 }
 
 #[tauri::command]
-pub async fn set_python_path(path: String) {
-    *PYTHON_PATH.lock().unwrap() = path.clone();
-    let mut config = load_gui_config();
+pub async fn set_python_path(window: Window, path: String) {
+    *PYTHON_PATH.lock().unwrap() = path.to_owned();
+    let mut config = load_gui_config(&window);
     config.set("python_config", "path", Some(path));
-    config.write(get_config_path()).unwrap();
+
+    if let Err(e) = config.write(get_config_path()) {
+        ccprintlne(&window, format!("Failed to save python path: {}", e));
+    }
 }
 
 #[tauri::command]
 pub async fn pick_appearance_file(window: Window) {
     FileDialogBuilder::new().add_filter("Appearance Cfg File", &["cfg"]).pick_file(move |path| {
         if let Some(path) = path {
-            window.emit("set_appearance_file", path.to_string_lossy().to_string()).unwrap();
+            if let Err(e) = window.emit("set_appearance_file", path.to_string_lossy().to_string()) {
+                ccprintlne(&window, format!("Failed to set appearance file: {}", e));
+            }
         }
     });
 }
@@ -337,7 +354,7 @@ pub async fn get_recommendations(window: Window) -> Option<AllRecommendations<Bo
                         bundle.logo = bundle.get_logo();
 
                         if has_rlbot {
-                            let missing_packages = bundle.get_missing_packages();
+                            let missing_packages = bundle.get_missing_packages(&window);
                             if !missing_packages.is_empty() {
                                 bundle.warn = Some("pythonpkg".to_owned());
                             }

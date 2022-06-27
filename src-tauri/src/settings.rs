@@ -32,15 +32,15 @@ impl FromStr for BotFolder {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct BotFolderSettings {
     pub files: HashMap<String, BotFolder>,
     pub folders: HashMap<String, BotFolder>,
 }
 
 impl BotFolderSettings {
-    pub fn new() -> Self {
-        let conf = load_gui_config();
+    pub fn load(window: &Window) -> Self {
+        let conf = load_gui_config(window);
         let files = serde_json::from_str(&conf.get("bot_folder_settings", "files").unwrap_or_else(|| String::from("[]"))).unwrap_or_default();
 
         let folders = serde_json::from_str(&*conf.get("bot_folder_settings", "folders").unwrap_or_else(|| String::from("[]"))).unwrap_or_default();
@@ -48,29 +48,32 @@ impl BotFolderSettings {
         Self { files, folders }
     }
 
-    pub fn update_config(&mut self, bfs: Self) {
+    pub fn update_config(&mut self, window: &Window, bfs: Self) {
         self.files = bfs.files;
         self.folders = bfs.folders;
 
         let path = get_config_path();
-        let mut conf = load_gui_config();
+        let mut conf = load_gui_config(window);
         conf.set("bot_folder_settings", "files", serde_json::to_string(&self.files).ok());
         conf.set("bot_folder_settings", "folders", serde_json::to_string(&self.folders).ok());
-        conf.write(&path).unwrap();
+
+        if let Err(e) = conf.write(&path) {
+            ccprintlne(window, format!("Failed to write config file: {}", e));
+        }
     }
 
-    pub fn add_folder(&mut self, path: String) {
+    pub fn add_folder(&mut self, window: &Window, path: String) {
         self.folders.insert(path, BotFolder { visible: true });
-        self.update_config(self.clone());
+        self.update_config(window, self.clone());
     }
 
-    pub fn add_file(&mut self, path: String) {
+    pub fn add_file(&mut self, window: &Window, path: String) {
         self.files.insert(path, BotFolder { visible: true });
-        self.update_config(self.clone());
+        self.update_config(window, self.clone());
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct MutatorSettings {
     pub match_length: String,
     pub max_score: String,
@@ -91,8 +94,8 @@ pub struct MutatorSettings {
 }
 
 impl MutatorSettings {
-    pub fn new() -> Self {
-        let conf = load_gui_config();
+    pub fn load(window: &Window) -> Self {
+        let conf = load_gui_config(window);
 
         let match_length = conf.get("mutator_settings", "match_length").unwrap_or_else(|| MATCH_LENGTH_TYPES[0].to_owned());
         let max_score = conf.get("mutator_settings", "max_score").unwrap_or_else(|| MAX_SCORE_TYPES[0].to_owned());
@@ -133,7 +136,7 @@ impl MutatorSettings {
         }
     }
 
-    pub fn update_config(&mut self, ms: Self) {
+    pub fn update_config(&mut self, window: &Window, ms: Self) {
         self.match_length = ms.match_length;
         self.max_score = ms.max_score;
         self.overtime = ms.overtime;
@@ -151,7 +154,7 @@ impl MutatorSettings {
         self.demolish = ms.demolish;
         self.respawn_time = ms.respawn_time;
 
-        let mut conf = load_gui_config();
+        let mut conf = load_gui_config(window);
         conf.set("mutator_settings", "match_length", Some(self.match_length.clone()));
         conf.set("mutator_settings", "max_score", Some(self.max_score.clone()));
         conf.set("mutator_settings", "overtime", Some(self.overtime.clone()));
@@ -168,11 +171,14 @@ impl MutatorSettings {
         conf.set("mutator_settings", "gravity", Some(self.gravity.clone()));
         conf.set("mutator_settings", "demolish", Some(self.demolish.clone()));
         conf.set("mutator_settings", "respawn_time", Some(self.respawn_time.clone()));
-        conf.write(get_config_path()).unwrap();
+
+        if let Err(e) = conf.write(get_config_path()) {
+            ccprintlne(window, format!("Error writing config file: {}", e));
+        }
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct MatchSettings {
     pub map: String,
     pub game_mode: String,
@@ -189,8 +195,8 @@ pub struct MatchSettings {
 }
 
 impl MatchSettings {
-    pub fn new() -> Self {
-        let conf = load_gui_config();
+    pub fn load(window: &Window) -> Self {
+        let conf = load_gui_config(window);
 
         let map = conf.get("match_settings", "map").unwrap_or_else(|| MAP_TYPES[0].to_owned());
         let game_mode = conf.get("match_settings", "game_mode").unwrap_or_else(|| GAME_MODES[0].to_owned());
@@ -216,11 +222,11 @@ impl MatchSettings {
             enable_state_setting,
             auto_save_replay,
             scripts,
-            mutators: MutatorSettings::new(),
+            mutators: MutatorSettings::load(window),
         }
     }
 
-    pub fn update_config(&mut self, ms: Self) {
+    pub fn update_config(&mut self, window: &Window, ms: Self) {
         self.map = ms.map;
         self.game_mode = ms.game_mode;
         self.match_behavior = ms.match_behavior;
@@ -233,9 +239,9 @@ impl MatchSettings {
         self.auto_save_replay = ms.auto_save_replay;
         self.scripts = ms.scripts;
 
-        self.mutators.update_config(ms.mutators);
+        self.mutators.update_config(window, ms.mutators);
 
-        let mut conf = load_gui_config();
+        let mut conf = load_gui_config(window);
         conf.set("match_settings", "map", Some(self.map.clone()));
         conf.set("match_settings", "game_mode", Some(self.game_mode.clone()));
         conf.set("match_settings", "match_behavior", Some(self.match_behavior.clone()));
@@ -247,7 +253,10 @@ impl MatchSettings {
         conf.set("match_settings", "enable_state_setting", Some(self.enable_state_setting.to_string()));
         conf.set("match_settings", "auto_save_replay", Some(self.auto_save_replay.to_string()));
         conf.set("match_settings", "scripts", Some(serde_json::to_string(&self.scripts).unwrap_or_default()));
-        conf.write(get_config_path()).unwrap();
+
+        if let Err(e) = conf.write(get_config_path()) {
+            ccprintlne(window, format!("Error writing config file: {}", e));
+        }
     }
 
     pub fn cleaned_scripts(&self) -> Self {
@@ -379,8 +388,8 @@ pub struct LauncherSettings {
 }
 
 impl LauncherSettings {
-    pub fn new() -> Self {
-        let config = load_gui_config();
+    pub fn load(window: &Window) -> Self {
+        let config = load_gui_config(window);
 
         Self {
             preferred_launcher: config.get("launcher_settings", "preferred_launcher").unwrap_or_else(|| "epic".to_owned()),
@@ -389,14 +398,16 @@ impl LauncherSettings {
         }
     }
 
-    pub fn write_to_file(self) {
-        let mut config = load_gui_config();
+    pub fn write_to_file(self, window: &Window) {
+        let mut config = load_gui_config(window);
 
         config.set("launcher_settings", "preferred_launcher", Some(self.preferred_launcher));
         config.set("launcher_settings", "use_login_tricks", Some(self.use_login_tricks.to_string()));
         config.set("launcher_settings", "rocket_league_exe_path", self.rocket_league_exe_path);
 
-        config.write(get_config_path()).unwrap();
+        if let Err(e) = config.write(get_config_path()) {
+            ccprintlne(window, format!("Error writing config file: {}", e));
+        }
     }
 }
 

@@ -184,8 +184,6 @@ export default {
 			invoke("get_detected_python_path").then(info => {
 				this.rec_python = info[0];
 				this.is_rec_isolated = info[1];
-				console.log(this.rec_python);
-				console.log(this.is_rec_isolated);
 			});
 
 			invoke("is_windows").then(is_windows => this.is_windows = is_windows);

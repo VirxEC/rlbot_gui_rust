@@ -1,5 +1,7 @@
+use crate::ccprintlne;
 use configparser::ini::Ini;
 use serde::{Deserialize, Serialize};
+use tauri::Window;
 
 pub const BOT_CONFIG_LOADOUT_HEADER: &str = "Bot Loadout";
 pub const BOT_CONFIG_LOADOUT_ORANGE_HEADER: &str = "Bot Loadout Orange";
@@ -35,33 +37,34 @@ pub struct BotTeamLooksConfig {
 
 impl BotTeamLooksConfig {
     pub fn from_path(loadout_header: &str, paint_header: &str, path: &str) -> Result<Self, String> {
-        let mut config = Ini::new();
-        config.load(path)?;
+        let mut conf = Ini::new();
+        conf.set_comment_symbols(&[';']);
+        conf.load(path)?;
 
-        let team_color_id = config.get(loadout_header, "team_color_id").unwrap_or_default();
-        let custom_color_id = config.get(loadout_header, "custom_color_id").unwrap_or_default();
-        let car_id = config.get(loadout_header, "car_id").unwrap_or_default();
-        let decal_id = config.get(loadout_header, "decal_id").unwrap_or_default();
-        let wheels_id = config.get(loadout_header, "wheels_id").unwrap_or_default();
-        let boost_id = config.get(loadout_header, "boost_id").unwrap_or_default();
-        let antenna_id = config.get(loadout_header, "antenna_id").unwrap_or_default();
-        let hat_id = config.get(loadout_header, "hat_id").unwrap_or_default();
-        let paint_finish_id = config.get(loadout_header, "paint_finish_id").unwrap_or_default();
-        let custom_finish_id = config.get(loadout_header, "custom_finish_id").unwrap_or_default();
-        let engine_audio_id = config.get(loadout_header, "engine_audio_id").unwrap_or_default();
-        let trails_id = config.get(loadout_header, "trails_id").unwrap_or_default();
-        let goal_explosion_id = config.get(loadout_header, "goal_explosion_id").unwrap_or_default();
-        let primary_color_lookup = config.get(loadout_header, "primary_color_lookup").unwrap_or_default();
-        let secondary_color_lookup = config.get(loadout_header, "secondary_color_lookup").unwrap_or_default();
+        let team_color_id = conf.get(loadout_header, "team_color_id").unwrap_or_default();
+        let custom_color_id = conf.get(loadout_header, "custom_color_id").unwrap_or_default();
+        let car_id = conf.get(loadout_header, "car_id").unwrap_or_default();
+        let decal_id = conf.get(loadout_header, "decal_id").unwrap_or_default();
+        let wheels_id = conf.get(loadout_header, "wheels_id").unwrap_or_default();
+        let boost_id = conf.get(loadout_header, "boost_id").unwrap_or_default();
+        let antenna_id = conf.get(loadout_header, "antenna_id").unwrap_or_default();
+        let hat_id = conf.get(loadout_header, "hat_id").unwrap_or_default();
+        let paint_finish_id = conf.get(loadout_header, "paint_finish_id").unwrap_or_default();
+        let custom_finish_id = conf.get(loadout_header, "custom_finish_id").unwrap_or_default();
+        let engine_audio_id = conf.get(loadout_header, "engine_audio_id").unwrap_or_default();
+        let trails_id = conf.get(loadout_header, "trails_id").unwrap_or_default();
+        let goal_explosion_id = conf.get(loadout_header, "goal_explosion_id").unwrap_or_default();
+        let primary_color_lookup = conf.get(loadout_header, "primary_color_lookup").unwrap_or_default();
+        let secondary_color_lookup = conf.get(loadout_header, "secondary_color_lookup").unwrap_or_default();
 
-        let car_paint_id = config.get(paint_header, "car_paint_id").unwrap_or_default();
-        let decal_paint_id = config.get(paint_header, "decal_paint_id").unwrap_or_default();
-        let wheels_paint_id = config.get(paint_header, "wheels_paint_id").unwrap_or_default();
-        let boost_paint_id = config.get(paint_header, "boost_paint_id").unwrap_or_default();
-        let antenna_paint_id = config.get(paint_header, "antenna_paint_id").unwrap_or_default();
-        let hat_paint_id = config.get(paint_header, "hat_paint_id").unwrap_or_default();
-        let trails_paint_id = config.get(paint_header, "trails_paint_id").unwrap_or_default();
-        let goal_explosion_paint_id = config.get(paint_header, "goal_explosion_paint_id").unwrap_or_default();
+        let car_paint_id = conf.get(paint_header, "car_paint_id").unwrap_or_default();
+        let decal_paint_id = conf.get(paint_header, "decal_paint_id").unwrap_or_default();
+        let wheels_paint_id = conf.get(paint_header, "wheels_paint_id").unwrap_or_default();
+        let boost_paint_id = conf.get(paint_header, "boost_paint_id").unwrap_or_default();
+        let antenna_paint_id = conf.get(paint_header, "antenna_paint_id").unwrap_or_default();
+        let hat_paint_id = conf.get(paint_header, "hat_paint_id").unwrap_or_default();
+        let trails_paint_id = conf.get(paint_header, "trails_paint_id").unwrap_or_default();
+        let goal_explosion_paint_id = conf.get(paint_header, "goal_explosion_paint_id").unwrap_or_default();
 
         Ok(Self {
             team_color_id,
@@ -131,12 +134,14 @@ impl BotLooksConfig {
         })
     }
 
-    pub fn save_to_path(&self, path: &str) {
+    pub fn save_to_path(&self, window: &Window, path: &str) {
         let mut config = Ini::new();
         self.blue.save_to_config(&mut config, BOT_CONFIG_LOADOUT_HEADER, BOT_CONFIG_LOADOUT_PAINT_BLUE_HEADER);
         self.orange
             .save_to_config(&mut config, BOT_CONFIG_LOADOUT_ORANGE_HEADER, BOT_CONFIG_LOADOUT_PAINT_ORANGE_HEADER);
 
-        config.write(path).unwrap();
+        if let Err(e) = config.write(path) {
+            ccprintlne(window, format!("Failed to save bot config to {}: {}", path, e));
+        }
     }
 }

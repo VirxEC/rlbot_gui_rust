@@ -46,8 +46,8 @@ pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, st
     ccprintln(window, format!("Extracting to {}", target_dir.to_string_lossy()));
     ccprintln(window, "".to_owned());
     for i in 0..archive.len() {
-        let mut file = archive.by_index(i)?;
-        let mut relative_path = match file.enclosed_name() {
+        let mut item = archive.by_index(i)?;
+        let mut relative_path = match item.enclosed_name() {
             Some(path) => path,
             None => continue,
         };
@@ -70,16 +70,15 @@ pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, st
         }
 
         let outpath = target_dir.join(relative_path);
-        let outpath_str = outpath.to_string_lossy();
-
-        ccprintlnr(window, format!("Creating {} from {}", outpath_str, relative_path.display()));
-        if outpath_str.ends_with('/') || outpath_str.ends_with('\\') {
+        if item.is_dir() {
+            ccprintlnr(window, format!("Creating directory {} from {}", outpath.to_string_lossy(), relative_path.display()));
             if !outpath.exists() {
                 fs::create_dir_all(&outpath)?;
             }
             continue;
         }
 
+        ccprintlnr(window, format!("Creating {} from {}", outpath.to_string_lossy(), relative_path.display()));
         if outpath.exists() {
             if replace {
                 fs::remove_file(&outpath)?;
@@ -95,7 +94,7 @@ pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, st
         }
 
         let mut outfile = fs::File::create(&outpath)?;
-        copy(&mut file, &mut outfile)?;
+        copy(&mut item, &mut outfile)?;
     }
 
     ccprintlnr(window, format!("Extracted {} files", archive.len()));

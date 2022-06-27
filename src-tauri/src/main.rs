@@ -13,22 +13,18 @@ use crate::config_handles::*;
 use crate::settings::*;
 use lazy_static::{initialize, lazy_static};
 use os_pipe::{pipe, PipeWriter};
-use std::io;
-use std::process::Child;
-use std::process::ChildStdin;
-use std::sync::Mutex;
+use serde::Serialize;
 use std::{
     env,
     ffi::OsStr,
     fs::{create_dir_all, write},
-    io::Read,
+    io::{Read, Result as IoResult},
     path::{Path, PathBuf},
-    process::{Command, Stdio},
+    process::{Child, ChildStdin, Command, Stdio},
+    sync::Mutex,
     thread,
 };
-use tauri::Manager;
-use tauri::Menu;
-use tauri::Window;
+use tauri::{Error as TauriError, Manager, Menu, Window};
 
 const BOTPACK_FOLDER: &str = "RLBotPackDeletable";
 const MAPPACK_FOLDER: &str = "RLBotMapPackDeletable";
@@ -37,9 +33,9 @@ const BOTPACK_REPO_OWNER: &str = "RLBot";
 const BOTPACK_REPO_NAME: &str = "RLBotPack";
 
 lazy_static! {
-    static ref BOT_FOLDER_SETTINGS: Mutex<BotFolderSettings> = Mutex::new(BotFolderSettings::new());
-    static ref MATCH_SETTINGS: Mutex<MatchSettings> = Mutex::new(MatchSettings::new());
-    static ref PYTHON_PATH: Mutex<String> = Mutex::new(load_gui_config().get("python_config", "path").unwrap_or_else(|| auto_detect_python().unwrap_or_default().0));
+    static ref BOT_FOLDER_SETTINGS: Mutex<BotFolderSettings> = Mutex::new(BotFolderSettings::default());
+    static ref MATCH_SETTINGS: Mutex<MatchSettings> = Mutex::new(MatchSettings::default());
+    static ref PYTHON_PATH: Mutex<String> = Mutex::new(String::new());
     static ref CONSOLE_TEXT: Mutex<Vec<ConsoleText>> = Mutex::new(vec![
         ConsoleText::from("Welcome to the RLBot Console!".to_owned(), None),
         ConsoleText::from("".to_owned(), None)
@@ -54,12 +50,12 @@ fn auto_detect_python() -> Option<(String, bool)> {
 
     let new_python = content_folder.join("Python37\\python.exe");
     if new_python.exists() {
-        return Some((new_python.to_str().unwrap().to_owned(), true));
+        return Some((new_python.to_string_lossy().to_string(), true));
     }
 
     let old_python = content_folder.join("venv\\Scripts\\python.exe");
     if old_python.exists() {
-        return Some((old_python.to_str().unwrap().to_owned(), true));
+        return Some((old_python.to_string_lossy().to_string(), true));
     }
 
     // Windows actually doesn't have a python3.7.exe command, just python.exe (no matter what)
@@ -127,29 +123,25 @@ fn get_config_path() -> PathBuf {
     get_content_folder().join("config.ini")
 }
 
+/// Emits text to the console
+/// Also calls println!() to print to the console
 pub fn ccprintln(window: &Window, text: String) {
     println!("{}", &text);
-    issue_console_update(window, text, false);
+    emit_text(window, text, false);
 }
 
-pub fn nwprintln(text: String) {
-    println!("{}", &text);
-    update_internet_console(&ConsoleTextUpdate::from(text, false));
-}
-
+/// Emits text to the console, replacing the previous line
+/// Also calls println!() to print to the console
 pub fn ccprintlnr(window: &Window, text: String) {
-    println!("\r{}", &text);
-    issue_console_update(window, text, true);
+    println!("{}", &text);
+    emit_text(window, text, true);
 }
 
+/// Emits text to the console
+/// Also calls printlne!() to print to the console
 pub fn ccprintlne(window: &Window, text: String) {
     eprintln!("{}", &text);
-    issue_console_update(window, text, false);
-}
-
-pub fn nwprintlne(text: String) {
-    eprintln!("{}", &text);
-    update_internet_console(&ConsoleTextUpdate::from(text, false));
+    emit_text(window, text, false);
 }
 
 #[cfg(windows)]
@@ -223,13 +215,16 @@ pub fn get_capture_command<S: AsRef<OsStr>>(program: S, args: &[&str]) -> Comman
 
 /// This function is esstential because is drops the command, which causes a deadlock
 /// Note: Child != Command
-pub fn spawn_capture_process<S: AsRef<OsStr>>(program: S, args: &[&str]) -> io::Result<Child> {
+pub fn spawn_capture_process<S: AsRef<OsStr>>(program: S, args: &[&str]) -> IoResult<Child> {
     get_capture_command(program, args).spawn()
 }
 
 pub fn spawn_capture_process_and_get_exit_code<S: AsRef<OsStr>>(program: S, args: &[&str]) -> i32 {
     if let Ok(mut child) = spawn_capture_process(program, args) {
-        child.wait().unwrap().code().unwrap_or(1)
+        match child.wait() {
+            Ok(exit_status) => exit_status.code().unwrap_or(1),
+            Err(_) => 2,
+        }
     } else {
         2
     }
@@ -254,15 +249,16 @@ fn get_content_folder() -> PathBuf {
     PathBuf::from(format!("{}/.RLBotGUI", env::var("HOME").unwrap()))
 }
 
-fn bootstrap_python_script<T: AsRef<Path>, C: AsRef<[u8]>>(content_folder: T, file_name: &str, file_contents: C) {
-    let full_path = content_folder.as_ref().join(file_name);
+fn bootstrap_python_script<T: AsRef<Path>, C: AsRef<[u8]>>(content_folder: T, file_name: &str, file_contents: C) -> IoResult<()> {
+    let content_folder = content_folder.as_ref();
+    let full_path = content_folder.join(file_name);
     println!("{}: {}", file_name, full_path.to_string_lossy());
 
-    if !full_path.parent().unwrap().exists() {
-        create_dir_all(&full_path).unwrap();
+    if !content_folder.exists() {
+        create_dir_all(&full_path)?;
     }
 
-    write(full_path, file_contents).unwrap();
+    write(full_path, file_contents)
 }
 
 fn update_internet_console(update: &ConsoleTextUpdate) {
@@ -277,23 +273,42 @@ fn update_internet_console(update: &ConsoleTextUpdate) {
     }
 }
 
-fn issue_console_update(window: &Window, text: String, replace_last: bool) {
+fn try_emit_signal<S: Serialize + Clone>(window: &Window, signal: &str, payload: S) -> (String, Option<TauriError>) {
+    (signal.to_owned(), window.emit(signal, payload).err())
+}
+
+fn issue_console_update(window: &Window, text: String, replace_last: bool) -> (String, Option<TauriError>) {
     let update = ConsoleTextUpdate::from(text, replace_last);
     update_internet_console(&update);
-    window.emit("new-console-text", vec![update]).unwrap();
+    try_emit_signal(window, "new-console-text", update)
+}
+
+fn try_emit_text(window: &Window, text: String, replace_last: bool) -> (String, Option<TauriError>) {
+    if text == "-|-*|MATCH START FAILED|*-|-" {
+        eprintln!("START MATCH FAILED");
+        try_emit_signal(window, "match-start-failed", ())
+    } else if text == "-|-*|MATCH STARTED|*-|-" {
+        eprintln!("MATCH STARTED");
+        try_emit_signal(window, "match-started", ())
+    } else {
+        issue_console_update(window, text, replace_last)
+    }
+}
+
+fn emit_text(window: &Window, text: String, replace_last: bool) {
+    let (signal, error) = try_emit_text(window, text, replace_last);
+    if let Some(e) = error {
+        ccprintlne(window, format!("Error emitting {}: {}", signal, e));
+    }
 }
 
 fn main() {
     println!("Config path: {}", get_config_path().display());
-    load_gui_config();
 
     let content_folder = get_content_folder();
-    bootstrap_python_script(&content_folder, "get_missing_packages.py", include_str!("get_missing_packages.py"));
-    bootstrap_python_script(&content_folder, "match_handler.py", include_str!("match_handler.py"));
+    bootstrap_python_script(&content_folder, "get_missing_packages.py", include_str!("get_missing_packages.py")).unwrap();
+    bootstrap_python_script(&content_folder, "match_handler.py", include_str!("match_handler.py")).unwrap();
 
-    initialize(&BOT_FOLDER_SETTINGS);
-    initialize(&MATCH_SETTINGS);
-    initialize(&PYTHON_PATH);
     initialize(&CONSOLE_TEXT);
     initialize(&MATCH_HANDLER_STDIN);
     initialize(&CAPTURE_PIPE_WRITER);
@@ -308,7 +323,14 @@ fn main() {
     }
 
     app.setup(|app| {
-        let main_window = app.get_window("main").unwrap();
+        let window = app.get_window("main").unwrap();
+
+        *PYTHON_PATH.lock().unwrap() = load_gui_config(&window)
+            .get("python_config", "path")
+            .unwrap_or_else(|| auto_detect_python().unwrap_or_default().0);
+        *BOT_FOLDER_SETTINGS.lock().unwrap() = BotFolderSettings::load(&window);
+        *MATCH_SETTINGS.lock().unwrap() = MatchSettings::load(&window);
+
         let (mut pipe_reader, pipe_writer) = pipe().unwrap();
         *CAPTURE_PIPE_WRITER.lock().unwrap() = Some(pipe_writer);
 
@@ -341,15 +363,7 @@ fn main() {
                     };
                 }
 
-                if text == "-|-*|MATCH START FAILED|*-|-" {
-                    eprintln!("START MATCH FAILED");
-                    main_window.emit("match-start-failed", ()).unwrap();
-                } else if text == "-|-*|MATCH STARTED|*-|-" {
-                    eprintln!("MATCH STARTED");
-                    main_window.emit("match-started", ()).unwrap();
-                } else {
-                    issue_console_update(&main_window, text, will_replace_last);
-                }
+                emit_text(&window, text, will_replace_last);
             }
         });
 
