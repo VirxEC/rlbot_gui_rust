@@ -17,8 +17,10 @@ jobs:
       run:
         working-directory: src-tauri
     steps:
+      - name: Fetch GUI
       - uses: actions/checkout@v3
       
+      - name: Fetch Release Tags
       - run: git fetch --all --tags
 
       # Fail the build if the version number wasn't incremented
@@ -30,9 +32,9 @@ jobs:
         id: version_check_staging
         
       - name: Install Tauri CLI
-      - run: cargo install tauri-cli --version "^1.0.0"
+        run: cargo install tauri-cli --version "^1.0.0"
 
-      - name: Build the GUI
+      - name: Build GUI
         run: cargo tauri build
 
       - name: Create Release
