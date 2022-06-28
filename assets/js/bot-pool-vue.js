@@ -71,7 +71,7 @@ export default {
 			// if the filter is an empty string, anything matches
 			if (!runnable.name.toLowerCase().includes(this.botNameFilter.toLowerCase()))
 				return false;
-			
+
 			if (runnable.runnable_type === 'human')
 				return this.displayHuman;
 
@@ -84,13 +84,15 @@ export default {
 			if (runnable.runnable_type === 'script' && !category.displayScriptDependencies && runnable.enabled)
 				return true;
 
-			let allowedTags = runnable.runnable_type === 'script' ? category.scripts : category.bots;
-			if (allowedTags) {
-				if (allowedTags === '*' || runnable.info == null) {
+			let allowedTag = runnable.runnable_type === 'script' ? category.scripts : category.bots;
+			if (allowedTag) {
+				if (allowedTag === '*')
 					return true;
-				}
 
-				return runnable.info.tags.some(tag => allowedTags.includes(tag));
+				if (runnable.info == null)
+					return false;
+
+				return runnable.info.tags.some(tag => tag.length > 0 && allowedTag.includes(tag));
 			}
 			return false;
 		},
