@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-binaries:
+  build-and-publish:
     runs-on: windows-2022
     defaults:
       run:
@@ -28,38 +28,21 @@ jobs:
           file: src-tauri/Cargo.toml
           tagFormat: v${version}
         id: version_check_staging
-  
-      # Build Tauri stuffs
-      - name: Tauri build
-        uses: JonasKruckenberg/tauri-build@v0.1.1
-        with:
-          projectPath: src-tauri
+        
+      - name: Install Tauri CLI
+      - run: cargo install tauri-cli --version "^1.0.0"
 
-      # Upload the stuffs
-      - uses: actions/upload-artifact@v3
-        with:
-          name: artifacts
-          path: "${{ join(fromJSON(steps.tauri_build.outputs.artifacts), '\n') }}"
-  publish:
-    needs: build-binaries
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      # Download the previously uploaded stuffs
-      - uses: actions/download-artifact@v3
-        id: download
-        with:
-          name: artifacts
-          path: artifacts
-      # And create a release with the stuffs attached
+      - name: Build the GUI
+        run: cargo tauri build
+
       - name: Create Release
         uses: softprops/action-gh-release@master
         env:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
         with:
-          name: RLBotGUI Rust port 
+          name: RLBotGUI Rust port ${{steps.version_check_staging.outputs.releaseVersion}}
           body: ${{ github.event.head_commit.message }}
           draft: false
           files: |
-            ./artifacts/**/*.msi
-            ./artifacts/**/*.msi.zip
+            ./**/target/**/*.msi
+            ./**/target/**/*.msi.zip
