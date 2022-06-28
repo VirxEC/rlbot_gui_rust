@@ -202,3 +202,6 @@ rlbot_gui/gui/imgs/logos
 WixTools
 /rlbot_gui/
 .tauri/
+package.json
+yarn.lock
+

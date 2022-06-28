@@ -8,12 +8,6 @@ project to work its magic: https://github.com/RLBot/RLBot
 
 Works on Windows and Linux
 
-## Auto-deploy changes with Github Actions
-
-This hasn't been implemented, but it's easy to do.
-
-[See this guide](https://github.com/tauri-apps/tauri-action)
-
 ## Features & fixes unqiue to the Rust port
 
 ### Back-portable
@@ -94,9 +88,12 @@ You're going to have build the GUI from scratch.
 
 ### Live Reload
    - Install Tauri's CLI: `cargo install tauri-cli --version "^1.0.0"`
+      - NOTE: This will download the CLI source and compile it. If you have yarn and don't wish to compile from source, you can:
+      - In the project directory, run `yarn add -D @tauri-apps/cli`
+      - And then replace `cargo` with `yarn`. The generated `package.json` and `yarn.lock` will be auto-ignored.
    - Host the `assets` folder on `localhost` port `5500` - the Live Server extension for VS Code can do this:
-       - Open the `assets` folder in a new VS Code window
-       - In VS Code's `settings.json`, add the following:
+      - Open the `assets` folder in a new VS Code window
+      - In VS Code's `settings.json`, add the following:
          ```json
          {
             "liveServer.settings.host": "localhost",
@@ -116,11 +113,22 @@ You're going to have build the GUI from scratch.
 
 Taken from the [Tauri guide](https://tauri.app/v1/guides/):
 
-1. Navigate to the `src-tauri` folder
-1. Run `cargo install tauri-cli --version "^1.0.0"`
-2. In the project directory, run `cargo tauri build`
-
 Note that for Linux, you should build on the oldest version of Ubuntu possible. Ubuntu 18.04 is recommended for the best compatibility.
+
+**Method 1: 100% compile from source**
+
+This will not only compile the GUI from source, but also the Tauri CLI. Once the CLI is compiled, you don't need to do it again.
+
+1. Navigate to the `src-tauri` folder
+2. Run `cargo install tauri-cli --version "^1.0.0"`
+3. In the project directory, run `cargo tauri build`
+
+**Method 2: Do it quickly with yarn**
+
+This will download a pre-compiled version of the Tauri CLI.
+
+1. Run `yarn add -D @tauri-apps/cli`
+2. In the project directory, run `yarn tauri build`
 
 ### How to update items in the appearance editor
 1. Install and run [BakkesMod](http://www.bakkesmod.com/)
