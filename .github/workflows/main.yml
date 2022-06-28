@@ -6,6 +6,10 @@ on:
 
   workflow_dispatch:
 
+concurrency: 
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-binaries:
     runs-on: windows-2022
@@ -28,6 +32,8 @@ jobs:
       # Build Tauri stuffs
       - name: Tauri build
         uses: JonasKruckenberg/tauri-build@v0.1.1
+        with:
+          projectPath: src-tauri
 
       # Upload the stuffs
       - uses: actions/upload-artifact@v3
