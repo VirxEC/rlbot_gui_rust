@@ -1,7 +1,0 @@
-{
-  "tauri": {
-    "bundle": {
-      "targets": ["deb"]
-    }
-  }
-}
