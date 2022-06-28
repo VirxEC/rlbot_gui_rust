@@ -1,0 +1,59 @@
+name: Build & Deploy Windows MSI
+
+on:
+  push:
+    branches: [ "master" ]
+
+  workflow_dispatch:
+
+jobs:
+  build-binaries:
+    runs-on: windows-2022
+    defaults:
+      run:
+        working-directory: scripts
+    steps:
+      - uses: actions/checkout@v3
+      
+      - run: git fetch --all --tags
+
+      # Fail the build if the version number wasn't incremented
+      - name: Check Release Version
+        uses: thebongy/version-check@v1
+        with:
+          file: Cargo.toml
+          tagFormat: v${version}
+        id: version_check_staging
+  
+      # Build Tauri stuffs
+      - name: Tauri build
+        uses: JonasKruckenberg/tauri-build@v0.1.1
+
+      # Upload the stuffs
+      - uses: actions/upload-artifact@v3
+        with:
+          name: artifacts
+          path: "${{ join(fromJSON(steps.tauri_build.outputs.artifacts), '\n') }}"
+  publish:
+    needs: build-binaries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      # Download the previously uploaded stuffs
+      - uses: actions/download-artifact@v3
+        id: download
+        with:
+          name: artifacts
+          path: artifacts
+      # And create a release with the stuffs attached
+      - name: Create Release
+        uses: softprops/action-gh-release@master
+        env:
+          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        with:
+          name: RLBotGUI Rust port 
+          body: ${{ github.event.head_commit.message }}
+          draft: false
+          files: |
+            ./artifacts/**/*.msi
+            ./artifacts/**/*.msi.zip
