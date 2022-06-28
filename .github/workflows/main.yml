@@ -47,6 +47,7 @@ jobs:
         with:
           name: RLBotGUI Rust port ${{steps.version_check_staging.outputs.releaseVersion}}
           body: ${{ github.event.head_commit.message }}
+          tag_name: v${version}
           draft: false
           files: |
             ./**/target/**/*.msi
