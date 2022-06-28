@@ -32,10 +32,10 @@ jobs:
         id: version_check_staging
         
       - name: Install Tauri CLI
-        run: cargo install tauri-cli --version "^1.0.0"
+        run: yarn add -D @tauri-apps/cli
 
       - name: Build GUI
-        run: cargo tauri build
+        run: yarn tauri build
 
       - name: Create Release
         uses: softprops/action-gh-release@master
