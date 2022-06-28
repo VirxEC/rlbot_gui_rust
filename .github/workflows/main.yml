@@ -11,7 +11,7 @@ jobs:
     runs-on: windows-2022
     defaults:
       run:
-        working-directory: scripts
+        working-directory: src-tauri
     steps:
       - uses: actions/checkout@v3
       
