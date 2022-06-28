@@ -18,7 +18,7 @@ jobs:
         working-directory: src-tauri
     steps:
       - name: Fetch GUI
-      - uses: actions/checkout@v3
+        uses: actions/checkout@v3
       
       - name: Fetch Release Tags
         run: git fetch --all --tags
