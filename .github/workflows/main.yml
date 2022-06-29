@@ -22,7 +22,6 @@ jobs:
       - name: Fetch Release Tags
         run: git fetch --all --tags
 
-      # Fail the build if the version number wasn't incremented
       - name: Check Release Version
         uses: thebongy/version-check@v1
         with:
@@ -106,18 +105,22 @@ jobs:
           path: rlbot_gui_rust_apt
           token: ${{ secrets.GH_PAT }}
 
-      - name: Fetch Release Tags
+      - name: Check Release Tags
         working-directory: rlbot_gui_rust_apt
-        run: git fetch --all --tags
-
-      # Fail the build if the version number wasn't incremented
-      - name: Check Release Version
-        uses: thebongy/version-check@v1
-        with:
-          file: src-tauri/Cargo.toml
-          tagFormat: v${version}
-          failBuild: false
         id: version_check_staging
+        run: |
+          git fetch --all --tags
+          cver=$(grep -x "version = ".*"" ../src-tauri/Cargo.toml | head -1)
+          cver=${cver#"version = \""}
+          cver=${cver%"\""}
+          echo '::set-output name=rawVersion::'$cver
+          cver=v$cver
+          echo '::set-output name=releaseVersion::'$cver
+          if [ $(git tag -l "$cver") ]; then
+              echo '::set-output name=versionChanged::true'
+          else
+              echo '::set-output name=versionChanged::false'
+          fi
 
       - name: Fetch build cache
         if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
@@ -163,7 +166,7 @@ jobs:
           body: ${{ github.event.head_commit.message }}
           token: ${{ secrets.GH_PAT }}
           tag: ${{ steps.version_check_staging.outputs.releaseVersion }}
-          repo: VirxEC/rlbot_gui_rust_apt
+          repo: rlbot_gui_rust_apt
 
       - name: Move in update files
         if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
@@ -183,20 +186,22 @@ jobs:
         run: |
           echo "${{ secrets.APT_KEY }}" > pgp-key.private
           chmod +x generate-deb-release-info.sh
-          ./generate-deb-release-info.sh > apt-repo/dists/stable/Release
+          cd apt-repo/dists/stable/
+          ../../../generate-deb-release-info.sh > Release
+          cd ../../../
           export GNUPGHOME="$(mktemp -d pgpkeys-XXXXXX)"
           gpg --list-keys
           cat pgp-key.private | gpg --import
           cat apt-repo/dists/stable/Release | gpg --default-key ${{ secrets.KEY_NAME }} -abs > ./apt-repo/dists/stable/Release.gpg
           cat apt-repo/dists/stable/Release | gpg --default-key ${{ secrets.KEY_NAME }} -abs --clearsign > ./apt-repo/dists/stable/InRelease
 
-#       - name: Commit updates
-#         if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
-#         working-directory: rlbot_gui_rust_apt
-#         run: |
-#           rm -rf ../.git
-#           git config user.name github-actions
-#           git config user.email github-actions@github.com
-#           git add .
-#           git commit -m "Add ${{ steps.version_check_staging.outputs.rawVersion }}"
-#           git push
+      - name: Commit updates
+        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
+        working-directory: rlbot_gui_rust_apt
+        run: |
+          rm -rf ../.git
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add .
+          git commit -m "Add ${{ steps.version_check_staging.outputs.rawVersion }}"
+          git push
