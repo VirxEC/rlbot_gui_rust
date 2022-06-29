@@ -49,9 +49,9 @@ jobs:
           tag: ${{ steps.version_check_staging.outputs.releaseVersion }}
             
       - name: Create & move out new latest.json 
+        working-directory: src-tauri
         run: |
-          cd src-tauri
-          call gen-latest-json.bat ${{ steps.version_check_staging.outputs.releaseVersion }} ${{ github.event.commits[0].message }}
+          gen-latest-json.bat ${{ steps.version_check_staging.outputs.releaseVersion }} ${{ github.event.commits[0].message }}
           MOVE /Y latest.json ../../
           
       - name: Change branch to site
