@@ -33,9 +33,9 @@ Works on Windows and Linux
 
 ### Windows
 
-Download the installer from (not here yet lol)
+Download the installer from the [latest release in this repo](https://github.com/VirxEC/rlbot_gui_rust/releases/latest).
 
-It will put "RLBotGUI" in your Windows start menu.
+It will put "RLBotGUI" in your Windows start menu and desktop.
 
 ### Debian-based Linux distros
 
@@ -46,22 +46,34 @@ It will put "RLBotGUI" in your Windows start menu.
 
 ### Arch-based Linux distros
 
-Using yay: `yay -S rlbotgui-rust-git`
+**NOTE**: If you wish to compile the GUI on your own system, replace `rlbotgui-rust-bin` with `rlbotgui-rust-git`!
 
-Using paru: `paru -S rlbotgui-rust-git`
+Using yay: `yay -S rlbotgui-rust-bin`
+
+Using paru: `paru -S rlbotgui-rust-bin`
 
 Without using an AUR helper:
 1. Setup: `sudo pacman -S --needed base-devel`
-2. Clone PKGBUILD: `git clone https://aur.archlinux.org/rlbotgui-rust-git.git`
-3. Navigate to the folder: `cd rlbotgui-rust-git`
+2. Clone PKGBUILD: `git clone https://aur.archlinux.org/rlbotgui-rust-bin.git`
+3. Navigate to the folder: `cd rlbotgui-rust-bin`
 4. Install using PKGBUILD: `makepkg -si`
 
-### Other Linux distros & MacOS
+### Other Linux distros (no easy updates)
 
-Warning to MacOS users: RLBot (not the GUI, the underlying RLBot project) is currently broken on MacOS.
-For all Linux distros: Before wasting your time compiling the GUI, RLBot will only work on a native-Linux install of Rocket League from Steam.
+We have a pre-compiled binary and `.desktop` file, just for you! [Get the `linux-basics.tar.gz` from here](https://github.com/VirxEC/rlbot_gui_rust_apt/releases/latest).
 
-You're going to have build the GUI from scratch.
+If you want to have a script that checks for updates, you could:
+
+1. [Download this JSON](https://api.github.com/repos/VirxEC/rlbot_gui_rust_apt/releases/latest)
+2. Compare the `tag_name` from when you last download the binary to the current `tag_name`
+3. Download the `asset` with the name `linux-basics.tar.gz` using `browser_download_url`
+4. Unzip the `.tar.gz` and put the files in their proper places on your system (currently `rl-bot-gui.desktop` and `rl-bot-gui` executable)
+
+### MacOS (no easy updates)
+
+**Warning**: RLBot (not the GUI, the underlying RLBot project) is currently broken on MacOS.
+
+You're going to have to compile the GUI yourself:
 
 1. Follow the [Tauri prerequisites guide](https://tauri.app/v1/guides/getting-started/prerequisites).
 2. A system with at least 8GB of RAM is required. 4GB will not work.
@@ -69,7 +81,7 @@ You're going to have build the GUI from scratch.
 4. Navigate to the right folder: `cd rlbot_gui_rust/src-tauri`
 5. Build the GUI: `cargo build --release`
 6. The compiled binary is `target/release/rl-bot-gui`
-7. To check for updates, run `git fetch` then `git pull` and if there's updates re-run `cargo build --release` to compile the new binary.
+7. To check for updates, run `git fetch` then `git pull` in the project directory - if there's updates re-run `cargo build --release` to compile the new binary.
 
 ## Dev Environment Setup
 
