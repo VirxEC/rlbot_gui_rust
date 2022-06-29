@@ -180,7 +180,6 @@ jobs:
           KEY_NAME: ${{ secrets.KEY_NAME }}
         run: |
           echo "${{ secrets.APT_KEY }}" > pgp-key.private
-          ls
           chmod +x generate-deb-release-info.sh
           ./generate-deb-release-info.sh > apt-repo/dists/stable/Release
           export GNUPGHOME="$(mktemp -d pgpkeys-XXXXXX)"
@@ -188,6 +187,15 @@ jobs:
           cat pgp-key.private | gpg --import
           cat apt-repo/dists/stable/Release | gpg --default-key ${{ secrets.KEY_NAME }} -abs > ./apt-repo/dists/stable/Release.gpg
           cat apt-repo/dists/stable/Release | gpg --default-key ${{ secrets.KEY_NAME }} -abs --clearsign > ./apt-repo/dists/stable/InRelease
+
+      - name: Commit updates
+        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
+        working-directory: rlbot_gui_rust_apt
+        run: |
           rm -rf ../.git
-          git diff --compact-summary
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add .
+          git commit -m "Add ${{ steps.version_check_staging.outputs.rawVersion }}"
+          git push
 
