@@ -137,6 +137,6 @@ This will download a pre-compiled version of the Tauri CLI.
 4. Replace `assets/csv/items.csv` with the new file
 5. Change encoding of the new file to UTF-8. Here's how to do that in VS Code:
    - use the _Change File Encoding_ command (or click the UTF-8 button in the bottom right)
-   - select _Reopen with Encoding_, select the one with _Guessed from content_
+   - select _Reopen with Encoding_, select the one with _Guessed from content_ (probably Windows 1252)
    - now do that again, but _Save with Encoding_ and _UTF-8_
 6. Don't forget to bump the version number in `src-tauri/Cargo.toml`
