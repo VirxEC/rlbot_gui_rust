@@ -13,6 +13,8 @@ concurrency:
 jobs:
   build-and-publish:
     runs-on: windows-2022
+    permissions:
+      contents: write
     steps:
       - name: Fetch GUI
         uses: actions/checkout@v3
