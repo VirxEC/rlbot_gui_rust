@@ -32,6 +32,17 @@ jobs:
         
       - name: Install Tauri CLI
         run: yarn add -D @tauri-apps/cli
+        
+      - name: Fetch build cache
+        uses: actions/cache@v3.0.4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build GUI
         env:
@@ -60,12 +71,14 @@ jobs:
       - name: Move in new latest.json
         shell: cmd
         run: move ..\latest.json .\docs\
-            
+
       - name: Commit new latest.json
-        uses: swinton/commit@v2.x
+        shell: cmd
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          files: docs\latest.json
-          commit-message: Updating latest.json to include ${{ steps.version_check_staging.outputs.releaseVersion }}
-          ref: refs/remotes/origin/site 
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "<>"
+          git add docs\latest.json
+          git commit -m "Updating latest.json to include ${{ steps.version_check_staging.outputs.releaseVersion }}"
+          git push
