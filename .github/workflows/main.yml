@@ -48,8 +48,9 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ steps.version_check_staging.outputs.releaseVersion }}
             
-      - name: Create new latest.json 
-        run: gen-latest-json.bat
+      - name: Create new latest.json
+        shell: cmd
+        run: gen-latest-json.bat ${{ steps.version_check_staging.outputs.releaseVersion }} ${{ github.event.commits[0].message }}
           
       - name: Change branch to site
         uses: actions/checkout@v3
@@ -57,7 +58,8 @@ jobs:
           ref: site
           
       - name: Move in new latest.json
-        run: MOVE \Y ../latest.json ./docs/
+        shell: cmd
+        run: move \Y ../latest.json ./docs/
             
       - name: Commit new latest.json
         uses: swinton/commit@v2.x
