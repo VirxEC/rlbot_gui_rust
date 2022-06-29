@@ -6,19 +6,19 @@ on:
 
   workflow_dispatch:
 
-concurrency: 
+concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  build-and-publish:
+  windows:
     runs-on: windows-2022
     permissions:
       contents: write
     steps:
       - name: Fetch GUI
         uses: actions/checkout@v3
-      
+
       - name: Fetch Release Tags
         run: git fetch --all --tags
 
@@ -28,12 +28,15 @@ jobs:
         with:
           file: src-tauri/Cargo.toml
           tagFormat: v${version}
+          failBuild: false
         id: version_check_staging
-        
+
       - name: Install Tauri CLI
+        if: ${{ steps.version_check_staging.outputs.versionChanged }}
         run: yarn add -D @tauri-apps/cli
-        
+
       - name: Fetch build cache
+        if: ${{ steps.version_check_staging.outputs.versionChanged }}
         uses: actions/cache@v3.0.4
         with:
           path: |
@@ -45,12 +48,14 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build GUI
+        if: ${{ steps.version_check_staging.outputs.versionChanged }}
         env:
           TAURI_PRIVATE_KEY: '${{ secrets.TAURI_PRIVATE_KEY }}'
           TAURI_KEY_PASSWORD: '${{ secrets.TAURI_KEY_PASSWORD }}'
         run: yarn tauri build
 
       - name: Create Release
+        if: ${{ steps.version_check_staging.outputs.versionChanged }}
         uses: ncipollo/release-action@v1
         with:
           name: RLBotGUI Rust port ${{ steps.version_check_staging.outputs.releaseVersion }}
@@ -58,21 +63,25 @@ jobs:
           body: ${{ github.event.head_commit.message }}
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ steps.version_check_staging.outputs.releaseVersion }}
-            
+
       - name: Create new latest.json
+        if: ${{ steps.version_check_staging.outputs.versionChanged }}
         shell: cmd
-        run: gen-latest-json.bat ${{ steps.version_check_staging.outputs.releaseVersion }} "${{ github.event.head_commit.message }}"
-          
+        run: gen-latest-json.bat ${{ steps.version_check_staging.outputs.releaseVersion }} ${{ steps.version_check_staging.outputs.rawVersion }} "${{ github.event.head_commit.message }}"
+
       - name: Change branch to site
+        if: ${{ steps.version_check_staging.outputs.versionChanged }}
         uses: actions/checkout@v3
         with:
           ref: site
-          
+
       - name: Move in new latest.json
+        if: ${{ steps.version_check_staging.outputs.versionChanged }}
         shell: cmd
         run: move ..\latest.json .\docs\
 
       - name: Commit new latest.json
+        if: ${{ steps.version_check_staging.outputs.versionChanged }}
         shell: cmd
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
