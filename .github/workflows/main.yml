@@ -30,6 +30,9 @@ jobs:
           tagFormat: v${version}
           failBuild: false
         id: version_check_staging
+        
+      - shell: cmd
+        run: echo ${{ steps.version_check_staging.outputs.versionChanged }}
 
       - name: Install Tauri CLI
         if: steps.version_check_staging.outputs.versionChanged
