@@ -13,9 +13,6 @@ concurrency:
 jobs:
   build-and-publish:
     runs-on: windows-2022
-    defaults:
-      run:
-        working-directory: src-tauri
     steps:
       - name: Fetch GUI
         uses: actions/checkout@v3
@@ -41,14 +38,35 @@ jobs:
         run: yarn tauri build
 
       - name: Create Release
-        uses: softprops/action-gh-release@master
-        env:
-          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN }}'
+        uses: ncipollo/release-action@v1
         with:
-          name: RLBotGUI Rust port ${{steps.version_check_staging.outputs.releaseVersion}}
-          body: ${{ github.event.head_commit.message }}
-          tag_name: v${{steps.version_check_staging.outputs.releaseVersion}}
-          draft: false
-          files: |
+          name: RLBotGUI Rust port ${{ steps.version_check_staging.outputs.releaseVersion }}
+          artifacts: |
             ./**/target/**/*.msi
             ./**/target/**/*.msi.zip
+          body: ${{ github.event.head_commit.message }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ steps.version_check_staging.outputs.releaseVersion }}
+            
+      - name: Create & move out new latest.json 
+        run: |
+          cd src-tauri
+          call gen-latest-json.bat ${{ steps.version_check_staging.outputs.releaseVersion }} ${{ github.event.commits[0].message }}
+          MOVE /Y latest.json ../../
+          
+      - name: Change branch to site
+        uses: actions/checkout@v3
+        with:
+          ref: site
+          
+      - name: Move in new latest.json
+        run: MOVE \Y ../latest.json ./docs/
+            
+      - name: Commit new latest.json
+        uses: swinton/commit@v2.x
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          files: latest.json
+          commit-message: Updating latest.json to include ${{ steps.version_check_staging.outputs.releaseVersion }}
+          ref: refs/heads/site
