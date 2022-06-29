@@ -41,9 +41,7 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           name: RLBotGUI Rust port ${{ steps.version_check_staging.outputs.releaseVersion }}
-          artifacts: |
-            ./**/target/**/*.msi
-            ./**/target/**/*.msi.zip
+          artifacts: "./**/target/**/*.msi,./**/target/**/*.msi.zip"
           body: ${{ github.event.head_commit.message }}
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ steps.version_check_staging.outputs.releaseVersion }}
