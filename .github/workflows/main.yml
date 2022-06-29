@@ -142,3 +142,50 @@ jobs:
       - name: Build GUI
         if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
         run: yarn tauri build
+
+      - name: Move out build files
+        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
+        run: mv src-tauri/target/release/bundle/deb/ ./
+
+      - name: Create .tar.gz
+        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
+        run: tar -czf linux-basics.tar.gz deb/*/data/usr/bin/rl-bot-gui deb/*/data/usr/share/applications/rl-bot-gui.desktop
+
+#       - name: Create Release
+#         if: ${{ contains(steps.package.outputs.content, steps.version_check_staging.outputs.rawVersion) }}
+#         uses: ncipollo/release-action@v1
+#         with:
+#           name: RLBotGUI Rust port ${{ steps.version_check_staging.outputs.releaseVersion }}
+#           artifacts: "linux-basics.tar.gz,deb/*.deb"
+#           body: ${{ github.event.head_commit.message }}
+#           token: ${{ secrets.GITHUB_TOKEN }}
+#           tag: ${{ steps.version_check_staging.outputs.releaseVersion }}
+
+      - name: Move in update files
+        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
+        working-directory: rlbot_gui_rust_apt
+        run: |
+          mv ../deb/*.deb apt-repo/pool/main/
+          cd apt-repo
+          dpkg-scanpackages --arch amd64 pool/ > dists/stable/main/binary-amd64/Packages
+          cat dists/stable/main/binary-amd64/Packages | gzip -9 > dists/stable/main/binary-amd64/Packages.gz
+
+      - name: Sign update files
+        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
+        working-directory: rlbot_gui_rust_apt
+        env: 
+          APT_KEY: ${{ secrets.APT_KEY }}
+          KEY_NAME: ${{ secrets.KEY_NAME }}
+        run: |
+          echo "${{ secrets.APT_KEY }}" > pgp-key.private
+          ls
+          chmod +x generate-deb-release-info.sh
+          ./generate-deb-release-info.sh > apt-repo/dists/stable/Release
+          export GNUPGHOME="$(mktemp -d pgpkeys-XXXXXX)"
+          gpg --list-keys
+          cat pgp-key.private | gpg --import
+          cat apt-repo/dists/stable/Release | gpg --default-key ${{ secrets.KEY_NAME }} -abs > ./apt-repo/dists/stable/Release.gpg
+          cat apt-repo/dists/stable/Release | gpg --default-key ${{ secrets.KEY_NAME }} -abs --clearsign > ./apt-repo/dists/stable/InRelease
+          rm -rf ../.git
+          git diff --compact-summary
+
