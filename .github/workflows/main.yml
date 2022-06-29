@@ -102,10 +102,9 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: VirxEC/rlbot_gui_rust_apt
-          path: ../rlbot_gui_rust_apt
 
       - name: Fetch Release Tags
-        working-directory: ../rlbot_gui_rust_apt
+        working-directory: rlbot_gui_rust_apt
         run: git fetch --all --tags
 
       # Fail the build if the version number wasn't incremented
@@ -121,7 +120,7 @@ jobs:
         id: package
         uses: juliangruber/read-file-action@v1
         with:
-          path: ./rlbot_gui_rust_apt/apt-repo/dists/stable/main/binary-amd64/Packages
+          path: rlbot_gui_rust_apt/apt-repo/dists/stable/main/binary-amd64/Packages
 
       - name: Install ubuntu dev packages
         if: ${{ contains(steps.package.outputs.content, steps.version_check_staging.outputs.rawVersion) }}
@@ -151,34 +150,34 @@ jobs:
 
       - name: Move out build files
         if: ${{ contains(steps.package.outputs.content, steps.version_check_staging.outputs.rawVersion) }}
-        run: mv src-tauri/target/release/bundle/deb/ ../
+        run: mv src-tauri/target/release/bundle/deb/ ./
 
       - name: Create .tar.gz
         if: ${{ contains(steps.package.outputs.content, steps.version_check_staging.outputs.rawVersion) }}
-        run: tar -czf ../deb/linux-basics.tar.gz ../deb/*/data/usr/bin/rl-bot-gui ../deb/*/data/usr/share/applications/rl-bot-gui.desktop
+        run: tar -czf linux-basics.tar.gz deb/*/data/usr/bin/rl-bot-gui deb/*/data/usr/share/applications/rl-bot-gui.desktop
 
-      # - name: Create Release
-      #  if: ${{ contains(steps.package.outputs.content, steps.version_check_staging.outputs.rawVersion) }}
-      #   uses: ncipollo/release-action@v1
-      #   with:
-      #     name: RLBotGUI Rust port ${{ steps.version_check_staging.outputs.releaseVersion }}
-      #     artifacts: "../deb/linux-basics.tar.gz,../deb/*.deb"
-      #     body: ${{ github.event.head_commit.message }}
-      #     token: ${{ secrets.GITHUB_TOKEN }}
-      #     tag: ${{ steps.version_check_staging.outputs.releaseVersion }}
+#       - name: Create Release
+#         if: ${{ contains(steps.package.outputs.content, steps.version_check_staging.outputs.rawVersion) }}
+#         uses: ncipollo/release-action@v1
+#         with:
+#           name: RLBotGUI Rust port ${{ steps.version_check_staging.outputs.releaseVersion }}
+#           artifacts: "linux-basics.tar.gz,deb/*.deb"
+#           body: ${{ github.event.head_commit.message }}
+#           token: ${{ secrets.GITHUB_TOKEN }}
+#           tag: ${{ steps.version_check_staging.outputs.releaseVersion }}
 
       - name: Move in update files
         if: ${{ contains(steps.package.outputs.content, steps.version_check_staging.outputs.rawVersion) }}
-        working-directory: ../rlbot_gui_rust_apt
+        working-directory: rlbot_gui_rust_apt
         run:
-          mv ../deb/linux-basics.tar.gz apt-repo/pool/main/
+          mv ../deb/*.deb apt-repo/pool/main/
           cd apt-repo
           dpkg-scanpackages --arch amd64 pool/ > dists/stable/main/binary-amd64/Packages
           cat dists/stable/main/binary-amd64/Packages | gzip -9 > dists/stable/main/binary-amd64/Packages.gz
 
       - name: Sign update files
         if: ${{ contains(steps.package.outputs.content, steps.version_check_staging.outputs.rawVersion) }}
-        working-directory: ../rlbot_gui_rust_apt
+        working-directory: rlbot_gui_rust_apt
         env: 
           APT_KEY: ${{ secrets.APT_KEY }}
           KEY_NAME: ${{ secrets.KEY_NAME }}
@@ -192,4 +191,5 @@ jobs:
           cat pgp-key.private | gpg --import
           cat apt-repo/dists/stable/Release | gpg --default-key ${{ secrets.KEY_NAME }} -abs > ./apt-repo/dists/stable/Release.gpg
           cat apt-repo/dists/stable/Release | gpg --default-key ${{ secrets.KEY_NAME }} -abs --clearsign > ./apt-repo/dists/stable/InRelease
+          rm -rf ../.git
           git diff --compact-summary
