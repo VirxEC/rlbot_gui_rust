@@ -50,7 +50,7 @@ jobs:
             
       - name: Create new latest.json
         shell: cmd
-        run: gen-latest-json.bat ${{ steps.version_check_staging.outputs.releaseVersion }} ${{ github.event.commits[0].message }}
+        run: gen-latest-json.bat ${{ steps.version_check_staging.outputs.releaseVersion }} "${{ github.event.head_commit.message }}"
           
       - name: Change branch to site
         uses: actions/checkout@v3
@@ -59,7 +59,7 @@ jobs:
           
       - name: Move in new latest.json
         shell: cmd
-        run: move \Y ../latest.json ./docs/
+        run: move ..\latest.json .\docs\
             
       - name: Commit new latest.json
         uses: swinton/commit@v2.x
