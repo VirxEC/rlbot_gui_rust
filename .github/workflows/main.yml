@@ -117,9 +117,9 @@ jobs:
           cver=v$cver
           echo '::set-output name=releaseVersion::'$cver
           if [ $(git tag -l "$cver") ]; then
-              echo '::set-output name=versionChanged::true'
-          else
               echo '::set-output name=versionChanged::false'
+          else
+              echo '::set-output name=versionChanged::true'
           fi
 
       - name: Fetch build cache
