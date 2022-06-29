@@ -48,11 +48,33 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ steps.version_check_staging.outputs.releaseVersion }}
             
-      - name: Create & move out new latest.json 
-        working-directory: src-tauri
+      - name: Create new latest.json 
         run: |
-          gen-latest-json.bat ${{ steps.version_check_staging.outputs.releaseVersion }} ${{ github.event.commits[0].message }}
-          MOVE /Y latest.json ../../
+          setlocal enabledelayedexpansion
+          
+          dir
+
+          set var1=${{ steps.version_check_staging.outputs.releaseVersion }}
+          set var1=!var1:~1!
+          echo !var1!
+
+          set /p sig=<target\release\bundle\msi\RLBotGUI_%var1%_x64_en-US.msi.zip.sig
+          echo %sig%
+          
+          echo ${{ github.event.commits[0].message }}
+
+          (
+          echo { 
+          echo   "name": "${{ steps.version_check_staging.outputs.releaseVersion }}",
+          echo   "notes": "${{ github.event.commits[0].message }}",
+          echo   "platforms": {
+          echo     "windows-x86_64": {
+          echo       "signature": "%sig%",
+          echo       "url":"https://github.com/VirxEC/rlbot_gui_rust/releases/download/${{ steps.version_check_staging.outputs.releaseVersion }}/RLBotGUI_!%var1%_x64_en-US.msi.zip"
+          echo     }
+          echo   }
+          echo }
+          )> ../latest.json
           
       - name: Change branch to site
         uses: actions/checkout@v3
