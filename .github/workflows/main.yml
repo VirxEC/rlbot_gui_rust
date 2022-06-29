@@ -155,7 +155,7 @@ jobs:
 
       - name: Create .tar.gz
         if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
-        run: tar -czf linux-basics.tar.gz deb/*/data/usr/bin/rl-bot-gui deb/*/data/usr/share/applications/rl-bot-gui.desktop
+        run: tar -czf linux-basics.tar.gz deb/*/data/usr/bin/rl-bot-gui deb/*/data/usr/share/applications/rl-bot-gui.desktop deb/*/data/usr/share/icons/**/rl-bot-gui.png
 
       - name: Create Release
         if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
