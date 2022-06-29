@@ -66,6 +66,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          files: latest.json
+          files: docs\latest.json
           commit-message: Updating latest.json to include ${{ steps.version_check_staging.outputs.releaseVersion }}
           ref: refs/heads/site
