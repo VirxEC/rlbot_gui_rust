@@ -97,26 +97,28 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Fetch GUI
+        uses: actions/checkout@v3
+
       - name: Fetch APT repo
         uses: actions/checkout@v3
         with:
           repository: VirxEC/rlbot_gui_rust_apt
+          path: ../rlbot_gui_rust_apt
 
       - name: Fetch Release Tags
+        working-directory: ../rlbot_gui_rust_apt
         run: git fetch --all --tags
 
       # Fail the build if the version number wasn't incremented
       - name: Check Release Version
+        working-directory: ../rlbot_gui_rust_apt
         uses: thebongy/version-check@v1
         with:
-          file: src-tauri/Cargo.toml
+          file: ../rlbot_gui_rust/src-tauri/Cargo.toml
           tagFormat: v${version}
           failBuild: false
         id: version_check_staging
-
-      - name: Fetch GUI
-        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
-        uses: actions/checkout@v3
 
       - name: Install ubuntu dev packages
         if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
@@ -148,12 +150,6 @@ jobs:
         if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
         run: mv src-tauri/target/release/bundle/deb/ ../
 
-      - name: Fetch APT repo
-        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
-        uses: actions/checkout@v3
-        with:
-          repository: VirxEC/rlbot_gui_rust_apt
-
       - name: Create .tar.gz
         if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
         run: tar -czf ../deb/linux-basics.tar.gz ../deb/*/data/usr/bin/rl-bot-gui ../deb/*/data/usr/share/applications/rl-bot-gui.desktop
@@ -170,6 +166,7 @@ jobs:
 
       - name: Move in update files
         if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
+        working-directory: ../rlbot_gui_rust_apt
         run:
           mv ../deb/linux-basics.tar.gz apt-repo/pool/main/
           cd apt-repo
@@ -178,6 +175,7 @@ jobs:
 
       - name: Sign update files
         if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
+        working-directory: ../rlbot_gui_rust_apt
         env: 
           APT_KEY: ${{ secrets.APT_KEY }}
           KEY_NAME: ${{ secrets.KEY_NAME }}
