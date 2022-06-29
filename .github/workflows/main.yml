@@ -116,25 +116,19 @@ jobs:
           tagFormat: v${version}
           failBuild: false
         id: version_check_staging
-        
-      - name: Read Package
-        id: package
-        uses: juliangruber/read-file-action@v1
-        with:
-          path: rlbot_gui_rust_apt/apt-repo/dists/stable/main/binary-amd64/Packages
 
       - name: Install ubuntu dev packages
-        if: ${{ contains(steps.package.outputs.content, steps.version_check_staging.outputs.rawVersion) }}
+        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
         run: |
           sudo apt update
           sudo apt install libwebkit2gtk-4.0-dev libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
 
       - name: Install Tauri CLI
-        if: ${{ contains(steps.package.outputs.content, steps.version_check_staging.outputs.rawVersion) }}
+        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
         run: yarn add -D @tauri-apps/cli
 
       - name: Fetch build cache
-        if: ${{ contains(steps.package.outputs.content, steps.version_check_staging.outputs.rawVersion) }}
+        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
         uses: actions/cache@v3.0.4
         with:
           path: |
@@ -146,15 +140,15 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build GUI
-        if: ${{ contains(steps.package.outputs.content, steps.version_check_staging.outputs.rawVersion) }}
+        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
         run: yarn tauri build
 
       - name: Move out build files
-        if: ${{ contains(steps.package.outputs.content, steps.version_check_staging.outputs.rawVersion) }}
+        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
         run: mv src-tauri/target/release/bundle/deb/ ./
 
       - name: Create .tar.gz
-        if: ${{ contains(steps.package.outputs.content, steps.version_check_staging.outputs.rawVersion) }}
+        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
         run: tar -czf linux-basics.tar.gz deb/*/data/usr/bin/rl-bot-gui deb/*/data/usr/share/applications/rl-bot-gui.desktop
 
 #       - name: Create Release
@@ -168,21 +162,21 @@ jobs:
 #           tag: ${{ steps.version_check_staging.outputs.releaseVersion }}
 
       - name: Move in update files
-        if: ${{ contains(steps.package.outputs.content, steps.version_check_staging.outputs.rawVersion) }}
+        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
         working-directory: rlbot_gui_rust_apt
-        run:
+        run: |
           mv ../deb/*.deb apt-repo/pool/main/
           cd apt-repo
           dpkg-scanpackages --arch amd64 pool/ > dists/stable/main/binary-amd64/Packages
           cat dists/stable/main/binary-amd64/Packages | gzip -9 > dists/stable/main/binary-amd64/Packages.gz
 
       - name: Sign update files
-        if: ${{ contains(steps.package.outputs.content, steps.version_check_staging.outputs.rawVersion) }}
+        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
         working-directory: rlbot_gui_rust_apt
         env: 
           APT_KEY: ${{ secrets.APT_KEY }}
           KEY_NAME: ${{ secrets.KEY_NAME }}
-        run:
+        run: |
           echo "${{ secrets.APT_KEY }}" > pgp-key.private
           ls
           chmod +x generate-deb-release-info.sh
