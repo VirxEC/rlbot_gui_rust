@@ -163,6 +163,7 @@ jobs:
           body: ${{ github.event.head_commit.message }}
           token: ${{ secrets.GH_PAT }}
           tag: ${{ steps.version_check_staging.outputs.releaseVersion }}
+          repo: rlbot_gui_rust_apt
 
       - name: Move in update files
         if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
