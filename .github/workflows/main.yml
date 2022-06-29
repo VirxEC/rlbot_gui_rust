@@ -83,11 +83,9 @@ jobs:
       - name: Commit new latest.json
         if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
         shell: cmd
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config user.name "GitHub Actions Bot"
-          git config user.email "<>"
+          git config user.name github-actions
+          git config user.email github-actions@github.com
           git add docs\latest.json
           git commit -m "Updating latest.json to include ${{ steps.version_check_staging.outputs.releaseVersion }}"
           git push
@@ -112,26 +110,31 @@ jobs:
 
       # Fail the build if the version number wasn't incremented
       - name: Check Release Version
-        working-directory: ../rlbot_gui_rust_apt
         uses: thebongy/version-check@v1
         with:
-          file: ../rlbot_gui_rust/src-tauri/Cargo.toml
+          file: src-tauri/Cargo.toml
           tagFormat: v${version}
           failBuild: false
         id: version_check_staging
+        
+      - name: Read Package
+        id: package
+        uses: juliangruber/read-file-action@v1
+        with:
+          path: ./rlbot_gui_rust_apt/apt-repo/dists/stable/main/binary-amd64/Packages
 
       - name: Install ubuntu dev packages
-        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
+        if: ${{ contains(steps.package.outputs.content, steps.version_check_staging.outputs.rawVersion) }}
         run: |
           sudo apt update
           sudo apt install libwebkit2gtk-4.0-dev libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
 
       - name: Install Tauri CLI
-        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
+        if: ${{ contains(steps.package.outputs.content, steps.version_check_staging.outputs.rawVersion) }}
         run: yarn add -D @tauri-apps/cli
 
       - name: Fetch build cache
-        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
+        if: ${{ contains(steps.package.outputs.content, steps.version_check_staging.outputs.rawVersion) }}
         uses: actions/cache@v3.0.4
         with:
           path: |
@@ -143,19 +146,19 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build GUI
-        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
+        if: ${{ contains(steps.package.outputs.content, steps.version_check_staging.outputs.rawVersion) }}
         run: yarn tauri build
 
       - name: Move out build files
-        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
+        if: ${{ contains(steps.package.outputs.content, steps.version_check_staging.outputs.rawVersion) }}
         run: mv src-tauri/target/release/bundle/deb/ ../
 
       - name: Create .tar.gz
-        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
+        if: ${{ contains(steps.package.outputs.content, steps.version_check_staging.outputs.rawVersion) }}
         run: tar -czf ../deb/linux-basics.tar.gz ../deb/*/data/usr/bin/rl-bot-gui ../deb/*/data/usr/share/applications/rl-bot-gui.desktop
 
       # - name: Create Release
-      #   if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
+      #  if: ${{ contains(steps.package.outputs.content, steps.version_check_staging.outputs.rawVersion) }}
       #   uses: ncipollo/release-action@v1
       #   with:
       #     name: RLBotGUI Rust port ${{ steps.version_check_staging.outputs.releaseVersion }}
@@ -165,7 +168,7 @@ jobs:
       #     tag: ${{ steps.version_check_staging.outputs.releaseVersion }}
 
       - name: Move in update files
-        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
+        if: ${{ contains(steps.package.outputs.content, steps.version_check_staging.outputs.rawVersion) }}
         working-directory: ../rlbot_gui_rust_apt
         run:
           mv ../deb/linux-basics.tar.gz apt-repo/pool/main/
@@ -174,7 +177,7 @@ jobs:
           cat dists/stable/main/binary-amd64/Packages | gzip -9 > dists/stable/main/binary-amd64/Packages.gz
 
       - name: Sign update files
-        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
+        if: ${{ contains(steps.package.outputs.content, steps.version_check_staging.outputs.rawVersion) }}
         working-directory: ../rlbot_gui_rust_apt
         env: 
           APT_KEY: ${{ secrets.APT_KEY }}
