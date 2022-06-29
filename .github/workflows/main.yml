@@ -101,7 +101,6 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: VirxEC/rlbot_gui_rust_apt
-          path: ./rlbot_gui_rust_apt
 
       - name: Fetch Release Tags
         run: git fetch --all --tags
@@ -154,7 +153,6 @@ jobs:
         uses: actions/checkout@v3
         with:
           repository: VirxEC/rlbot_gui_rust_apt
-          path: ./rlbot_gui_rust_apt
 
       - name: Create .tar.gz
         if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
