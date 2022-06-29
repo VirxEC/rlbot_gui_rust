@@ -104,6 +104,7 @@ jobs:
         with:
           repository: VirxEC/rlbot_gui_rust_apt
           path: rlbot_gui_rust_apt
+          token: ${{ secrets.GH_PAT }}
 
       - name: Fetch Release Tags
         working-directory: rlbot_gui_rust_apt
@@ -160,7 +161,7 @@ jobs:
 #           name: RLBotGUI Rust port ${{ steps.version_check_staging.outputs.releaseVersion }}
 #           artifacts: "linux-basics.tar.gz,deb/*.deb"
 #           body: ${{ github.event.head_commit.message }}
-#           token: ${{ secrets.GITHUB_TOKEN }}
+#           token: ${{ secrets.GH_PAT }}
 #           tag: ${{ steps.version_check_staging.outputs.releaseVersion }}
 
       - name: Move in update files
