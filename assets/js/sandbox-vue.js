@@ -7,6 +7,9 @@ const HISTORY_INCREMENT_SECONDS = 0.1;
 
 let packetHistory = [];
 
+const invoke = window.__TAURI__.invoke;
+const listen = window.__TAURI__.event.listen;
+
 import VelocityArrow from "./velocity-arrow-vue.js"
 
 export default {
@@ -125,16 +128,16 @@ export default {
                     draggable: true
                 },
                 cars: [],
-                hasPacketHistory: false
+                hasPacketHistory: false,
+                gtp: listen("gtp", event => this.gameTickPacketReceived(event.payload))
             };
         },
     methods: {
             startWatching: function () {
-                // eel.fetch_game_tick_packet_json()(this.gameTickPacketReceived);
+                invoke("fetch_game_tick_packet_json");
                 this.previousSecondsElapsed = 0;
             },
             gameTickPacketReceived: function (result) {
-                this.gameTickPacket = result;
                 if (!this.dragging && result.game_info.seconds_elapsed > this.previousSecondsElapsed) {
                     this.previousSecondsElapsed = result.game_info.seconds_elapsed;
 
@@ -188,9 +191,8 @@ export default {
                 this.hasPacketHistory = true;
 
                 if (this.watching) {
-                    setTimeout(function() {
-                        // eel.fetch_game_tick_packet_json()(this.gameTickPacketReceived)
-                    }.bind(this), 50);  // Delay 50 milliseconds to avoid hurting the CPU
+                    // Delay 50 milliseconds to avoid hurting the CPU
+                    setTimeout(() => invoke("fetch_game_tick_packet_json"), 50);
                 }
             },
             toCanvasVec: function(packetVec) {

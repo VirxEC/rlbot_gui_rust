@@ -551,3 +551,8 @@ pub async fn kill_bots(window: Window) {
         match_handler_stdin.take().unwrap();
     }
 }
+
+#[tauri::command]
+pub async fn fetch_game_tick_packet_json(window: Window) {
+    issue_match_handler_command(&window, &["fetch-gtp".to_owned()], false);
+}

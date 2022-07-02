@@ -1,14 +1,12 @@
+use crate::{ccprintln, ccprintlne, ccprintlnr};
 use std::{
     error::Error,
     fmt, fs,
     io::{copy, Read, Seek},
     path::{Path, PathBuf, StripPrefixError},
 };
-
 use tauri::Window;
 use zip::{result::ZipError, ZipArchive};
-
-use crate::{ccprintln, ccprintlne, ccprintlnr};
 
 // Code taken from https://github.com/MCOfficer/zip-extract
 // License: MIT

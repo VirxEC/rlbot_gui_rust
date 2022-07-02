@@ -19,6 +19,7 @@ from rlbot.parsing.incrementing_integer import IncrementingInteger
 from rlbot.setup_manager import (RocketLeagueLauncherPreference, SetupManager,
                                  try_get_steam_executable_path)
 from rlbot.utils import logging_utils
+from rlbot.utils.structures.game_data_struct import GameTickPacket, Physics
 
 sm: SetupManager = None
 
@@ -211,6 +212,43 @@ def start_match_helper(bot_list: List[dict], match_settings: dict, launcher_pref
         print_exc()
         print("-|-*|MATCH START FAILED|*-|-", flush=True)
 
+def _physics_to_dict(physics: Physics):
+    return {
+        'location': {
+            'x': physics.location.x,
+            'y': physics.location.y,
+        },
+        'velocity': {
+            'x': physics.velocity.x,
+            'y': physics.velocity.y,
+        },
+        'rotation': {
+            'yaw': physics.rotation.yaw,
+        },
+    }
+
+def fetch_game_tick_packet() -> GameTickPacket:
+    global sm
+    if sm is None:
+        sm = SetupManager()
+        sm.connect_to_game()
+    game_tick_packet = GameTickPacket()
+    sm.game_interface.update_live_data_packet(game_tick_packet)
+    # Make Rust GameTickPacket as dict
+    return {
+        "game_ball": {
+            "physics": _physics_to_dict(game_tick_packet.game_ball.physics),
+        },
+        "game_cars": list({
+            "team": car.team,
+            "physics": _physics_to_dict(car.physics),
+            "boost": car.boost
+        } for car in game_tick_packet.game_cars[:game_tick_packet.num_cars]),
+        "game_info": {
+            "seconds_elapsed": game_tick_packet.game_info.seconds_elapsed,
+        },
+    }
+
 if __name__ == "__main__":
     try:
         online = True
@@ -239,6 +277,8 @@ if __name__ == "__main__":
                 else:
                     print("There gotta be some setup manager already")
                 online = False
+            elif params[0] == "fetch-gtp":
+                print(f"-|-*|GTP {json.dumps(fetch_game_tick_packet())}|*-|-", flush=True)
     except Exception:
         print_exc()
 
@@ -246,5 +286,5 @@ if __name__ == "__main__":
         sm.shut_down(time_limit=5, kill_all_pids=True)
         sm = None
     
-    print("Closing...")
+    print("Closing...", flush=True)
     exit()

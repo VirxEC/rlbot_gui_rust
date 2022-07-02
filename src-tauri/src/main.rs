@@ -288,8 +288,12 @@ fn try_emit_text(window: &Window, text: String, replace_last: bool) -> (String, 
         eprintln!("START MATCH FAILED");
         try_emit_signal(window, "match-start-failed", ())
     } else if text == "-|-*|MATCH STARTED|*-|-" {
-        eprintln!("MATCH STARTED");
+        println!("MATCH STARTED");
         try_emit_signal(window, "match-started", ())
+    } else if text.starts_with("-|-*|GTP ") && text.ends_with("|*-|-") {
+        let text = text.replace("-|-*|GTP ", "").replace("|*-|-", "");
+        let gtp: GameTickPacket = serde_json::from_str(&text).unwrap();
+        try_emit_signal(window, "gtp", gtp)
     } else {
         issue_console_update(window, text, replace_last)
     }
@@ -413,6 +417,7 @@ fn main() {
         get_launcher_settings,
         save_launcher_settings,
         kill_bots,
+        fetch_game_tick_packet_json,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

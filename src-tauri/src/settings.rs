@@ -419,3 +419,44 @@ pub struct TeamBotBundle {
     pub runnable_type: String,
     pub path: Option<String>,
 }
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+pub struct Vec2D {
+    pub x: f32,
+    pub y: f32,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+pub struct Rotation {
+    pub yaw: f32,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+pub struct Physics {
+    pub location: Vec2D,
+    pub velocity: Vec2D,
+    pub rotation: Rotation,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+pub struct Ball {
+    pub physics: Physics,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+pub struct Car {
+    pub team: u8,
+    pub physics: Physics,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug)]
+pub struct GameInfo {
+    pub seconds_elapsed: f32,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct GameTickPacket {
+    pub game_ball: Ball,
+    pub game_cars: Vec<Car>,
+    pub game_info: GameInfo,
+}

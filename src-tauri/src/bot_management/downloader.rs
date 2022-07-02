@@ -1,3 +1,10 @@
+use crate::{bot_management::zip_extract_fixed, ccprintln, ccprintlne, ccprintlnr, get_config_path, load_gui_config};
+use configparser::ini::Ini;
+use fs_extra::dir;
+use futures_util::StreamExt;
+use rand::Rng;
+use reqwest::{header::USER_AGENT, Client, IntoUrl};
+use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     error::Error,
@@ -6,17 +13,7 @@ use std::{
     path::{Path, PathBuf},
     time::Instant,
 };
-
-use configparser::ini::Ini;
-use fs_extra::dir;
-use rand::Rng;
-use reqwest::{header::USER_AGENT, Client, IntoUrl};
-use serde::{Deserialize, Serialize};
 use tauri::Window;
-
-use futures_util::StreamExt;
-
-use crate::{bot_management::zip_extract_fixed, ccprintln, ccprintlne, ccprintlnr, get_config_path, load_gui_config};
 
 const FOLDER_SUFFIX: &str = "master";
 
