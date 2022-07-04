@@ -1,3 +1,4 @@
+use super::cfg_helper::load_cfg;
 use crate::{bot_management::zip_extract_fixed, ccprintln, ccprintlne, ccprintlnr, get_config_path, load_gui_config};
 use fs_extra::dir;
 use futures_util::StreamExt;
@@ -13,18 +14,27 @@ use std::{
     time::Instant,
 };
 use tauri::Window;
-
-use super::cfg_helper::load_cfg;
+use tokio::task;
 
 const FOLDER_SUFFIX: &str = "master";
 
+/// Represents the action taken after a function
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BotpackStatus {
+    /// Update did not run, a full download must be ran
     RequiresFullDownload,
+    /// There is no update / there was an error when updating
     Skipped(String),
+    /// Update / full download was successful
     Success(String),
 }
 
+/// Remove all empty folders in a directory, returns an error if something went wrong
+///
+/// # Arguments
+///
+/// * `window`: A reference to the GUI, obtained from a `#[tauri::command]` function
+/// * `dir`: The directory to target
 fn remove_empty_folders<T: AsRef<Path>>(window: &Window, dir: T) -> Result<(), Box<dyn Error>> {
     let dir = dir.as_ref();
 
@@ -45,17 +55,24 @@ fn remove_empty_folders<T: AsRef<Path>>(window: &Window, dir: T) -> Result<(), B
     Ok(())
 }
 
+/// Get a JSON file from a URL and do a generic parse, returning an error if something went wrong
+///
+/// # Arguments
+///
+/// * `client`: The client to use to make the request
+/// * `url`: The URL to get the JSON from
 async fn get_json_from_url(client: &Client, url: &str) -> Result<serde_json::Value, Box<dyn Error>> {
     // get random string
     let user_agent: [char; 8] = rand::thread_rng().gen();
     Ok(client.get(url).header(USER_AGENT, user_agent.iter().collect::<String>()).send().await?.json().await?)
 }
 
-/// Returns Size of the repository in bytes, or None if the API call fails.
+/// Call GitHub API to get an estimate size of a GitHub in bytes, or None if the API call fails
 ///
-/// Call GitHub API to get an estimate size of a GitHub repository.
+/// # Arguments
 ///
-/// * `repo_full_name` Full name of a repository. Example: 'RLBot/RLBotPack'
+/// * `client`: The client to use to make the request
+/// * `repo_full_name` The owner/name of the repo, e.x. "RLBot/RLBotPack"
 async fn get_repo_size(client: &Client, repo_full_name: &str) -> Result<u64, Box<dyn Error>> {
     let data = get_json_from_url(client, &format!("https://api.github.com/repos/{}", repo_full_name)).await?;
     match data["size"].as_u64() {
@@ -64,6 +81,7 @@ async fn get_repo_size(client: &Client, repo_full_name: &str) -> Result<u64, Box
     }
 }
 
+/// An update packet that the GUI understands
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProgressBarUpdate {
     pub percent: f32,
@@ -76,6 +94,18 @@ impl ProgressBarUpdate {
     }
 }
 
+/// Downloads and extracts a zip file, passing updates to the GUI and returning an error if something went wrong when downloading
+///
+/// Errors other than during the download process are printed to the console
+///
+/// # Arguments
+///
+/// * `window`: A reference to the GUI, obtained from a `#[tauri::command]` function
+/// * `client`: The client to use to make the request
+/// * `download_url`: The URL to get the zip from
+/// * `local_folder_path`: The path to the folder to extract the zip to
+/// * `clobber`: Deletes `local_folder_path` if it already exists
+/// * `repo_full_name`: The owner/name of the repo, e.x. "RLBot/RLBotPack"
 async fn download_and_extract_repo_zip<T: IntoUrl, J: AsRef<Path>>(
     window: &Window,
     client: &Client,
@@ -123,6 +153,15 @@ async fn download_and_extract_repo_zip<T: IntoUrl, J: AsRef<Path>>(
     Ok(())
 }
 
+/// Handles downloading a Github repo
+///
+/// # Arguments
+///
+/// * `window`: A reference to the GUI, obtained from a `#[tauri::command]` function
+/// * `repo_owner`: The owner of the repo, e.x. "RLBot"
+/// * `repo_name`: The name of the repo, e.x. "RLBotPack"
+/// * `checkout_folder`: The folder to checkout the repo to
+/// * `update_tag_settings`: Whether to update the incr tag in the GUI config
 pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, checkout_folder: &str, update_tag_settings: bool) -> BotpackStatus {
     let client = Client::new();
     let repo_full_name = format!("{}/{}", repo_owner, repo_name);
@@ -180,12 +219,18 @@ fn get_current_tag_name() -> Option<u32> {
 ///
 /// # Arguments
 ///
-/// `repo_full_name`: The owner/name of the repo, e.x. `RLBot/RLBotPack`
+/// `repo_full_name`: The owner/name of the repo, e.x. "RLBot/RLBotPack"
 /// `tag`: The tag number, e.x. `103`
 fn get_url_from_tag(repo_full_name: &str, tag: u32) -> String {
     format!("https://github.com/{}/releases/download/incr-{}/incremental.zip", repo_full_name, tag)
 }
 
+/// Check if the botpack is up to date
+///
+/// # Arguments
+///
+/// * `window`: A reference to the GUI, obtained from a `#[tauri::command]` function
+/// * `repo_full_name`: The owner/name of the repo, e.x. "RLBot/RLBotPack"
 pub async fn is_botpack_up_to_date(window: &Window, repo_full_name: &str) -> bool {
     let current_tag_name = match get_current_tag_name() {
         Some(tag) => tag,
@@ -203,8 +248,15 @@ pub async fn is_botpack_up_to_date(window: &Window, repo_full_name: &str) -> boo
     latest_release_tag == current_tag_name
 }
 
+/// Handles updating the botpack
+///
+/// # Arguments
+///
+/// * `window`: A reference to the GUI, obtained from a `#[tauri::command]` function
+/// * `repo_owner`: The owner of the repo, e.x. "RLBot"
+/// * `repo_name`: The name of the repo, e.x. "RLBotPack"
+/// * `checkout_folder`: The folder to checkout the repo to
 pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str, checkout_folder: &str) -> BotpackStatus {
-    let client = Client::new();
     let repo_full_name = format!("{}/{}", repo_owner, repo_name);
 
     let current_tag_name = match get_current_tag_name() {
@@ -212,7 +264,7 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
         None => return BotpackStatus::RequiresFullDownload,
     };
 
-    let latest_release_tag = match get_json_from_url(&client, &format!("https://api.github.com/repos/{}/releases/latest", repo_full_name)).await {
+    let latest_release_tag = match get_json_from_url(&Client::new(), &format!("https://api.github.com/repos/{}/releases/latest", repo_full_name)).await {
         Ok(release) => release["tag_name"].as_str().unwrap().replace("incr-", "").parse::<u32>().unwrap(),
         Err(e) => {
             ccprintlne(window, format!("{}", e));
@@ -238,15 +290,22 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
         return BotpackStatus::RequiresFullDownload;
     }
 
-    let mut tag = current_tag_name + 1;
-    let mut next_download = Some(client.get(get_url_from_tag(&repo_full_name, tag)).send());
-
     let config_path = get_config_path();
     let mut config = load_gui_config(window);
 
     let tag_deleted_files_path = local_folder_path.join(".deleted");
 
-    while let Some(future) = next_download {
+    let mut handles = Vec::new();
+
+    for tag in current_tag_name + 1..latest_release_tag + 1 {
+        let url = get_url_from_tag(&repo_full_name, tag);
+
+        handles.push(task::spawn(async move { Client::new().get(url).send().await }));
+    }
+
+    let mut tag = current_tag_name + 1;
+
+    for handle in handles {
         ccprintln(window, format!("Patching in update incr-{}", tag));
 
         let progress = (tag - current_tag_name) as f32 / total_patches as f32 * 100.;
@@ -254,19 +313,21 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
             ccprintlne(window, format!("Error when updating progress bar: {}", e));
         }
 
-        let download = match future.await {
+        let resp = match handle.await {
+            Ok(resp) => resp,
+            Err(e) => {
+                ccprintlne(window, format!("Failed to await handle: {}", e));
+                break;
+            }
+        };
+
+        let download = match resp {
             Ok(download) => download,
             Err(e) => {
                 ccprintlne(window, format!("Failed to download upgrade zip: {}", e));
                 break;
             }
         };
-
-        if tag < latest_release_tag {
-            next_download = Some(client.get(get_url_from_tag(&repo_full_name, tag + 1)).send());
-        } else {
-            next_download = None;
-        }
 
         let progress = progress + 1. / (total_patches as f32 * 2.) * 100.;
         if let Err(e) = window.emit("update-download-progress", ProgressBarUpdate::new(progress, format!("Applying patch incr-{}...", tag))) {
@@ -334,7 +395,6 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
         if tag_deleted_files_path.exists() {
             if let Err(e) = remove_file(&tag_deleted_files_path) {
                 ccprintlne(window, format!("Failed to delete {}: {}", tag_deleted_files_path.display(), e));
-                break;
             }
         }
     }

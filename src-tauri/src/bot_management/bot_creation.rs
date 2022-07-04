@@ -34,23 +34,10 @@ pub const CREATED_BOTS_FOLDER: &str = "MyBots";
 /// * `url`: The URL of the ZIP that should be downloaded
 /// * `top_dir`: The path to the folder where the ZIP will get extracted
 async fn download_extract_bot_template<T: IntoUrl>(window: &Window, url: T, top_dir: &Path) -> Result<(), String> {
-    match reqwest::get(url).await {
-        Ok(res) => {
-            let bytes = match res.bytes().await {
-                Ok(bytes) => bytes,
-                Err(e) => {
-                    return Err(format!("Failed to download the bot template: {}", e));
-                }
-            };
+    let res = reqwest::get(url).await.map_err(|e| format!("Failed to download the bot template: {}", e))?;
+    let bytes = res.bytes().await.map_err(|e| format!("Failed to download the bot template: {}", e))?;
 
-            if let Err(e) = zip_extract_fixed::extract(window, Cursor::new(bytes), top_dir, true, true) {
-                return Err(format!("Failed to extract zip: {}", e));
-            }
-        }
-        Err(e) => {
-            return Err(format!("Failed to download bot template: {}", e));
-        }
-    }
+    zip_extract_fixed::extract(window, Cursor::new(bytes), top_dir, true, true).map_err(|e| format!("Failed to extract the bot template: {}", e))?;
 
     Ok(())
 }
@@ -131,9 +118,8 @@ pub async fn bootstrap_python_hivemind(window: &Window, hive_name: String, direc
 
     change_key_in_cfg(&config_file, BOT_CONFIG_MODULE_HEADER, NAME_KEY, hive_name.clone())?;
 
-    if let Err(e) = replace_all_regex_in_file(&drone_file, &Regex::new(r"hive_name = .*$").unwrap(), format!("hive_name = \"{} Hivemind\"", &hive_name)) {
-        return Err(format!("Failed to replace hivemind drone name: {}", e));
-    }
+    replace_all_regex_in_file(&drone_file, &Regex::new(r"hive_name = .*$").unwrap(), format!("hive_name = \"{} Hivemind\"", &hive_name))
+        .map_err(|e| format!("Failed to replace hivemind drone name: {}", e))?;
 
     let mut hasher = DefaultHasher::new();
     hive_name.hash(&mut hasher);
@@ -141,17 +127,15 @@ pub async fn bootstrap_python_hivemind(window: &Window, hive_name: String, direc
     // add random number between 100000 and 999999 to hive_id
     hive_key += rand::random::<u64>() % 1000000;
 
-    if let Err(e) = replace_all_regex_in_file(&drone_file, &Regex::new(r"hive_key = .*$").unwrap(), format!("hive_key = \"{}\"", hive_key)) {
-        return Err(format!("Failed to replace hive_key in drone.py: {}", e));
-    }
+    replace_all_regex_in_file(&drone_file, &Regex::new(r"hive_key = .*$").unwrap(), format!("hive_key = \"{}\"", hive_key))
+        .map_err(|e| format!("Failed to replace hive_key in drone.py: {}", e))?;
 
-    if let Err(e) = replace_all_regex_in_file(
+    replace_all_regex_in_file(
         &hive_file,
         &Regex::new(r"class .*\(PythonHivemind\)").unwrap(),
         format!("class {}Hivemind(PythonHivemind)", &hive_name),
-    ) {
-        return Err(format!("Failed to replace class name in hive.py: {}", e));
-    }
+    )
+    .map_err(|e| format!("Failed to replace class name in hive.py: {}", e))?;
 
     let config_file = config_file.to_string_lossy();
 
@@ -236,15 +220,14 @@ pub async fn bootstrap_scratch_bot(window: &Window, bot_name: String, directory:
     let config_filename = format!("{}.cfg", &sanitized_name);
     let config_file = code_dir.join(&config_filename);
 
-    if let Err(e) = replace_all_regex_in_file(
+    replace_all_regex_in_file(
         &top_dir.join("rlbot.cfg"),
         &Regex::new(r"(?P<a>participant_config_\d = ).*$").unwrap(),
         Regex::new(&format!(r"$a{}", Path::new(&sanitized_name).join(config_filename).to_string_lossy().replace('\\', "\\\\")))
             .unwrap()
             .to_string(),
-    ) {
-        return Err(format!("Failed to replace config file: {}", e));
-    }
+    )
+    .map_err(|e| format!("Failed to replace config file: {}", e))?;
 
     // We're assuming that the file structure / names in RLBotScratchInterface will not change.
     // Semi-safe assumption because we're looking at a gui-specific git branch which ought to be stable.
@@ -253,14 +236,9 @@ pub async fn bootstrap_scratch_bot(window: &Window, bot_name: String, directory:
         ..Default::default()
     };
 
-    if let Err(e) = move_dir(top_dir.join("scratch_bot"), &code_dir, &copy_options) {
-        ccprintlne(window, e.to_string());
-        return Err(format!("Failed to move scratch bot: {}", e));
-    }
+    move_dir(top_dir.join("scratch_bot"), &code_dir, &copy_options).map_err(|e| format!("Failed to move scratch bot: {}", e))?;
 
-    if let Err(e) = rename(code_dir.join("my_scratch_bot.sb3"), sb3_file) {
-        return Err(format!("Failed to rename scratch bot: {}", e));
-    }
+    rename(code_dir.join("my_scratch_bot.sb3"), sb3_file).map_err(|e| format!("Failed to rename scratch bot: {}", e))?;
 
     let old_config_file = code_dir.join("my_scratch_bot.cfg");
     let mut conf = load_cfg(&old_config_file)?;
@@ -273,9 +251,7 @@ pub async fn bootstrap_scratch_bot(window: &Window, bot_name: String, directory:
     save_cfg(conf, &config_file)?;
 
     // delete the old config file
-    if let Err(e) = remove_file(old_config_file) {
-        return Err(format!("Failed to delete old config file: {}", e));
-    }
+    remove_file(old_config_file).map_err(|e| format!("Failed to delete old config file: {}", e))?;
 
     ccprintln(window, format!("Your new bot is located at {}", top_dir.to_string_lossy()));
 

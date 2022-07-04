@@ -9,21 +9,15 @@ use std::path::Path;
 pub fn load_cfg<T: AsRef<Path>>(path: T) -> Result<Ini, String> {
     let mut conf = Ini::new();
     conf.set_comment_symbols(&[';']);
+    conf.load(path).map_err(|e| format!("Failed to load config file: {}", e))?;
 
-    if let Err(e) = conf.load(path) {
-        Err(format!("Failed to load config file: {}", e))
-    } else {
-        Ok(conf)
-    }
+    Ok(conf)
 }
 
 /// Save a CFG file, returns a description of any errors if unable to do so
 pub fn save_cfg<T: AsRef<Path>>(conf: Ini, path: T) -> Result<(), String> {
-    if let Err(e) = conf.write(path) {
-        Err(format!("Failed to write config file: {}", e))
-    } else {
-        Ok(())
-    }
+    conf.write(path).map_err(|e| format!("Failed to save config file: {}", e))?;
+    Ok(())
 }
 
 /// Load, change a key, and save a cfg file. Returns a descripton of any errors if unable to do so
