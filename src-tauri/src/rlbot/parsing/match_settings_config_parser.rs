@@ -83,7 +83,7 @@ pub const RESPAWN_TIME_MUTATOR_TYPES: [&str; 4] = ["3 Seconds", "2 Seconds", "1 
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Mutators {
     pub match_length_types: Vec<String>,
     pub max_score_types: Vec<String>,
@@ -107,8 +107,8 @@ fn vec_to_string(vec: &[&str]) -> Vec<String> {
     vec.iter().map(|s| s.to_string()).collect()
 }
 
-impl Mutators {
-    pub fn new() -> Self {
+impl Default for Mutators {
+    fn default() -> Self {
         Self {
             match_length_types: vec_to_string(&MATCH_LENGTH_TYPES),
             max_score_types: vec_to_string(&MAX_SCORE_TYPES),
@@ -130,7 +130,7 @@ impl Mutators {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MatchOptions {
     pub map_types: Vec<String>,
     pub game_modes: Vec<String>,
@@ -138,13 +138,13 @@ pub struct MatchOptions {
     pub mutators: Mutators,
 }
 
-impl MatchOptions {
-    pub fn new() -> Self {
+impl Default for MatchOptions {
+    fn default() -> Self {
         Self {
             map_types: vec_to_string(&MAP_TYPES),
             game_modes: vec_to_string(&GAME_MODES),
             match_behaviours: vec_to_string(&EXISTING_MATCH_BEHAVIOR_TYPES),
-            mutators: Mutators::new(),
+            mutators: Mutators::default(),
         }
     }
 }

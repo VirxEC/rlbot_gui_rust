@@ -8,6 +8,7 @@ use crate::{
         match_settings_config_parser::*,
     },
 };
+use configparser::ini::Ini;
 use core::fmt;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, str::FromStr};
@@ -49,8 +50,7 @@ impl BotFolderSettings {
     }
 
     pub fn update_config(&mut self, window: &Window, bfs: Self) {
-        self.files = bfs.files;
-        self.folders = bfs.folders;
+        *self = bfs;
 
         let path = get_config_path();
         let mut conf = load_gui_config(window);
@@ -136,25 +136,7 @@ impl MutatorSettings {
         }
     }
 
-    pub fn update_config(&mut self, window: &Window, ms: Self) {
-        self.match_length = ms.match_length;
-        self.max_score = ms.max_score;
-        self.overtime = ms.overtime;
-        self.series_length = ms.series_length;
-        self.game_speed = ms.game_speed;
-        self.ball_max_speed = ms.ball_max_speed;
-        self.ball_type = ms.ball_type;
-        self.ball_weight = ms.ball_weight;
-        self.ball_size = ms.ball_size;
-        self.ball_bounciness = ms.ball_bounciness;
-        self.boost_amount = ms.boost_amount;
-        self.rumble = ms.rumble;
-        self.boost_strength = ms.boost_strength;
-        self.gravity = ms.gravity;
-        self.demolish = ms.demolish;
-        self.respawn_time = ms.respawn_time;
-
-        let mut conf = load_gui_config(window);
+    pub fn update_config(&mut self, conf: &mut Ini) {
         conf.set("mutator_settings", "match_length", Some(self.match_length.clone()));
         conf.set("mutator_settings", "max_score", Some(self.max_score.clone()));
         conf.set("mutator_settings", "overtime", Some(self.overtime.clone()));
@@ -171,10 +153,6 @@ impl MutatorSettings {
         conf.set("mutator_settings", "gravity", Some(self.gravity.clone()));
         conf.set("mutator_settings", "demolish", Some(self.demolish.clone()));
         conf.set("mutator_settings", "respawn_time", Some(self.respawn_time.clone()));
-
-        if let Err(e) = conf.write(get_config_path()) {
-            ccprintlne(window, format!("Error writing config file: {}", e));
-        }
     }
 }
 
@@ -227,19 +205,7 @@ impl MatchSettings {
     }
 
     pub fn update_config(&mut self, window: &Window, ms: Self) {
-        self.map = ms.map;
-        self.game_mode = ms.game_mode;
-        self.match_behavior = ms.match_behavior;
-        self.skip_replays = ms.skip_replays;
-        self.instant_start = ms.instant_start;
-        self.enable_lockstep = ms.enable_lockstep;
-        self.randomize_map = ms.randomize_map;
-        self.enable_rendering = ms.enable_rendering;
-        self.enable_state_setting = ms.enable_state_setting;
-        self.auto_save_replay = ms.auto_save_replay;
-        self.scripts = ms.scripts;
-
-        self.mutators.update_config(window, ms.mutators);
+        *self = ms;
 
         let mut conf = load_gui_config(window);
         conf.set("match_settings", "map", Some(self.map.clone()));
@@ -253,6 +219,7 @@ impl MatchSettings {
         conf.set("match_settings", "enable_state_setting", Some(self.enable_state_setting.to_string()));
         conf.set("match_settings", "auto_save_replay", Some(self.auto_save_replay.to_string()));
         conf.set("match_settings", "scripts", Some(serde_json::to_string(&self.scripts).unwrap_or_default()));
+        self.mutators.update_config(&mut conf);
 
         if let Err(e) = conf.write(get_config_path()) {
             ccprintlne(window, format!("Error writing config file: {}", e));
@@ -421,20 +388,24 @@ pub struct TeamBotBundle {
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
-pub struct Vec2D {
+pub struct Vec3D {
     pub x: f32,
     pub y: f32,
+    pub z: f32,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 pub struct Rotation {
+    pub pitch: f32,
     pub yaw: f32,
+    pub roll: f32,
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug)]
 pub struct Physics {
-    pub location: Vec2D,
-    pub velocity: Vec2D,
+    pub location: Vec3D,
+    pub velocity: Vec3D,
+    pub angular_velocity: Vec3D,
     pub rotation: Rotation,
 }
 

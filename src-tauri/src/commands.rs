@@ -486,7 +486,6 @@ pub fn issue_match_handler_command(window: &Window, command_parts: &[String], cr
     let command = format!("{} | \n", command_parts.join(" | "));
     let stdin = match_handler_stdin.as_mut().unwrap();
 
-    println!("Issuing the following command to the match handler: {}", command);
     if stdin.write_all(command.as_bytes()).is_err() {
         match_handler_stdin.take().unwrap();
     }
@@ -555,4 +554,9 @@ pub async fn kill_bots(window: Window) {
 #[tauri::command]
 pub async fn fetch_game_tick_packet_json(window: Window) {
     issue_match_handler_command(&window, &["fetch-gtp".to_owned()], false);
+}
+
+#[tauri::command]
+pub async fn set_state(window: Window, state: HashMap<String, serde_json::Value>) {
+    issue_match_handler_command(&window, &["set_state".to_owned(), serde_json::to_string(&state).unwrap()], false)
 }

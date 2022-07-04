@@ -195,7 +195,7 @@ pub async fn save_looks(window: Window, path: String, config: BotLooksConfig) {
 
 #[tauri::command]
 pub async fn get_match_options() -> MatchOptions {
-    let mut mo = MatchOptions::new();
+    let mut mo = MatchOptions::default();
     mo.map_types.extend(find_all_custom_maps(&BOT_FOLDER_SETTINGS.lock().unwrap().folders));
     mo
 }

@@ -261,7 +261,7 @@ fn bootstrap_python_script<T: AsRef<Path>, C: AsRef<[u8]>>(content_folder: T, fi
     write(full_path, file_contents)
 }
 
-fn update_internet_console(update: &ConsoleTextUpdate) {
+fn update_internal_console(update: &ConsoleTextUpdate) {
     let mut console_text = CONSOLE_TEXT.lock().unwrap();
     if update.replace_last {
         console_text.pop();
@@ -279,7 +279,7 @@ fn try_emit_signal<S: Serialize + Clone>(window: &Window, signal: &str, payload:
 
 fn issue_console_update(window: &Window, text: String, replace_last: bool) -> (String, Option<TauriError>) {
     let update = ConsoleTextUpdate::from(text, replace_last);
-    update_internet_console(&update);
+    update_internal_console(&update);
     try_emit_signal(window, "new-console-text", update)
 }
 
@@ -418,6 +418,7 @@ fn main() {
         save_launcher_settings,
         kill_bots,
         fetch_game_tick_packet_json,
+        set_state,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

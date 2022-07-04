@@ -76,7 +76,6 @@ pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, st
             continue;
         }
 
-        ccprintlnr(window, format!("Creating {} from {}", outpath.to_string_lossy(), relative_path.display()));
         if outpath.exists() {
             if replace {
                 fs::remove_file(&outpath)?;
@@ -90,12 +89,13 @@ pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, st
                 }
             }
         }
-
+        
+        ccprintlnr(window, format!("Creating {} from {}", outpath.to_string_lossy(), relative_path.display()));
         let mut outfile = fs::File::create(&outpath)?;
         copy(&mut item, &mut outfile)?;
     }
 
-    ccprintlnr(window, format!("Extracted {} files", archive.len()));
+    ccprintlnr(window, format!("Extracted {} items", archive.len()));
     Ok(())
 }
 

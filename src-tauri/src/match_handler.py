@@ -19,12 +19,13 @@ from rlbot.parsing.incrementing_integer import IncrementingInteger
 from rlbot.setup_manager import (RocketLeagueLauncherPreference, SetupManager,
                                  try_get_steam_executable_path)
 from rlbot.utils import logging_utils
-from rlbot.utils.structures.game_data_struct import GameTickPacket, Physics
+from rlbot.utils.game_state_util import (BallState, CarState, GameInfoState,
+                                         GameState, Physics, Rotator, Vector3)
+from rlbot.utils.structures.game_data_struct import GameTickPacket
+from rlbot.utils.structures.game_data_struct import Physics as PhysicsGTP
 
 sm: SetupManager = None
-
 CUSTOM_MAP_TARGET = {"filename": "Labs_Utopia_P.upk", "game_map": "UtopiaRetro"}
-
 logger = logging_utils.get_logger("custom_maps")
 
 
@@ -212,18 +213,27 @@ def start_match_helper(bot_list: List[dict], match_settings: dict, launcher_pref
         print_exc()
         print("-|-*|MATCH START FAILED|*-|-", flush=True)
 
-def _physics_to_dict(physics: Physics):
+def _physics_to_dict(physics: PhysicsGTP):
     return {
         'location': {
             'x': physics.location.x,
             'y': physics.location.y,
+            'z': physics.location.z
         },
         'velocity': {
             'x': physics.velocity.x,
             'y': physics.velocity.y,
+            'z': physics.velocity.z
+        },
+        'angular_velocity': {
+            'x': physics.angular_velocity.x,
+            'y': physics.angular_velocity.y,
+            'z': physics.angular_velocity.z
         },
         'rotation': {
+            'pitch': physics.rotation.pitch,
             'yaw': physics.rotation.yaw,
+            'roll': physics.rotation.roll,
         },
     }
 
@@ -249,15 +259,80 @@ def fetch_game_tick_packet() -> GameTickPacket:
         },
     }
 
+def dict_to_game_state(state_dict):
+    gs = GameState()
+    if 'ball' in state_dict:
+        gs.ball = BallState()
+        if 'physics' in state_dict['ball']:
+            gs.ball.physics = dict_to_physics(state_dict['ball']['physics'])
+    if 'cars' in state_dict:
+        gs.cars = {}
+        for index, car in state_dict['cars'].items():
+            car_state = CarState()
+            if 'physics' in car:
+                car_state.physics = dict_to_physics(car['physics'])
+            if 'boost_amount' in car:
+                car_state.boost_amount = car['boost_amount']
+            gs.cars[int(index)] = car_state
+    if 'game_info' in state_dict:
+        gs.game_info = GameInfoState()
+        if 'paused' in state_dict['game_info']:
+            gs.game_info.paused = state_dict['game_info']['paused']
+        if 'world_gravity_z' in state_dict['game_info']:
+            gs.game_info.world_gravity_z = state_dict['game_info']['world_gravity_z']
+        if 'game_speed' in state_dict['game_info']:
+            gs.game_info.game_speed = state_dict['game_info']['game_speed']
+    if 'console_commands' in state_dict:
+        gs.console_commands = state_dict['console_commands']
+    return gs
+
+def dict_to_physics(physics_dict):
+    phys = Physics()
+    if 'location' in physics_dict:
+        phys.location = dict_to_vec(physics_dict['location'])
+    if 'velocity' in physics_dict:
+        phys.velocity = dict_to_vec(physics_dict['velocity'])
+    if 'angular_velocity' in physics_dict:
+        phys.angular_velocity = dict_to_vec(physics_dict['angular_velocity'])
+    if 'rotation' in physics_dict:
+        phys.rotation = dict_to_rot(physics_dict['rotation'])
+    return phys
+
+def dict_to_vec(v):
+    vec = Vector3()
+    if 'x' in v:
+        vec.x = v['x']
+    if 'y' in v:
+        vec.y = v['y']
+    if 'z' in v:
+        vec.z = v['z']
+    return vec
+
+def dict_to_rot(r):
+    rot = Rotator()
+    if 'pitch' in r:
+        rot.pitch = r['pitch']
+    if 'yaw' in r:
+        rot.yaw = r['yaw']
+    if 'roll' in r:
+        rot.roll = r['roll']
+    return rot
+
+def set_game_state(state):
+    global sm
+    if sm is None:
+        sm = SetupManager()
+        sm.connect_to_game()
+    game_state = dict_to_game_state(state)
+    sm.game_interface.set_game_state(game_state)
+
 if __name__ == "__main__":
     try:
         online = True
         while online:
-            print("Looking for new command")
             command = sys.stdin.readline()
             params = command.split(" | ")
 
-            print(params[0])
             if params[0] == "start_match":
                 bot_list = json.loads(params[1])
                 match_settings = json.loads(params[2])
@@ -279,6 +354,8 @@ if __name__ == "__main__":
                 online = False
             elif params[0] == "fetch-gtp":
                 print(f"-|-*|GTP {json.dumps(fetch_game_tick_packet())}|*-|-", flush=True)
+            elif params[0] == "set_state":
+                set_game_state(json.loads(params[1]))
     except Exception:
         print_exc()
 
