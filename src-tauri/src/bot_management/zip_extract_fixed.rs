@@ -1,20 +1,21 @@
+use crate::{ccprintln, ccprintlne, ccprintlnr};
 use std::{
     error::Error,
     fmt, fs,
     io::{copy, Read, Seek},
     path::{Path, PathBuf, StripPrefixError},
 };
-
 use tauri::Window;
 use zip::{result::ZipError, ZipArchive};
-
-use crate::{ccprintln, ccprintlne, ccprintlnr};
 
 // Code taken from https://github.com/MCOfficer/zip-extract
 // License: MIT
 // Code taken due to lack up updates, a few prominent bugs & a lack of eyes from the community (potential security flaw)
 // As a result, the code has been patched and debugging as been better integrated into the GUI
 
+/// Custom error that can be merged with other errors in a Result
+///
+/// This is a `std::path::StripPrefixError` with extra debug information
 #[derive(Clone, Debug)]
 pub struct StripToplevel {
     pub toplevel: PathBuf,
@@ -34,6 +35,15 @@ impl Error for StripToplevel {
     }
 }
 
+/// Extract a zip file to a directory with GUI console prints
+///
+/// # Arguments
+///
+/// * `window`: A reference to the GUI, obtained from a `#[tauri::command]` function
+/// * `source`: The source zip file to extract
+/// * `target_dir`: The target directory to extract the zip file to
+/// * `toplevel`: If the top level directory to strip from the zip file (does nothing if there are multiple top level directories)
+/// * `replace`: Whether or not files should be overwritten if they already exist in the target directory
 pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, strip_toplevel: bool, replace: bool) -> Result<(), Box<dyn Error>> {
     if !target_dir.exists() {
         fs::create_dir_all(&target_dir)?;
@@ -69,7 +79,12 @@ pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, st
             continue;
         }
 
-        let outpath = target_dir.join(relative_path);
+        let outpath = if cfg!(windows) {
+            target_dir.join(relative_path)
+        } else {
+            target_dir.join(relative_path.to_string_lossy().replace('\\', "/"))
+        };
+
         if item.is_dir() {
             ccprintlnr(window, format!("Creating directory {} from {}", outpath.to_string_lossy(), relative_path.display()));
             if !outpath.exists() {
@@ -78,7 +93,6 @@ pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, st
             continue;
         }
 
-        ccprintlnr(window, format!("Creating {} from {}", outpath.to_string_lossy(), relative_path.display()));
         if outpath.exists() {
             if replace {
                 fs::remove_file(&outpath)?;
@@ -93,14 +107,21 @@ pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, st
             }
         }
 
+        ccprintlnr(window, format!("Creating {} from {}", outpath.to_string_lossy(), relative_path.display()));
         let mut outfile = fs::File::create(&outpath)?;
         copy(&mut item, &mut outfile)?;
     }
 
-    ccprintlnr(window, format!("Extracted {} files", archive.len()));
+    ccprintlnr(window, format!("Extracted {} items", archive.len()));
     Ok(())
 }
 
+/// Check if the zip file has a top level directory
+///
+/// # Arguments
+///
+/// * `window`: A reference to the GUI, obtained from a `#[tauri::command]` function
+/// * `archive`: The zip archive to check
 fn has_toplevel<S: Read + Seek>(window: &Window, archive: &mut ZipArchive<S>) -> Result<bool, ZipError> {
     let mut toplevel_dir: Option<PathBuf> = None;
     if archive.len() < 2 {

@@ -76,109 +76,109 @@ export default {
 	</b-modal>
 	`,
 	data () {
-			return {
-				appearanceModalActive: false,
-				config: {
-					blue: {},
-					orange: {},
-				},
-				items: {},
-				itemTypes: [
-					{name: 'Body', category: 'Body', itemKey: 'car_id', paintKey: 'car_paint_id'},
-					{name: 'Decal', category: 'Skin', itemKey: 'decal_id', paintKey: 'decal_paint_id'},
-					{name: 'Wheels', category: 'Wheels', itemKey: 'wheels_id', paintKey: 'wheels_paint_id'},
-					{name: 'Boost', category: 'Boost', itemKey: 'boost_id', paintKey: 'boost_paint_id'},
-					{name: 'Antenna', category: 'Antenna', itemKey: 'antenna_id', paintKey: 'antenna_paint_id'},
-					{name: 'Topper', category: 'Hat', itemKey: 'hat_id', paintKey: 'hat_paint_id'},
-					{name: 'Primary Finish', category: 'PaintFinish', itemKey: 'paint_finish_id', paintKey: null},
-					{name: 'Accent Finish', category: 'PaintFinish', itemKey: 'custom_finish_id', paintKey: null},
-					{name: 'Engine Audio', category: 'EngineAudio', itemKey: 'engine_audio_id', paintKey: null},
-					{name: 'Trail', category: 'SupersonicTrail', itemKey: 'trails_id', paintKey: 'trails_paint_id'},
-					{name: 'Goal Explosion', category: 'GoalExplosion', itemKey: 'goal_explosion_id', paintKey: 'goal_explosion_paint_id'},
-				],
-				teams: ['blue', 'orange'],
-				showcaseTypes: [
-					{id: "back-center-kickoff", name: "Static (Back-center kickoff)"},
-					{id: "static", name: "Static (Center)"},
-					{id: "throttle", name: "Drive around center"},
-					{id: "boost", name: "Boost around center"},
-					{id: "goal-explosion", name: "Goal explosion"},
-				],
-				selectedShowcaseType: "boost"
-			}
-		},
+		return {
+			appearanceModalActive: false,
+			config: {
+				blue: {},
+				orange: {},
+			},
+			items: {},
+			itemTypes: [
+				{name: 'Body', category: 'Body', itemKey: 'car_id', paintKey: 'car_paint_id'},
+				{name: 'Decal', category: 'Skin', itemKey: 'decal_id', paintKey: 'decal_paint_id'},
+				{name: 'Wheels', category: 'Wheels', itemKey: 'wheels_id', paintKey: 'wheels_paint_id'},
+				{name: 'Boost', category: 'Boost', itemKey: 'boost_id', paintKey: 'boost_paint_id'},
+				{name: 'Antenna', category: 'Antenna', itemKey: 'antenna_id', paintKey: 'antenna_paint_id'},
+				{name: 'Topper', category: 'Hat', itemKey: 'hat_id', paintKey: 'hat_paint_id'},
+				{name: 'Primary Finish', category: 'PaintFinish', itemKey: 'paint_finish_id', paintKey: null},
+				{name: 'Accent Finish', category: 'PaintFinish', itemKey: 'custom_finish_id', paintKey: null},
+				{name: 'Engine Audio', category: 'EngineAudio', itemKey: 'engine_audio_id', paintKey: null},
+				{name: 'Trail', category: 'SupersonicTrail', itemKey: 'trails_id', paintKey: 'trails_paint_id'},
+				{name: 'Goal Explosion', category: 'GoalExplosion', itemKey: 'goal_explosion_id', paintKey: 'goal_explosion_paint_id'},
+			],
+			teams: ['blue', 'orange'],
+			showcaseTypes: [
+				{id: "back-center-kickoff", name: "Static (Back-center kickoff)"},
+				{id: "static", name: "Static (Center)"},
+				{id: "throttle", name: "Drive around center"},
+				{id: "boost", name: "Boost around center"},
+				{id: "goal-explosion", name: "Goal explosion"},
+			],
+			selectedShowcaseType: "boost"
+		}
+	},
 
 	methods: {
-			getAndParseItems: async function() {
-				let response = await fetch('csv/items.csv');
-				let csv = await response.text();
-				let lines = csv.split(/\r?\n/);
+		getAndParseItems: async function() {
+			let response = await fetch('csv/items.csv');
+			let csv = await response.text();
+			let lines = csv.split(/\r?\n/);
 
-				let items = {};
-				for (const key in this.itemTypes) {
-					let category = this.itemTypes[key].category;
-					items[category] = [];
-				}
+			let items = {};
+			for (const key in this.itemTypes) {
+				let category = this.itemTypes[key].category;
+				items[category] = [];
+			}
 
-				for (const line of lines) {
-					let columns = line.split(',');
-					let category = columns[1];
+			for (const line of lines) {
+				let columns = line.split(',');
+				let category = columns[1];
 
-					if (items[category])
-						items[category].push({id: columns[0], name: columns[3]});
-				}
+				if (items[category])
+					items[category].push({id: columns[0], name: columns[3]});
+			}
 
-				// rename duplicate item names (append them with (2), (3), ...)
-				for (const category in items) {
-					let nameCounts = {};
-					for (let item of items[category]) {
-						if (nameCounts[item.name]) {
-							nameCounts[item.name]++;
-							item.name = `${item.name} (${nameCounts[item.name]})`;
-						} else {
-							nameCounts[item.name] = 1;
-						}
-					}
-				}
-
-				this.items = items;
-			},
-			saveAppearance: function() {
-				console.log(this.config)
-				invoke('save_looks', { path: this.path, config: this.config });
-				this.$bvModal.hide('appearance-editor-dialog');
-				this.config = {}; // prevents a memory leak from not un-loading configs when the dialog is closed
-			},
-			spawnCarForViewing: function(team) {
-				// eel.spawn_car_for_viewing(this.config, team, this.selectedShowcaseType, this.map);
-			},
-			loadLooks: async function (path) {
-				invoke('get_looks', { path: path }).then((config) => {
-					this.config = config
-				});
-			},
-			randomizeTeamLoadout: function(team) {
-				this.config[team].team_color_id = Math.floor(Math.random() * 70);
-				this.config[team].custom_color_id = Math.floor(Math.random() * 105);
-
-				for (const itemField of this.$refs[team]) {
-					itemField.selectRandomItem();
-					itemField.selectRandomPaintColor();
-				}
-			},
-		},
-
-	created: function() {
-			this.getAndParseItems();
-		},
-
-	watch: {
-			appearanceModalActive: {
-				handler: function(val) {
-					if (val && this.path) {
-						this.loadLooks(this.path);
+			// rename duplicate item names (append them with (2), (3), ...)
+			for (const category in items) {
+				let nameCounts = {};
+				for (let item of items[category]) {
+					if (nameCounts[item.name]) {
+						nameCounts[item.name]++;
+						item.name = `${item.name} (${nameCounts[item.name]})`;
+					} else {
+						nameCounts[item.name] = 1;
 					}
 				}
 			}
+
+			this.items = items;
 		},
+		saveAppearance: function() {
+			console.log(this.config)
+			invoke('save_looks', { path: this.path, config: this.config });
+			this.$bvModal.hide('appearance-editor-dialog');
+			this.config = {}; // prevents a memory leak from not un-loading configs when the dialog is closed
+		},
+		spawnCarForViewing: function(team) {
+			invoke('spawn_car_for_viewing', { config: this.config, team: team, showcaseType: this.selectedShowcaseType, map: this.map });
+		},
+		loadLooks: async function (path) {
+			invoke('get_looks', { path: path }).then((config) => {
+				this.config = config
+			});
+		},
+		randomizeTeamLoadout: function(team) {
+			this.config[team].team_color_id = Math.floor(Math.random() * 70);
+			this.config[team].custom_color_id = Math.floor(Math.random() * 105);
+
+			for (const itemField of this.$refs[team]) {
+				itemField.selectRandomItem();
+				itemField.selectRandomPaintColor();
+			}
+		},
+	},
+
+	created: function() {
+		this.getAndParseItems();
+	},
+
+	watch: {
+		appearanceModalActive: {
+			handler: function(val) {
+				if (val && this.path) {
+					this.loadLooks(this.path);
+				}
+			}
+		}
+	},
 }

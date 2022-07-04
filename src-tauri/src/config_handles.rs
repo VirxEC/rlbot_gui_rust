@@ -80,12 +80,12 @@ pub fn load_gui_config(window: &Window) -> Ini {
 
 #[tauri::command]
 pub async fn save_folder_settings(window: Window, bot_folder_settings: BotFolderSettings) {
-    BOT_FOLDER_SETTINGS.lock().unwrap().update_config(&window, bot_folder_settings)
+    BOT_FOLDER_SETTINGS.lock().unwrap().as_mut().unwrap().update_config(&window, bot_folder_settings)
 }
 
 #[tauri::command]
 pub async fn get_folder_settings() -> BotFolderSettings {
-    BOT_FOLDER_SETTINGS.lock().unwrap().clone()
+    BOT_FOLDER_SETTINGS.lock().unwrap().as_ref().unwrap().clone()
 }
 
 fn filter_hidden_bundles<T: Runnable + Clone>(bundles: HashSet<T>) -> Vec<T> {
@@ -98,7 +98,8 @@ fn get_bots_from_directory(path: &str) -> Vec<BotConfigBundle> {
 
 #[tauri::command]
 pub async fn scan_for_bots() -> Vec<BotConfigBundle> {
-    let bfs = BOT_FOLDER_SETTINGS.lock().unwrap();
+    let bfs_lock = BOT_FOLDER_SETTINGS.lock().unwrap();
+    let bfs = bfs_lock.as_ref().unwrap();
     let mut bots = Vec::new();
 
     for (path, props) in bfs.folders.iter() {
@@ -124,7 +125,8 @@ fn get_scripts_from_directory(path: &str) -> Vec<ScriptConfigBundle> {
 
 #[tauri::command]
 pub async fn scan_for_scripts() -> Vec<ScriptConfigBundle> {
-    let bfs = BOT_FOLDER_SETTINGS.lock().unwrap();
+    let bfs_lock = BOT_FOLDER_SETTINGS.lock().unwrap();
+    let bfs = bfs_lock.as_ref().unwrap();
     let mut scripts = Vec::with_capacity(bfs.folders.len() + bfs.files.len());
 
     for (path, props) in bfs.folders.iter() {
@@ -148,7 +150,12 @@ pub async fn scan_for_scripts() -> Vec<ScriptConfigBundle> {
 pub async fn pick_bot_folder(window: Window) {
     FileDialogBuilder::new().pick_folder(move |folder_path| {
         if let Some(path) = folder_path {
-            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(&window, path.to_string_lossy().to_string());
+            BOT_FOLDER_SETTINGS
+                .lock()
+                .unwrap()
+                .as_mut()
+                .unwrap()
+                .add_folder(&window, path.to_string_lossy().to_string());
         }
     });
 }
@@ -157,7 +164,7 @@ pub async fn pick_bot_folder(window: Window) {
 pub async fn pick_bot_config(window: Window) {
     FileDialogBuilder::new().add_filter("Bot Cfg File", &["cfg"]).pick_file(move |path| {
         if let Some(path) = path {
-            BOT_FOLDER_SETTINGS.lock().unwrap().add_file(&window, path.to_string_lossy().to_string());
+            BOT_FOLDER_SETTINGS.lock().unwrap().as_mut().unwrap().add_file(&window, path.to_string_lossy().to_string());
         }
     });
 }
@@ -195,19 +202,19 @@ pub async fn save_looks(window: Window, path: String, config: BotLooksConfig) {
 
 #[tauri::command]
 pub async fn get_match_options() -> MatchOptions {
-    let mut mo = MatchOptions::new();
-    mo.map_types.extend(find_all_custom_maps(&BOT_FOLDER_SETTINGS.lock().unwrap().folders));
+    let mut mo = MatchOptions::default();
+    mo.map_types.extend(find_all_custom_maps(&BOT_FOLDER_SETTINGS.lock().unwrap().as_ref().unwrap().folders));
     mo
 }
 
 #[tauri::command]
-pub async fn get_match_settings() -> MatchSettings {
-    MATCH_SETTINGS.lock().unwrap().clone()
+pub async fn get_match_settings(window: Window) -> MatchSettings {
+    MatchSettings::load(&window)
 }
 
 #[tauri::command]
 pub async fn save_match_settings(window: Window, settings: MatchSettings) {
-    MATCH_SETTINGS.lock().unwrap().update_config(&window, settings.cleaned_scripts());
+    settings.cleaned_scripts().save_config(&window);
 }
 
 #[tauri::command]
@@ -285,7 +292,7 @@ pub async fn pick_appearance_file(window: Window) {
 
 fn get_recommendations_json(window: &Window) -> Option<AllRecommendations<String>> {
     // Search for and load the json file
-    for path in BOT_FOLDER_SETTINGS.lock().unwrap().folders.keys() {
+    for path in BOT_FOLDER_SETTINGS.lock().unwrap().as_ref().unwrap().folders.keys() {
         let pattern = Path::new(path).join("**/recommendations.json");
 
         for path2 in glob(&pattern.to_string_lossy().to_owned()).unwrap().flatten() {
@@ -316,7 +323,8 @@ pub async fn get_recommendations(window: Window) -> Option<AllRecommendations<Bo
     get_recommendations_json(&window).map(|j| {
         // Get a list of all the bots in (bot name, bot config file path) pairs
         let name_path_pairs = {
-            let bfs = BOT_FOLDER_SETTINGS.lock().unwrap();
+            let bfs_lock = BOT_FOLDER_SETTINGS.lock().unwrap();
+            let bfs = bfs_lock.as_ref().unwrap();
             let mut bots = Vec::new();
 
             bots.par_extend(
