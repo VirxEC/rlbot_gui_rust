@@ -419,6 +419,7 @@ fn main() {
         kill_bots,
         fetch_game_tick_packet_json,
         set_state,
+        spawn_car_for_viewing,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

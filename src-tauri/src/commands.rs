@@ -1,8 +1,8 @@
-use crate::bot_management::{
+use crate::{bot_management::{
     bot_creation::{bootstrap_python_bot, bootstrap_python_hivemind, bootstrap_rust_bot, bootstrap_scratch_bot, CREATED_BOTS_FOLDER},
     downloader::{self, ProgressBarUpdate},
     zip_extract_fixed,
-};
+}, rlbot::parsing::agent_config_parser::BotLooksConfig};
 use crate::rlbot::{
     agents::runnable::Runnable,
     gateway_util,
@@ -536,6 +536,8 @@ pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_set
         launcher_settings.rocket_league_exe_path.unwrap_or_default(),
     ];
 
+    println!("Issuing command: {} | ", args.join(" | "));
+
     issue_match_handler_command(&window, &args, true);
 
     true
@@ -559,4 +561,22 @@ pub async fn fetch_game_tick_packet_json(window: Window) {
 #[tauri::command]
 pub async fn set_state(window: Window, state: HashMap<String, serde_json::Value>) {
     issue_match_handler_command(&window, &["set_state".to_owned(), serde_json::to_string(&state).unwrap()], false)
+}
+
+#[tauri::command]
+pub async fn spawn_car_for_viewing(window: Window, config: BotLooksConfig, team: u8, showcase_type: String, map: String) {
+    let launcher_settings = LauncherSettings::load(&window);
+
+    let args = [
+        "spawn_car_for_viewing".to_owned(),
+        serde_json::to_string(&config).unwrap(),
+        team.to_string(),
+        showcase_type,
+        map,
+        launcher_settings.preferred_launcher,
+        launcher_settings.use_login_tricks.to_string(),
+        launcher_settings.rocket_league_exe_path.unwrap_or_default(),
+    ];
+
+    issue_match_handler_command(&window, &args, true)
 }
