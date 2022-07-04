@@ -1,4 +1,4 @@
-use crate::ccprintlne;
+use crate::{bot_management::cfg_helper::load_cfg, ccprintlne};
 use configparser::ini::Ini;
 use serde::{Deserialize, Serialize};
 use tauri::Window;
@@ -37,9 +37,7 @@ pub struct BotTeamLooksConfig {
 
 impl BotTeamLooksConfig {
     pub fn from_path(loadout_header: &str, paint_header: &str, path: &str) -> Result<Self, String> {
-        let mut conf = Ini::new();
-        conf.set_comment_symbols(&[';']);
-        conf.load(path)?;
+        let conf = load_cfg(path)?;
 
         let team_color_id = conf.get(loadout_header, "team_color_id").unwrap_or_default();
         let custom_color_id = conf.get(loadout_header, "custom_color_id").unwrap_or_default();

@@ -1,5 +1,4 @@
 use crate::{bot_management::zip_extract_fixed, ccprintln, ccprintlne, ccprintlnr, get_config_path, load_gui_config};
-use configparser::ini::Ini;
 use fs_extra::dir;
 use futures_util::StreamExt;
 use rand::Rng;
@@ -14,6 +13,8 @@ use std::{
     time::Instant,
 };
 use tauri::Window;
+
+use super::cfg_helper::load_cfg;
 
 const FOLDER_SUFFIX: &str = "master";
 
@@ -165,15 +166,22 @@ pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, c
     }
 }
 
+/// Load the GUI config and check the get the current version number of the botpack
 fn get_current_tag_name() -> Option<u32> {
-    let config_path = get_config_path();
-    let mut conf = Ini::new();
-    conf.set_comment_symbols(&[';']);
-    conf.load(&config_path).ok()?;
-
-    conf.get("bot_folder_settings", "incr")?.replace("incr-", "").parse::<u32>().ok()
+    load_cfg(get_config_path())
+        .ok()?
+        .get("bot_folder_settings", "incr")?
+        .replace("incr-", "")
+        .parse::<u32>()
+        .ok()
 }
 
+/// Gets the corresponding incremental zip to a version number
+///
+/// # Arguments
+///
+/// `repo_full_name`: The owner/name of the repo, e.x. `RLBot/RLBotPack`
+/// `tag`: The tag number, e.x. `103`
 fn get_url_from_tag(repo_full_name: &str, tag: u32) -> String {
     format!("https://github.com/{}/releases/download/incr-{}/incremental.zip", repo_full_name, tag)
 }

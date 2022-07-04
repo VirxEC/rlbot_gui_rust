@@ -1,8 +1,3 @@
-use crate::{bot_management::{
-    bot_creation::{bootstrap_python_bot, bootstrap_python_hivemind, bootstrap_rust_bot, bootstrap_scratch_bot, CREATED_BOTS_FOLDER},
-    downloader::{self, ProgressBarUpdate},
-    zip_extract_fixed,
-}, rlbot::parsing::agent_config_parser::BotLooksConfig};
 use crate::rlbot::{
     agents::runnable::Runnable,
     gateway_util,
@@ -11,6 +6,14 @@ use crate::rlbot::{
 };
 use crate::settings::*;
 use crate::*;
+use crate::{
+    bot_management::{
+        bot_creation::{bootstrap_python_bot, bootstrap_python_hivemind, bootstrap_rust_bot, bootstrap_scratch_bot, CREATED_BOTS_FOLDER},
+        downloader::{self, ProgressBarUpdate},
+        zip_extract_fixed,
+    },
+    rlbot::parsing::agent_config_parser::BotLooksConfig,
+};
 use futures_util::StreamExt;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::{
@@ -42,9 +45,8 @@ pub async fn check_rlbot_python() -> HashMap<String, bool> {
     dbg!(python_support)
 }
 
-fn ensure_bot_directory(window: &Window) -> String {
-    let bot_directory = get_content_folder();
-    let bot_directory_path = Path::new(&bot_directory).join(CREATED_BOTS_FOLDER);
+fn ensure_bot_directory(window: &Window) -> PathBuf {
+    let bot_directory_path = get_content_folder().join(CREATED_BOTS_FOLDER);
 
     if !bot_directory_path.exists() {
         if let Err(e) = create_dir_all(&bot_directory_path) {
@@ -52,12 +54,12 @@ fn ensure_bot_directory(window: &Window) -> String {
         }
     }
 
-    bot_directory.to_string_lossy().to_string()
+    bot_directory_path
 }
 
 #[tauri::command]
 pub async fn begin_python_bot(window: Window, bot_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
-    match bootstrap_python_bot(&window, bot_name, &ensure_bot_directory(&window)).await {
+    match bootstrap_python_bot(&window, bot_name, ensure_bot_directory(&window)).await {
         Ok(config_file) => Ok(HashMap::from([("bot".to_owned(), BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap())])),
         Err(e) => Err(HashMap::from([("error".to_owned(), e)])),
     }
@@ -65,7 +67,7 @@ pub async fn begin_python_bot(window: Window, bot_name: String) -> Result<HashMa
 
 #[tauri::command]
 pub async fn begin_python_hivemind(window: Window, hive_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
-    match bootstrap_python_hivemind(&window, hive_name, &ensure_bot_directory(&window)).await {
+    match bootstrap_python_hivemind(&window, hive_name, ensure_bot_directory(&window)).await {
         Ok(config_file) => Ok(HashMap::from([("bot".to_owned(), BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap())])),
         Err(e) => Err(HashMap::from([("error".to_owned(), e)])),
     }
@@ -73,7 +75,7 @@ pub async fn begin_python_hivemind(window: Window, hive_name: String) -> Result<
 
 #[tauri::command]
 pub async fn begin_rust_bot(window: Window, bot_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
-    match bootstrap_rust_bot(&window, bot_name, &ensure_bot_directory(&window)).await {
+    match bootstrap_rust_bot(&window, bot_name, ensure_bot_directory(&window)).await {
         Ok(config_file) => Ok(HashMap::from([("bot".to_owned(), BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap())])),
         Err(e) => Err(HashMap::from([("error".to_owned(), e)])),
     }
@@ -81,7 +83,7 @@ pub async fn begin_rust_bot(window: Window, bot_name: String) -> Result<HashMap<
 
 #[tauri::command]
 pub async fn begin_scratch_bot(window: Window, bot_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
-    match bootstrap_scratch_bot(&window, bot_name, &ensure_bot_directory(&window)).await {
+    match bootstrap_scratch_bot(&window, bot_name, ensure_bot_directory(&window)).await {
         Ok(config_file) => Ok(HashMap::from([("bot".to_owned(), BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap())])),
         Err(e) => Err(HashMap::from([("error".to_owned(), e)])),
     }

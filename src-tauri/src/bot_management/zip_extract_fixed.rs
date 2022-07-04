@@ -89,7 +89,7 @@ pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, st
                 }
             }
         }
-        
+
         ccprintlnr(window, format!("Creating {} from {}", outpath.to_string_lossy(), relative_path.display()));
         let mut outfile = fs::File::create(&outpath)?;
         copy(&mut item, &mut outfile)?;

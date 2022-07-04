@@ -150,7 +150,12 @@ pub async fn scan_for_scripts() -> Vec<ScriptConfigBundle> {
 pub async fn pick_bot_folder(window: Window) {
     FileDialogBuilder::new().pick_folder(move |folder_path| {
         if let Some(path) = folder_path {
-            BOT_FOLDER_SETTINGS.lock().unwrap().as_mut().unwrap().add_folder(&window, path.to_string_lossy().to_string());
+            BOT_FOLDER_SETTINGS
+                .lock()
+                .unwrap()
+                .as_mut()
+                .unwrap()
+                .add_folder(&window, path.to_string_lossy().to_string());
         }
     });
 }

@@ -1,3 +1,4 @@
+use crate::bot_management::cfg_helper::load_cfg;
 use crate::rlbot::agents::{base_script::SCRIPT_FILE_KEY, runnable::Runnable};
 use crate::{ccprintln, get_command_status, get_content_folder, PYTHON_PATH};
 use configparser::ini::Ini;
@@ -139,9 +140,7 @@ pub struct BotConfigBundle {
 
 impl BotConfigBundle {
     pub fn minimal_from_path(config_path: &Path) -> Result<Self, String> {
-        let mut conf = Ini::new();
-        conf.set_comment_symbols(&[';']);
-        conf.load(config_path)?;
+        let conf = load_cfg(config_path)?;
 
         let path = config_path.to_string_lossy().to_string();
         let config_directory = config_path.parent().unwrap().to_string_lossy().to_string();
@@ -217,9 +216,7 @@ impl BotConfigBundle {
     }
 
     pub fn name_from_path(config_path: &Path) -> Result<(String, String), String> {
-        let mut conf = Ini::new();
-        conf.set_comment_symbols(&[';']);
-        conf.load(config_path)?;
+        let conf = load_cfg(config_path)?;
 
         let name = if let Some(the_name) = conf.get(BOT_CONFIG_MODULE_HEADER, NAME_KEY) {
             the_name
@@ -388,9 +385,7 @@ pub struct ScriptConfigBundle {
 
 impl ScriptConfigBundle {
     pub fn minimal_from_path(config_path: &Path) -> Result<Self, String> {
-        let mut conf = Ini::new();
-        conf.set_comment_symbols(&[';']);
-        conf.load(config_path.to_string_lossy().to_string())?;
+        let conf = load_cfg(config_path)?;
 
         let name = conf.get(BOT_CONFIG_MODULE_HEADER, NAME_KEY);
         let runnable_type = String::from("script");

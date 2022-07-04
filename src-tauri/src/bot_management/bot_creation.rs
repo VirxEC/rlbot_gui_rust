@@ -1,4 +1,7 @@
-use super::zip_extract_fixed;
+use super::{
+    cfg_helper::{change_key_in_cfg, load_cfg, save_cfg},
+    zip_extract_fixed,
+};
 use crate::{
     ccprintln, ccprintlne,
     rlbot::parsing::{
@@ -7,7 +10,6 @@ use crate::{
     },
     BOT_FOLDER_SETTINGS,
 };
-use configparser::ini::Ini;
 use fs_extra::dir::{move_dir, CopyOptions};
 use rand::Rng;
 use regex::{Regex, Replacer};
@@ -18,12 +20,19 @@ use std::{
     fs::{remove_file, rename, write, File},
     hash::{Hash, Hasher},
     io::{Cursor, Read, Result as IoResult},
-    path::Path,
+    path::{Path, PathBuf},
 };
 use tauri::Window;
 
 pub const CREATED_BOTS_FOLDER: &str = "MyBots";
 
+/// Downloads a ZIP from a given URL and unpacks it to top_dir, updating progress in the window along the way
+///
+/// # Arguments
+///
+/// * `window`: A reference to the GUI, obtained from a `#[tauri::command]` function
+/// * `url`: The URL of the ZIP that should be downloaded
+/// * `top_dir`: The path to the folder where the ZIP will get extracted
 async fn download_extract_bot_template<T: IntoUrl>(window: &Window, url: T, top_dir: &Path) -> Result<(), String> {
     match reqwest::get(url).await {
         Ok(res) => {
@@ -46,9 +55,16 @@ async fn download_extract_bot_template<T: IntoUrl>(window: &Window, url: T, top_
     Ok(())
 }
 
-pub async fn bootstrap_python_bot(window: &Window, bot_name: String, directory: &str) -> Result<String, String> {
+/// Download and setup a new Python bot
+///
+/// # Arguments
+///
+/// * `window`: A reference to the GUI, obtained from a `#[tauri::command]` function
+/// * `bot_name`: The name of the bot
+/// * `directory`: The base directory to put the bot it, which must exist already
+pub async fn bootstrap_python_bot(window: &Window, bot_name: String, directory: PathBuf) -> Result<String, String> {
     let sanitized_name = sanitize(&bot_name);
-    let top_dir = Path::new(directory).join(CREATED_BOTS_FOLDER).join(&sanitized_name);
+    let top_dir = directory.join(&sanitized_name);
 
     if top_dir.exists() {
         return Err(format!("There is already a bot named {}, please choose a different name!", sanitized_name));
@@ -61,18 +77,7 @@ pub async fn bootstrap_python_bot(window: &Window, bot_name: String, directory: 
     let config_file = bundle.path.clone().unwrap();
     let python_file = bundle.python_path.clone().unwrap();
 
-    let mut conf = Ini::new();
-    conf.set_comment_symbols(&[';']);
-
-    if let Err(e) = conf.load(&config_file) {
-        return Err(format!("Failed to load config file: {}", e));
-    }
-
-    conf.set(BOT_CONFIG_MODULE_HEADER, NAME_KEY, Some(bot_name));
-
-    if let Err(e) = conf.write(&config_file) {
-        return Err(format!("Failed to write config file: {}", e));
-    }
+    change_key_in_cfg(&config_file, BOT_CONFIG_MODULE_HEADER, NAME_KEY, bot_name)?;
 
     BOT_FOLDER_SETTINGS.lock().unwrap().as_mut().unwrap().add_file(window, config_file.clone());
 
@@ -87,19 +92,32 @@ pub async fn bootstrap_python_bot(window: &Window, bot_name: String, directory: 
     Ok(config_file)
 }
 
+/// Load a file, replace all the matching regex with the replacement, and save the file - returns potential IO errors
+///
+/// # Arguments
+///
+/// * `file_path`: Path to the file that needs to be edited
+/// * `regex`: The regex that should be matched
+/// * `replacement`: The string that should replace everything that matches `regex`
 fn replace_all_regex_in_file<R: Replacer>(file_path: &Path, regex: &Regex, replacement: R) -> IoResult<()> {
     let mut file = File::open(file_path)?;
     let mut contents = String::new();
     file.read_to_string(&mut contents)?;
-    let new_contents = regex.replace_all(&contents, replacement);
-    write(file_path, new_contents.as_bytes())?;
+    write(file_path, regex.replace_all(&contents, replacement).as_bytes())?;
 
     Ok(())
 }
 
-pub async fn bootstrap_python_hivemind(window: &Window, hive_name: String, directory: &str) -> Result<String, String> {
+/// Download and setup a new Python hivemind-style bot
+///
+/// # Arguments
+///
+/// * `window`: A reference to the GUI, obtained from a `#[tauri::command]` function
+/// * `hive_name`: The name of the bots
+/// * `directory`: The base directory to put the bot it, which must exist already
+pub async fn bootstrap_python_hivemind(window: &Window, hive_name: String, directory: PathBuf) -> Result<String, String> {
     let sanitized_name = sanitize(&hive_name);
-    let top_dir = Path::new(directory).join(CREATED_BOTS_FOLDER).join(&sanitized_name);
+    let top_dir = directory.join(&sanitized_name);
 
     if top_dir.exists() {
         return Err(format!("There is already a bot named {}, please choose a different name!", sanitized_name));
@@ -111,18 +129,7 @@ pub async fn bootstrap_python_hivemind(window: &Window, hive_name: String, direc
     let drone_file = top_dir.join("src").join("drone.py");
     let hive_file = top_dir.join("src").join("hive.py");
 
-    let mut conf = Ini::new();
-    conf.set_comment_symbols(&[';']);
-
-    if let Err(e) = conf.load(&config_file) {
-        return Err(format!("Failed to load config file: {}", e));
-    }
-
-    conf.set(BOT_CONFIG_MODULE_HEADER, NAME_KEY, Some(hive_name.clone()));
-
-    if let Err(e) = conf.write(&config_file) {
-        return Err(format!("Failed to write config file: {}", e));
-    }
+    change_key_in_cfg(&config_file, BOT_CONFIG_MODULE_HEADER, NAME_KEY, hive_name.clone())?;
 
     if let Err(e) = replace_all_regex_in_file(&drone_file, &Regex::new(r"hive_name = .*$").unwrap(), format!("hive_name = \"{} Hivemind\"", &hive_name)) {
         return Err(format!("Failed to replace hivemind drone name: {}", e));
@@ -160,43 +167,40 @@ pub async fn bootstrap_python_hivemind(window: &Window, hive_name: String, direc
     Ok(config_file.to_string())
 }
 
-pub async fn bootstrap_rust_bot(window: &Window, bot_name: String, directory: &str) -> Result<String, String> {
+/// Download and setup a new Rust bot
+///
+/// # Arguments
+///
+/// * `window`: A reference to the GUI, obtained from a `#[tauri::command]` function
+/// * `bot_name`: The name of the bot
+/// * `directory`: The base directory to put the bot it, which must exist already
+pub async fn bootstrap_rust_bot(window: &Window, bot_name: String, directory: PathBuf) -> Result<String, String> {
     let sanitized_name = sanitize(&bot_name);
-    let top_dir = Path::new(directory).join(CREATED_BOTS_FOLDER).join(&sanitized_name);
+    let top_dir = directory.join(&sanitized_name);
 
     if top_dir.exists() {
-        return Err(format!("There is already a bot named {}, please choose a different name!", sanitized_name));
+        return Err(format!("There is already a bot named {}, please choose a different name!", &sanitized_name));
     }
 
     download_extract_bot_template(window, "https://github.com/NicEastvillage/RLBotRustTemplateBot/archive/master.zip", top_dir.as_path()).await?;
 
-    let bundles = scan_directory_for_bot_configs(&top_dir.to_string_lossy());
-    let bundle = bundles.iter().next().unwrap();
-    let config_file = bundle.path.clone().unwrap();
+    let config_file = top_dir.join("rustbot_dev").join("rustbot.cfg");
 
-    let mut conf = Ini::new();
-    conf.set_comment_symbols(&[';']);
-
-    if let Err(e) = conf.load(&config_file) {
-        return Err(format!("Failed to write config file: {}", e));
-    }
+    let mut conf = load_cfg(&config_file)?;
 
     conf.set(BOT_CONFIG_MODULE_HEADER, NAME_KEY, Some(bot_name.clone()));
     conf.set(BOT_CONFIG_PARAMS_HEADER, EXECUTABLE_PATH_KEY, Some(format!("../target/debug/{}.exe", bot_name)));
 
-    if let Err(e) = conf.write(&config_file) {
-        return Err(format!("Failed to write config file: {}", e));
-    }
+    save_cfg(conf, &config_file)?;
 
     let cargo_toml_file = top_dir.join("Cargo.toml");
 
-    if let Err(e) = replace_all_regex_in_file(&cargo_toml_file, &Regex::new(r"name = .*$").unwrap(), format!("name = \"{}\"", bot_name)) {
-        return Err(format!("Failed to replace name: {}", e));
-    }
+    let mut conf = load_cfg(&cargo_toml_file)?;
 
-    if let Err(e) = replace_all_regex_in_file(&cargo_toml_file, &Regex::new(r"authors = .*$").unwrap(), "authors = []".to_owned()) {
-        return Err(format!("Failed to empty authors: {}", e));
-    }
+    conf.set("package", "name", Some(format!("\"{}\"", sanitized_name)));
+    conf.set("package", "authors", Some("[\"\"]".to_owned()));
+
+    save_cfg(conf, cargo_toml_file)?;
 
     if open::that(top_dir.join("src").join("main.rs")).is_err() {
         ccprintln(
@@ -205,12 +209,19 @@ pub async fn bootstrap_rust_bot(window: &Window, bot_name: String, directory: &s
         );
     }
 
-    Ok(config_file)
+    Ok(config_file.to_string_lossy().to_string())
 }
 
-pub async fn bootstrap_scratch_bot(window: &Window, bot_name: String, directory: &str) -> Result<String, String> {
+/// Download and setup a new Scratch bot
+///
+/// # Arguments
+///
+/// * `window`: A reference to the GUI, obtained from a `#[tauri::command]` function
+/// * `bot_name`: The name of the bot
+/// * `directory`: The base directory to put the bot it, which must exist already
+pub async fn bootstrap_scratch_bot(window: &Window, bot_name: String, directory: PathBuf) -> Result<String, String> {
     let sanitized_name = sanitize(&bot_name);
-    let top_dir = Path::new(directory).join(CREATED_BOTS_FOLDER).join(&sanitized_name);
+    let top_dir = directory.join(&sanitized_name);
 
     if top_dir.exists() {
         return Err(format!("There is already a bot named {}, please choose a different name!", sanitized_name));
@@ -252,21 +263,14 @@ pub async fn bootstrap_scratch_bot(window: &Window, bot_name: String, directory:
     }
 
     let old_config_file = code_dir.join("my_scratch_bot.cfg");
-    let mut conf = Ini::new();
-    conf.set_comment_symbols(&[';']);
-
-    if let Err(e) = conf.load(&config_file) {
-        return Err(format!("Failed to load config file: {}", e));
-    }
+    let mut conf = load_cfg(&old_config_file)?;
 
     conf.set(BOT_CONFIG_MODULE_HEADER, NAME_KEY, Some(bot_name.clone()));
     conf.set(BOT_CONFIG_PARAMS_HEADER, "sb3file", Some(sb3_filename));
     let random_port = rand::thread_rng().gen_range(20000..65000);
     conf.set(BOT_CONFIG_PARAMS_HEADER, "port", Some(random_port.to_string()));
 
-    if let Err(e) = conf.write(&config_file) {
-        return Err(format!("Failed to write config file: {}", e));
-    }
+    save_cfg(conf, &config_file)?;
 
     // delete the old config file
     if let Err(e) = remove_file(old_config_file) {
