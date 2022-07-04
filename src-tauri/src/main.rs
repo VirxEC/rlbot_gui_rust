@@ -33,13 +33,9 @@ const BOTPACK_REPO_OWNER: &str = "RLBot";
 const BOTPACK_REPO_NAME: &str = "RLBotPack";
 
 lazy_static! {
-    static ref BOT_FOLDER_SETTINGS: Mutex<BotFolderSettings> = Mutex::new(BotFolderSettings::default());
-    static ref MATCH_SETTINGS: Mutex<MatchSettings> = Mutex::new(MatchSettings::default());
+    static ref CONSOLE_TEXT: Mutex<Vec<ConsoleText>> = Mutex::new(Vec::new());
     static ref PYTHON_PATH: Mutex<String> = Mutex::new(String::new());
-    static ref CONSOLE_TEXT: Mutex<Vec<ConsoleText>> = Mutex::new(vec![
-        ConsoleText::from("Welcome to the RLBot Console!".to_owned(), None),
-        ConsoleText::from("".to_owned(), None)
-    ]);
+    static ref BOT_FOLDER_SETTINGS: Mutex<Option<BotFolderSettings>> = Mutex::new(None);
     static ref MATCH_HANDLER_STDIN: Mutex<Option<ChildStdin>> = Mutex::new(None);
     static ref CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
 }
@@ -315,7 +311,6 @@ fn main() {
 
     initialize(&CONSOLE_TEXT);
     initialize(&MATCH_HANDLER_STDIN);
-    initialize(&CAPTURE_PIPE_WRITER);
 
     let mut app = tauri::Builder::default();
 
@@ -332,8 +327,7 @@ fn main() {
         *PYTHON_PATH.lock().unwrap() = load_gui_config(&window)
             .get("python_config", "path")
             .unwrap_or_else(|| auto_detect_python().unwrap_or_default().0);
-        *BOT_FOLDER_SETTINGS.lock().unwrap() = BotFolderSettings::load(&window);
-        *MATCH_SETTINGS.lock().unwrap() = MatchSettings::load(&window);
+        *BOT_FOLDER_SETTINGS.lock().unwrap() = Some(BotFolderSettings::load(&window));
 
         let (mut pipe_reader, pipe_writer) = pipe().unwrap();
         *CAPTURE_PIPE_WRITER.lock().unwrap() = Some(pipe_writer);

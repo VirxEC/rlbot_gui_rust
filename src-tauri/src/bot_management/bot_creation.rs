@@ -74,7 +74,7 @@ pub async fn bootstrap_python_bot(window: &Window, bot_name: String, directory: 
         return Err(format!("Failed to write config file: {}", e));
     }
 
-    BOT_FOLDER_SETTINGS.lock().unwrap().add_file(window, config_file.clone());
+    BOT_FOLDER_SETTINGS.lock().unwrap().as_mut().unwrap().add_file(window, config_file.clone());
 
     if open::that(python_file).is_err() {
         // We don't want to return an error here, because the bot was successfully created
@@ -148,7 +148,7 @@ pub async fn bootstrap_python_hivemind(window: &Window, hive_name: String, direc
 
     let config_file = config_file.to_string_lossy();
 
-    BOT_FOLDER_SETTINGS.lock().unwrap().add_file(window, config_file.to_string());
+    BOT_FOLDER_SETTINGS.lock().unwrap().as_mut().unwrap().add_file(window, config_file.to_string());
 
     if open::that(hive_file).is_err() {
         ccprintln(

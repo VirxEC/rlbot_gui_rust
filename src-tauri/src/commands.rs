@@ -366,7 +366,7 @@ pub async fn download_bot_pack(window: Window) -> String {
     match botpack_status {
         downloader::BotpackStatus::Success(message) => {
             // Configure the folder settings
-            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(&window, botpack_location);
+            BOT_FOLDER_SETTINGS.lock().unwrap().as_mut().unwrap().add_folder(&window, botpack_location);
             message
         }
         downloader::BotpackStatus::Skipped(message) => message,
@@ -383,7 +383,7 @@ pub async fn update_bot_pack(window: Window) -> String {
         downloader::BotpackStatus::Skipped(message) => message,
         downloader::BotpackStatus::Success(message) => {
             // Configure the folder settings
-            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(&window, botpack_location);
+            BOT_FOLDER_SETTINGS.lock().unwrap().as_mut().unwrap().add_folder(&window, botpack_location);
             message
         }
         downloader::BotpackStatus::RequiresFullDownload => {
@@ -391,7 +391,7 @@ pub async fn update_bot_pack(window: Window) -> String {
             // the most likely cause is the botpack not existing in the first place
             match downloader::download_repo(&window, BOTPACK_REPO_OWNER, BOTPACK_REPO_NAME, &botpack_location, true).await {
                 downloader::BotpackStatus::Success(message) => {
-                    BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(&window, botpack_location);
+                    BOT_FOLDER_SETTINGS.lock().unwrap().as_mut().unwrap().add_folder(&window, botpack_location);
                     message
                 }
                 downloader::BotpackStatus::Skipped(message) => message,
@@ -410,12 +410,12 @@ pub async fn update_map_pack(window: Window) -> String {
 
     match updater.needs_update(&window).await {
         downloader::BotpackStatus::Skipped(message) => {
-            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(&window, location);
+            BOT_FOLDER_SETTINGS.lock().unwrap().as_mut().unwrap().add_folder(&window, location);
             message
         }
         downloader::BotpackStatus::Success(message) => {
             // Configure the folder settings
-            BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(&window, location);
+            BOT_FOLDER_SETTINGS.lock().unwrap().as_mut().unwrap().add_folder(&window, location);
             message
         }
         downloader::BotpackStatus::RequiresFullDownload => {
@@ -423,7 +423,7 @@ pub async fn update_map_pack(window: Window) -> String {
             // the most likely cause is the botpack not existing in the first place
             match downloader::download_repo(&window, MAPPACK_REPO.0, MAPPACK_REPO.1, &location, false).await {
                 downloader::BotpackStatus::Success(message) => {
-                    BOT_FOLDER_SETTINGS.lock().unwrap().add_folder(&window, location);
+                    BOT_FOLDER_SETTINGS.lock().unwrap().as_mut().unwrap().add_folder(&window, location);
 
                     if updater.get_map_index(&window).is_none() {
                         ccprintlne(&window, "Couldn't find revision number in map pack".to_owned());
@@ -516,7 +516,7 @@ pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_set
 
     let launcher_settings = LauncherSettings::load(&window);
 
-    let match_settings = match match_settings.setup_for_start_match(&window, &BOT_FOLDER_SETTINGS.lock().unwrap().folders) {
+    let match_settings = match match_settings.setup_for_start_match(&window, &BOT_FOLDER_SETTINGS.lock().unwrap().as_ref().unwrap().folders) {
         Some(match_settings) => match_settings,
         None => {
             if let Err(e) = window.emit("match-start-failed", ()) {

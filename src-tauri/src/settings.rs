@@ -33,7 +33,7 @@ impl FromStr for BotFolder {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BotFolderSettings {
     pub files: HashMap<String, BotFolder>,
     pub folders: HashMap<String, BotFolder>,
@@ -136,7 +136,7 @@ impl MutatorSettings {
         }
     }
 
-    pub fn update_config(&mut self, conf: &mut Ini) {
+    pub fn save_config(&self, conf: &mut Ini) {
         conf.set("mutator_settings", "match_length", Some(self.match_length.clone()));
         conf.set("mutator_settings", "max_score", Some(self.max_score.clone()));
         conf.set("mutator_settings", "overtime", Some(self.overtime.clone()));
@@ -204,9 +204,7 @@ impl MatchSettings {
         }
     }
 
-    pub fn update_config(&mut self, window: &Window, ms: Self) {
-        *self = ms;
-
+    pub fn save_config(&mut self, window: &Window) {
         let mut conf = load_gui_config(window);
         conf.set("match_settings", "map", Some(self.map.clone()));
         conf.set("match_settings", "game_mode", Some(self.game_mode.clone()));
@@ -219,7 +217,7 @@ impl MatchSettings {
         conf.set("match_settings", "enable_state_setting", Some(self.enable_state_setting.to_string()));
         conf.set("match_settings", "auto_save_replay", Some(self.auto_save_replay.to_string()));
         conf.set("match_settings", "scripts", Some(serde_json::to_string(&self.scripts).unwrap_or_default()));
-        self.mutators.update_config(&mut conf);
+        self.mutators.save_config(&mut conf);
 
         if let Err(e) = conf.write(get_config_path()) {
             ccprintlne(window, format!("Error writing config file: {}", e));
