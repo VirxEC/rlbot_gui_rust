@@ -63,6 +63,7 @@ jobs:
           body: ${{ github.event.head_commit.message }}
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ steps.version_check_staging.outputs.releaseVersion }}
+          repo: rlbot_gui_rust
 
       - name: Create new latest.json
         if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
