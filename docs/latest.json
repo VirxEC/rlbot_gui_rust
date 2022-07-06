@@ -1,10 +1,10 @@
 { 
-  "name": "v1.0.8",
-  "notes": "Add build cache & use normal git commands",
+  "name": "v1.0.9",
+  "notes": "Try specifying repo",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSRUhsNHpKd29ueW1rK0J4K2RtSTlZWldQSitETWIrQis0dTdNakNmZHFmMnJpWG05eFE5N3JLTmVHa2QzQURwbXd6Z1hwM1BLKyszdkRxeEluZ3o4bys2akVXRzkreGdRPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNjU2NDg0MDQyCWZpbGU6RDpcYVxybGJvdF9ndWlfcnVzdFxybGJvdF9ndWlfcnVzdFxzcmMtdGF1cmlcdGFyZ2V0XHJlbGVhc2VcYnVuZGxlL21zaS9STEJvdEdVSV8xLjAuOF94NjRfZW4tVVMubXNpLnppcApDU3UxYTB5YjJ0WW9MZ0MwZ1E0cGcvT3ExcG44UWRoVUEvdms0aDRhTHJybWZ4TDhmekFxSnphUUNvQjIvNUNkZkdUWXZvOWd1RHNrVDRoOGZsMERBQT09Cg==",
-      "url":"https://github.com/VirxEC/rlbot_gui_rust/releases/download/v1.0.8/RLBotGUI_1.0.8_x64_en-US.msi.zip"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSRUhsNHpKd29ueW52NXd0TkRRSEREcFdOU0tTcTZCT0ZtOHlnUDFwVEdDVXVWMEdzWHpDOTVnYmxoZUxSbDFaTTdXZjZvYnF4WEJUNmZOVlF0d1R4eGFVUXB0MHEzeEEwPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNjU3MDY4MDg4CWZpbGU6UkxCb3RHVUlfMS4wLjlfeDY0X2VuLVVTLm1zaS56aXAKbkh4QzVaVXZRNDFnaXRxOFhBWDhEZ2d5ZDFuSTZWaHVlN3lLQUN5cHUzNm9xZkZsdnZPZnFidWpyTEt3S3IyalRJeEJmRnp3aWZIVlNJZUUrT0NnREE9PQo=",
+      "url":"https://github.com/VirxEC/rlbot_gui_rust/releases/download/v1.0.9/RLBotGUI_1.0.9_x64_en-US.msi.zip"
     }
   }
 }
