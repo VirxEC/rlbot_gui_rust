@@ -1,18 +1,20 @@
-use crate::rlbot::{
-    agents::runnable::Runnable,
-    gateway_util,
-    parsing::bot_config_bundle::{BotConfigBundle, ScriptConfigBundle},
-    setup_manager,
-};
-use crate::settings::*;
-use crate::*;
 use crate::{
     bot_management::{
         bot_creation::{bootstrap_python_bot, bootstrap_python_hivemind, bootstrap_rust_bot, bootstrap_scratch_bot, CREATED_BOTS_FOLDER},
-        downloader::{self, ProgressBarUpdate},
+        downloader::{self, get_current_tag_name, ProgressBarUpdate},
         zip_extract_fixed,
     },
-    rlbot::parsing::agent_config_parser::BotLooksConfig,
+    rlbot::{
+        agents::runnable::Runnable,
+        gateway_util,
+        parsing::{
+            agent_config_parser::BotLooksConfig,
+            bot_config_bundle::{BotConfigBundle, ScriptConfigBundle},
+        },
+        setup_manager,
+    },
+    settings::*,
+    *,
 };
 use futures_util::StreamExt;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
@@ -581,4 +583,9 @@ pub async fn spawn_car_for_viewing(window: Window, config: BotLooksConfig, team:
     ];
 
     issue_match_handler_command(&window, &args, true)
+}
+
+#[tauri::command]
+pub async fn get_downloaded_botpack_commit_id() -> Option<u32> {
+    get_current_tag_name()
 }

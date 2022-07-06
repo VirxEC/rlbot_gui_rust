@@ -131,35 +131,36 @@ export default {
             // let settings = await eel.get_story_settings_json(this.saveState.story_config)();
 
             // check min map pack version
-            // let key = "min_map_pack_revision"
-            // let min_version = settings[key]
+            let key = "min_map_pack_revision"
+            let min_version = settings[key]
 
             // let cur_version = await eel.get_map_pack_revision()()
-            // let maps_required = (min_version != null)
+            let maps_required = (min_version != null)
 
-            // let need_maps_download = false
-            // let need_maps_update = false
-            // if (maps_required) {
-            //     need_maps_download = (min_version && !cur_version)
-            //     need_maps_update = (min_version > cur_version)
-            // }
+            let need_maps_download = false
+            let need_maps_update = false
+            if (maps_required) {
+                need_maps_download = (min_version && !cur_version)
+                need_maps_update = (min_version > cur_version)
+            }
 
-            // // check botpack condition
-            // // we could do version checks with "release tag" but whatever
-            // // just doing existence checks
-            // let commit_id = await eel.get_downloaded_botpack_commit_id()()
-            // let need_bots_download = (commit_id == null)
+            // check botpack condition
+            // we could do version checks with "release tag" but whatever
+            // just doing existence checks
+            invoke("get_downloaded_botpack_commit_id").then(commit_id => {
+                let need_bots_download = (commit_id == null)
 
-            // this.validationState.mapPack.downloadNeeded = need_maps_download
-            // this.validationState.mapPack.updateNeeded = need_maps_update
-            // this.validationState.botPack.downloadNeeded = need_bots_download
+                this.validationState.mapPack.downloadNeeded = need_maps_download
+                this.validationState.mapPack.updateNeeded = need_maps_update
+                this.validationState.botPack.downloadNeeded = need_bots_download
 
-            // if (need_maps_download || need_maps_update || need_bots_download) {
-            //     this.storyStateMachine(UI_STATES.VALIDATE_PRECONDITIONS);
-            // }
-            // else {
-            //     this.storyStateMachine(UI_STATES.STORY_CHALLENGES)
-            // }
+                if (need_maps_download || need_maps_update || need_bots_download) {
+                    this.storyStateMachine(UI_STATES.VALIDATE_PRECONDITIONS);
+                } else {
+                    this.storyStateMachine(UI_STATES.STORY_CHALLENGES)
+                }
+            });
+            
         },
         validationUIHelper: function() {
             let mapPack = this.validationState.mapPack;
@@ -185,11 +186,11 @@ export default {
         },
         downloadBotPack: function() {
             this.download_in_progress = true
-			// eel.download_bot_pack()(this.handle_download_updates);
+			invoke("download_bot_pack").then(this.handle_download_updates);
         },
         downloadMapPack: function() {
             this.download_in_progress = true
-            // eel.update_map_pack()(this.handle_download_updates);
+			invoke("download_bot_pack").then(this.handle_download_updates);
         },
         handle_download_updates: function(finished) {
             this.download_in_progress = false

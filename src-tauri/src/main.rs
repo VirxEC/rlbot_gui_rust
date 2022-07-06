@@ -414,6 +414,7 @@ fn main() {
         fetch_game_tick_packet_json,
         set_state,
         spawn_car_for_viewing,
+        get_downloaded_botpack_commit_id,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

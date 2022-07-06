@@ -60,7 +60,7 @@ Without using an AUR helper:
 
 ### Other Linux distros (no easy updates)
 
-We have a pre-compiled binary and `.desktop` file, just for you! [Get the `linux-basics.tar.gz` from here](https://github.com/VirxEC/rlbot_gui_rust_apt/releases/latest).
+We have a pre-compiled binary, icon, and `.desktop` just for you! [Get the `linux-basics.tar.gz` from here](https://github.com/VirxEC/rlbot_gui_rust_apt/releases/latest).
 
 If you want to have a script that checks for updates, you could:
 

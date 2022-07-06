@@ -15,9 +15,9 @@ pub fn load_cfg<T: AsRef<Path>>(path: T) -> Result<Ini, String> {
 }
 
 /// Save a CFG file, returns a description of any errors if unable to do so
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `conf`: The CFG file that needs to be saved
 /// * `path`: Where to save the CFG file to
 pub fn save_cfg<T: AsRef<Path>>(conf: Ini, path: T) -> Result<(), String> {
@@ -26,9 +26,9 @@ pub fn save_cfg<T: AsRef<Path>>(conf: Ini, path: T) -> Result<(), String> {
 }
 
 /// Load, change a key, and save a cfg file. Returns a descripton of any errors if unable to do so
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `path`: The path to the CFG file
 /// * `section`: The section of the CFG file to change
 /// * `key`: The key in `section` to change
