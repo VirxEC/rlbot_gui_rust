@@ -417,6 +417,7 @@ fn main() {
             get_story_settings,
             get_map_pack_revision,
             get_cities_json,
+            pick_json_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

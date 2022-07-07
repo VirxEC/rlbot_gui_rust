@@ -1,6 +1,9 @@
 import Colorpicker from './colorpicker-vue.js'
 import LauncherPreferenceModal from './launcher-preference-vue.js'
 
+const invoke = window.__TAURI__.invoke;
+const listen = window.__TAURI__.event.listen;
+
 export default {
     name: 'story-start',
     components: {
@@ -76,17 +79,21 @@ export default {
                 { value: "easy", text: "Easy"},
                 { value: "default", text: "Default"},
                 { value: "custom", text: "User Provided Config"}
-            ]
+            ],
+            field: null,
+            listenForPickFile: listen('json_file_selected', event => {
+                let file_path = event.payload;
+                if (this.field != null) {
+                    this.form.custom_story[this.field] = file_path;
+                    this.field = null;
+                }
+            })
         };
     },
     methods: {
-        pickFile: async function(event) {
-            let field = event.target.value;
-
-            // let path = await eel.pick_location(false, 'JSON files (*.json)')(); // is_folder=False
-            // if (path) {
-            //     this.form.custom_story[field] = path
-            // }
+        pickFile: function(event) {
+            this.field = event.target.value;
+            invoke('pick_json_file');
         },
         submit: function (event) {
             console.log("Submitting story-start");

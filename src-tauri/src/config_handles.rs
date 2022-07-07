@@ -172,6 +172,17 @@ pub async fn pick_bot_config(window: Window) {
 }
 
 #[tauri::command]
+pub async fn pick_json_file(window: Window) {
+    FileDialogBuilder::new().add_filter("JSON File", &["json"]).pick_file(move |path| {
+        if let Some(path) = path {
+            if let Err(e) = window.emit("json_file_selected", path.to_string_lossy().to_string()) {
+                ccprintlne(&window, format!("Failed to emit json_file_selected event: {}", e));
+            }
+        }
+    });
+}
+
+#[tauri::command]
 pub async fn show_path_in_explorer(window: Window, path: String) {
     let command = if cfg!(target_os = "windows") {
         "explorer.exe"
