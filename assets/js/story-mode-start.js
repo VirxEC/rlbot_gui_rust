@@ -40,8 +40,8 @@ export default {
 
         <b-form-group label="User Provided" v-if="form.story_id == 'custom'" label-class="font-weight-bold">
             <b-form-group label="Story Config" label-cols="3">
-                <b-button @click="pickFile" value="storyPath">Pick File</b-button>
-                <span>{{this.form.custom_story.storyPath}}</span>
+                <b-button @click="pickFile" value="story_path">Pick File</b-button>
+                <span>{{this.form.custom_story.story_path}}</span>
             </b-form-group>
         </b-form-group>
         
@@ -68,7 +68,7 @@ export default {
                 teamcolor: 0,
                 story_id: 'default',
                 custom_story: {
-                    storyPath: ''
+                    story_path: ''
                 },
                 use_custom_maps: false
             },

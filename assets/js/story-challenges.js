@@ -3,6 +3,8 @@ import StoryUpgrades from './story-upgrades.js';
 import StoryPickTeam from './story-pick-team.js';
 import StoryRecruitList from './story-recruit-list.js';
 
+const invoke = window.__TAURI__.invoke;
+
 const DEBUG = false;
 
 const CITY_STATE = {
@@ -367,15 +369,17 @@ export default {
     },
     created: async function () {
         console.log(this.saveState)
-        // let cities = await eel.get_cities_json(this.saveState.story_config)();
-        // this.bots_config = await eel.get_bots_json(this.saveState.story_config)();
-        // this.challenges = {}
-        // for (let city of Object.keys(cities)) {
-        //     this.challenges[city] = cities[city].challenges
-        //     this.cityDisplayInfo[city] = cities[city].description
-        //     Object.assign(this.cityDisplayInfo[city], CITY_MAP_INFO[city])
-        // }
-        // this.switchSelectedCityToBest();
+        invoke("get_cities_json", { storySettings: this.saveState.story_settings }).then(cities => {
+            console.log(cities);
+            // this.bots_config = await eel.get_bots_json(this.saveState.story_config)();
+            this.challenges = {}
+            for (let city of Object.keys(cities)) {
+                this.challenges[city] = cities[city].challenges
+                this.cityDisplayInfo[city] = cities[city].description
+                Object.assign(this.cityDisplayInfo[city], CITY_MAP_INFO[city])
+            }
+            this.switchSelectedCityToBest();
+        });
     },
     watch: {
 

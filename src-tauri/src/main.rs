@@ -7,6 +7,7 @@ mod custom_maps;
 mod is_online;
 mod rlbot;
 mod settings;
+mod stories;
 
 use crate::commands::*;
 use crate::config_handles::*;
@@ -14,6 +15,7 @@ use crate::settings::*;
 use lazy_static::{initialize, lazy_static};
 use os_pipe::{pipe, PipeWriter};
 use serde::Serialize;
+use std::collections::HashMap;
 use std::{
     env,
     ffi::OsStr,
@@ -24,7 +26,7 @@ use std::{
     sync::Mutex,
     thread,
 };
-use tauri::{Error as TauriError, Manager, Menu, Window};
+use tauri::{Error as TauriError, Manager, Window};
 
 const BOTPACK_FOLDER: &str = "RLBotPackDeletable";
 const MAPPACK_FOLDER: &str = "RLBotMapPackDeletable";
@@ -38,6 +40,7 @@ lazy_static! {
     static ref BOT_FOLDER_SETTINGS: Mutex<Option<BotFolderSettings>> = Mutex::new(None);
     static ref MATCH_HANDLER_STDIN: Mutex<Option<ChildStdin>> = Mutex::new(None);
     static ref CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
+    static ref STORIES_CACHE: Mutex<Option<HashMap<StorySettings, JsonMap>>> = Mutex::new(None);
 }
 
 #[cfg(windows)]
@@ -245,7 +248,7 @@ fn get_content_folder() -> PathBuf {
     PathBuf::from(format!("{}/.RLBotGUI", env::var("HOME").unwrap()))
 }
 
-fn bootstrap_python_script<T: AsRef<Path>, C: AsRef<[u8]>>(content_folder: T, file_name: &str, file_contents: C) -> IoResult<()> {
+fn bootstrap_gui_file<T: AsRef<Path>, C: AsRef<[u8]>>(content_folder: T, file_name: &str, file_contents: C) -> IoResult<()> {
     let content_folder = content_folder.as_ref();
     let full_path = content_folder.join(file_name);
     println!("{}: {}", file_name, full_path.to_string_lossy());
@@ -306,116 +309,115 @@ fn main() {
     println!("Config path: {}", get_config_path().display());
 
     let content_folder = get_content_folder();
-    bootstrap_python_script(&content_folder, "get_missing_packages.py", include_str!("get_missing_packages.py")).unwrap();
-    bootstrap_python_script(&content_folder, "match_handler.py", include_str!("match_handler.py")).unwrap();
+    bootstrap_gui_file(&content_folder, "get_missing_packages.py", include_str!("get_missing_packages.py")).unwrap();
+    bootstrap_gui_file(&content_folder, "match_handler.py", include_str!("match_handler.py")).unwrap();
 
     initialize(&CONSOLE_TEXT);
     initialize(&MATCH_HANDLER_STDIN);
 
-    let mut app = tauri::Builder::default();
+    *STORIES_CACHE.lock().unwrap() = Some(HashMap::new());
 
-    if cfg!(target_os = "macos") {
-        // Only used in MacOS because copy/pasting and stuff won't work otherwise
-        // Also, MacOS is the only OS with some actually slick app menu integration
-        // Might as well add it encase MacOS support gets added in the future
-        app = app.menu(Menu::os_default("RLBotGUI"));
-    }
+    tauri::Builder::default()
+        .setup(|app| {
+            let window = app.get_window("main").unwrap();
 
-    app.setup(|app| {
-        let window = app.get_window("main").unwrap();
+            *PYTHON_PATH.lock().unwrap() = load_gui_config(&window)
+                .get("python_config", "path")
+                .unwrap_or_else(|| auto_detect_python().unwrap_or_default().0);
+            *BOT_FOLDER_SETTINGS.lock().unwrap() = Some(BotFolderSettings::load(&window));
 
-        *PYTHON_PATH.lock().unwrap() = load_gui_config(&window)
-            .get("python_config", "path")
-            .unwrap_or_else(|| auto_detect_python().unwrap_or_default().0);
-        *BOT_FOLDER_SETTINGS.lock().unwrap() = Some(BotFolderSettings::load(&window));
+            let (mut pipe_reader, pipe_writer) = pipe().unwrap();
+            *CAPTURE_PIPE_WRITER.lock().unwrap() = Some(pipe_writer);
 
-        let (mut pipe_reader, pipe_writer) = pipe().unwrap();
-        *CAPTURE_PIPE_WRITER.lock().unwrap() = Some(pipe_writer);
-
-        thread::spawn(move || {
-            let mut next_replace_last = false;
-            loop {
-                let mut text = String::new();
-                let mut will_replace_last = next_replace_last;
-                next_replace_last = false;
-
+            thread::spawn(move || {
+                let mut next_replace_last = false;
                 loop {
-                    let mut buf = [0];
-                    match pipe_reader.read(&mut buf[..]) {
-                        Ok(0) | Err(_) => break,
-                        Ok(_) => {
-                            let string = String::from_utf8_lossy(&buf).to_owned();
-                            if &string == "\n" {
-                                if text.is_empty() && will_replace_last {
-                                    will_replace_last = false;
-                                    continue;
+                    let mut text = String::new();
+                    let mut will_replace_last = next_replace_last;
+                    next_replace_last = false;
+
+                    loop {
+                        let mut buf = [0];
+                        match pipe_reader.read(&mut buf[..]) {
+                            Ok(0) | Err(_) => break,
+                            Ok(_) => {
+                                let string = String::from_utf8_lossy(&buf).to_owned();
+                                if &string == "\n" {
+                                    if text.is_empty() && will_replace_last {
+                                        will_replace_last = false;
+                                        continue;
+                                    }
+
+                                    break;
+                                } else if &string == "\r" {
+                                    next_replace_last = true;
+                                    break;
                                 }
-
-                                break;
-                            } else if &string == "\r" {
-                                next_replace_last = true;
-                                break;
+                                text.push_str(&string);
                             }
-                            text.push_str(&string);
-                        }
-                    };
+                        };
+                    }
+
+                    emit_text(&window, text, will_replace_last);
                 }
+            });
 
-                emit_text(&window, text, will_replace_last);
-            }
-        });
-
-        Ok(())
-    })
-    .invoke_handler(tauri::generate_handler![
-        get_folder_settings,
-        save_folder_settings,
-        pick_bot_folder,
-        pick_bot_config,
-        show_path_in_explorer,
-        scan_for_bots,
-        get_looks,
-        save_looks,
-        scan_for_scripts,
-        get_match_options,
-        get_match_settings,
-        save_match_settings,
-        get_team_settings,
-        save_team_settings,
-        get_language_support,
-        get_python_path,
-        set_python_path,
-        get_recommendations,
-        pick_appearance_file,
-        begin_python_bot,
-        begin_python_hivemind,
-        begin_rust_bot,
-        begin_scratch_bot,
-        install_package,
-        install_requirements,
-        install_basic_packages,
-        get_console_texts,
-        get_detected_python_path,
-        get_missing_bot_packages,
-        get_missing_script_packages,
-        get_missing_bot_logos,
-        get_missing_script_logos,
-        is_windows,
-        install_python,
-        download_bot_pack,
-        update_bot_pack,
-        is_botpack_up_to_date,
-        check_rlbot_python,
-        update_map_pack,
-        start_match,
-        get_launcher_settings,
-        save_launcher_settings,
-        kill_bots,
-        fetch_game_tick_packet_json,
-        set_state,
-        spawn_car_for_viewing,
-        get_downloaded_botpack_commit_id,
-    ])
-    .run(tauri::generate_context!())
-    .expect("error while running tauri application");
+            Ok(())
+        })
+        .invoke_handler(tauri::generate_handler![
+            get_folder_settings,
+            save_folder_settings,
+            pick_bot_folder,
+            pick_bot_config,
+            show_path_in_explorer,
+            scan_for_bots,
+            get_looks,
+            save_looks,
+            scan_for_scripts,
+            get_match_options,
+            get_match_settings,
+            save_match_settings,
+            get_team_settings,
+            save_team_settings,
+            get_language_support,
+            get_python_path,
+            set_python_path,
+            get_recommendations,
+            pick_appearance_file,
+            begin_python_bot,
+            begin_python_hivemind,
+            begin_rust_bot,
+            begin_scratch_bot,
+            install_package,
+            install_requirements,
+            install_basic_packages,
+            get_console_texts,
+            get_detected_python_path,
+            get_missing_bot_packages,
+            get_missing_script_packages,
+            get_missing_bot_logos,
+            get_missing_script_logos,
+            is_windows,
+            install_python,
+            download_bot_pack,
+            update_bot_pack,
+            is_botpack_up_to_date,
+            check_rlbot_python,
+            update_map_pack,
+            start_match,
+            get_launcher_settings,
+            save_launcher_settings,
+            kill_bots,
+            fetch_game_tick_packet_json,
+            set_state,
+            spawn_car_for_viewing,
+            get_downloaded_botpack_commit_id,
+            story_load_save,
+            story_new_save,
+            get_story_settings,
+            get_map_pack_revision,
+            get_cities_json,
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
 }
