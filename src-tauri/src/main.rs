@@ -206,7 +206,7 @@ pub fn get_capture_command<S: AsRef<OsStr>>(program: S, args: &[&str]) -> Comman
     let out_pipe = pipe.as_ref().unwrap().try_clone().unwrap();
     let err_pipe = pipe.as_ref().unwrap().try_clone().unwrap();
 
-    command.args(args).stdout(out_pipe).stderr(err_pipe);
+    command.args(args).current_dir(get_content_folder()).stdout(out_pipe).stderr(err_pipe);
 
     command
 }
@@ -309,6 +309,8 @@ fn main() {
 
     let content_folder = get_content_folder();
     bootstrap_gui_file(&content_folder, "get_missing_packages.py", include_str!("get_missing_packages.py")).unwrap();
+    bootstrap_gui_file(&content_folder, "custom_map_util.py", include_str!("custom_map_util.py")).unwrap();
+    bootstrap_gui_file(&content_folder, "showroom_util.py", include_str!("showroom_util.py")).unwrap();
     bootstrap_gui_file(&content_folder, "match_handler.py", include_str!("match_handler.py")).unwrap();
 
     initialize(&CONSOLE_TEXT);

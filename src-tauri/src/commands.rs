@@ -459,9 +459,8 @@ pub async fn save_launcher_settings(window: Window, settings: LauncherSettings) 
 
 fn create_match_handler(window: &Window) -> Option<ChildStdin> {
     let program = PYTHON_PATH.lock().unwrap().clone();
-    let script_path = get_content_folder().join("match_handler.py").to_string_lossy().to_string();
 
-    match get_capture_command(program, &[&script_path]).stdin(Stdio::piped()).spawn() {
+    match get_capture_command(program, &["match_handler.py"]).stdin(Stdio::piped()).spawn() {
         Ok(mut child) => child.stdin.take(),
         Err(err) => {
             ccprintlne(window, format!("Failed to start match handler: {}", err));
