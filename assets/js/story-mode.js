@@ -4,6 +4,9 @@ import StoryChallenges from './story-challenges.js';
 
 import AlterSaveState from './story-alter-save-state.js';
 
+const invoke = window.__TAURI__.invoke;
+const listen = window.__TAURI__.event.listen;
+
 const UI_STATES = {
     'LOAD_SAVE': 0,
     'START_SCREEN': 1,
@@ -92,7 +95,12 @@ export default {
             },
             debugMode: false,
             debugStateHelper: '',
-            download_in_progress: false
+            download_in_progress: false,
+            loadUpdatedSaveState: listen("load_updated_save_state", event => {
+                let saveState = event.payload;
+                console.log(saveState);
+                this.saveState = saveState;
+            }),
         };
     },
     methods: {
@@ -103,15 +111,7 @@ export default {
             console.log(`Going from ${this.ui_state} to ${targetState}`);
             this.ui_state = targetState;
         },
-        startMatch: async function (event) {
-            console.log("startMatch");
-            setTimeout(() => {
-                console.log("gonna call eel");
-                // eel.story_story_test();
-            }, 0);
-        },
         startStory: async function (event) {
-            console.log(event);
             let team_settings = {
                 name: event.teamname,
                 color: event.teamcolor,
@@ -121,45 +121,47 @@ export default {
                 custom_config: event.custom_story,
                 use_custom_maps: event.use_custom_maps
             }
-            // let state = await eel.story_new_save(team_settings, story_settings)();
-            // this.saveState = state;
 
-            await this.run_validation()
+            invoke("story_new_save", { teamSettings: team_settings, storySettings: story_settings }).then(state => {
+                this.saveState = state;
+                this.run_validation();
+            });
         },
-        run_validation: async function () {
+        run_validation: function () {
             // check things like map pack and bot pack are downloaded
-            // let settings = await eel.get_story_settings_json(this.saveState.story_config)();
+            invoke("get_story_settings", { storySettings: this.saveState.story_settings }).then(settings => {
+                // check min map pack version
+                let key = "min_map_pack_revision"
+                let min_version = settings[key]
 
-            // check min map pack version
-            // let key = "min_map_pack_revision"
-            // let min_version = settings[key]
+                invoke("get_map_pack_revision").then(cur_version => {
+                    let maps_required = (min_version != null)
 
-            // let cur_version = await eel.get_map_pack_revision()()
-            // let maps_required = (min_version != null)
+                    let need_maps_download = false
+                    let need_maps_update = false
+                    if (maps_required) {
+                        need_maps_download = (min_version && !cur_version)
+                        need_maps_update = (min_version > cur_version)
+                    }
 
-            // let need_maps_download = false
-            // let need_maps_update = false
-            // if (maps_required) {
-            //     need_maps_download = (min_version && !cur_version)
-            //     need_maps_update = (min_version > cur_version)
-            // }
+                    // check botpack condition
+                    // we could do version checks with "release tag" but whatever
+                    // just doing existence checks
+                    invoke("get_downloaded_botpack_commit_id").then(commit_id => {
+                        let need_bots_download = (commit_id == null)
 
-            // // check botpack condition
-            // // we could do version checks with "release tag" but whatever
-            // // just doing existence checks
-            // let commit_id = await eel.get_downloaded_botpack_commit_id()()
-            // let need_bots_download = (commit_id == null)
+                        this.validationState.mapPack.downloadNeeded = need_maps_download
+                        this.validationState.mapPack.updateNeeded = need_maps_update
+                        this.validationState.botPack.downloadNeeded = need_bots_download
 
-            // this.validationState.mapPack.downloadNeeded = need_maps_download
-            // this.validationState.mapPack.updateNeeded = need_maps_update
-            // this.validationState.botPack.downloadNeeded = need_bots_download
-
-            // if (need_maps_download || need_maps_update || need_bots_download) {
-            //     this.storyStateMachine(UI_STATES.VALIDATE_PRECONDITIONS);
-            // }
-            // else {
-            //     this.storyStateMachine(UI_STATES.STORY_CHALLENGES)
-            // }
+                        if (need_maps_download || need_maps_update || need_bots_download) {
+                            this.storyStateMachine(UI_STATES.VALIDATE_PRECONDITIONS);
+                        } else {
+                            this.storyStateMachine(UI_STATES.STORY_CHALLENGES)
+                        }
+                    });
+                });
+            });
         },
         validationUIHelper: function() {
             let mapPack = this.validationState.mapPack;
@@ -185,24 +187,25 @@ export default {
         },
         downloadBotPack: function() {
             this.download_in_progress = true
-			// eel.download_bot_pack()(this.handle_download_updates);
+			invoke("download_bot_pack").then(this.handle_download_updates);
         },
         downloadMapPack: function() {
             this.download_in_progress = true
-            // eel.update_map_pack()(this.handle_download_updates);
+			invoke("download_bot_pack").then(this.handle_download_updates);
         },
         handle_download_updates: function(finished) {
             this.download_in_progress = false
             this.run_validation()
         },
-        deleteSave: async function () {
-            // await eel.story_delete_save()();
-            this.saveState = null;
-            this.storyStateMachine(UI_STATES.START_SCREEN);
+        deleteSave: function () {
+            invoke("story_delete_save").then(() => {
+                this.saveState = null;
+                this.storyStateMachine(UI_STATES.START_SCREEN);
+            });
         },
         launchChallenge: function ({ id, pickedTeammates }) {
             console.log("Starting match", id);
-            // eel.launch_challenge(id, pickedTeammates);
+            invoke("launch_challenge", { storySettings: this.saveState.story_settings, challengeId: id, pickedTeammates: pickedTeammates });
         },
         purchaseUpgrade: function ({ id, currentCurrency, cost }) {
             // Send eel a message to add id to purchases and reduce currency
@@ -215,22 +218,13 @@ export default {
         }
     },
     created: async function () {
-        // let state = await eel.story_load_save()();
-        console.log(state);
-        if (!state) {
-            this.storyStateMachine(UI_STATES.START_SCREEN);
-        }
-        else {
-            this.saveState = state;
-            this.run_validation()
-        }
-
-        let self = this;
-        // eel.expose(loadUpdatedSaveState);
-        function loadUpdatedSaveState(saveState) {
-            self.saveState = saveState;
-            console.log(saveState);
-        }
-
+        invoke("story_load_save").then(state => {
+            if (!state) {
+                this.storyStateMachine(UI_STATES.START_SCREEN);
+            } else {
+                this.saveState = state;
+                this.run_validation()
+            }
+        });
     },
 };

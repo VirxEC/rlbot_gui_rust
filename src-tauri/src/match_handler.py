@@ -1,7 +1,6 @@
 import json
 import multiprocessing as mp
 import os
-import platform
 import shutil
 import sys
 from contextlib import contextmanager
@@ -35,7 +34,7 @@ from rlbot.utils.structures.game_data_struct import Physics as PhysicsGTP
 
 sm: SetupManager = None
 CUSTOM_MAP_TARGET = {"filename": "Labs_Utopia_P.upk", "game_map": "UtopiaRetro"}
-logger = logging_utils.get_logger("custom_maps")
+logger = logging_utils.get_logger("match_handler")
 
 
 def create_player_config(bot: dict, human_index_tracker: IncrementingInteger):
@@ -135,6 +134,20 @@ def setup_match(
 ):
     """Starts the match and bots. Also detects and handles custom maps"""
 
+    def do_setup():
+        setup_manager.early_start_seconds = 5
+        setup_manager.connect_to_game(launcher_preference=launcher_pref)
+
+        # Loading the setup manager's game interface just as a quick fix because story mode uses it. Ideally story mode
+        # should now make its own game interface to use.
+        setup_manager.game_interface.load_interface(wants_ball_predictions=False, wants_quick_chat=False, wants_game_messages=False)
+        setup_manager.load_match_config(match_config)
+        setup_manager.launch_early_start_bot_processes()
+        setup_manager.start_match()
+        setup_manager.launch_bot_processes()
+        while not setup_manager.has_received_metadata_from_all_bots():
+            setup_manager.try_recieve_agent_metadata()
+
     map_file = match_config.game_map
     if map_file.endswith('.upk') or map_file.endswith('.udk'):
         rl_directory = identify_map_directory(launcher_pref)
@@ -149,28 +162,9 @@ def setup_match(
                 match_config.script_configs.append(
                     create_script_config({'path': config_path}))
                 print(f"Will load custom script for map {config_path}")
-
-    setup_manager.early_start_seconds = 5
-    setup_manager.connect_to_game(launcher_preference=launcher_pref)
-
-    # Loading the setup manager's game interface just as a quick fix because story mode uses it. Ideally story mode
-    # should now make its own game interface to use.
-    setup_manager.game_interface.load_interface(wants_ball_predictions=False, wants_quick_chat=False, wants_game_messages=False)
-    setup_manager.load_match_config(match_config)
-    setup_manager.launch_early_start_bot_processes()
-    setup_manager.start_match()
-    setup_manager.launch_bot_processes()
-
-    if platform.system() == "Windows":
-        # This is a very weird issue on Windows only
-        # This is the only solution I could find
-        # Basically, all bots but the last bot were starting
-        # And this somehow fixes that?
-        logger.warning("Starting dummy process to ensure bots start")
-        proc = mp.Process()
-        proc.start()
-        proc.join()
-        logger.info("Dummy process started, all bots should be running")
+            do_setup()
+    else:
+        do_setup()
 
 def start_match_helper(bot_list: List[dict], match_settings: dict, launcher_prefs: RocketLeagueLauncherPreference):
     print(f"Bot list: {bot_list}")
@@ -430,6 +424,8 @@ def spawn_car_for_viewing(looks: dict, team: int, showcase_type: str, map_name: 
     spawn_car_in_showroom(loadout_config, team, showcase_type, map_name, launcher_prefs)
 
 if __name__ == "__main__":
+    mp.set_start_method("spawn")
+    
     try:
         online = True
         while online:

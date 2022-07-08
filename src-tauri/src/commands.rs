@@ -1,18 +1,20 @@
-use crate::rlbot::{
-    agents::runnable::Runnable,
-    gateway_util,
-    parsing::bot_config_bundle::{BotConfigBundle, ScriptConfigBundle},
-    setup_manager,
-};
-use crate::settings::*;
-use crate::*;
 use crate::{
     bot_management::{
         bot_creation::{bootstrap_python_bot, bootstrap_python_hivemind, bootstrap_rust_bot, bootstrap_scratch_bot, CREATED_BOTS_FOLDER},
-        downloader::{self, ProgressBarUpdate},
+        downloader::{self, get_current_tag_name, ProgressBarUpdate},
         zip_extract_fixed,
     },
-    rlbot::parsing::agent_config_parser::BotLooksConfig,
+    rlbot::{
+        agents::runnable::Runnable,
+        gateway_util,
+        parsing::{
+            agent_config_parser::BotLooksConfig,
+            bot_config_bundle::{BotConfigBundle, ScriptConfigBundle},
+        },
+        setup_manager,
+    },
+    settings::*,
+    *,
 };
 use futures_util::StreamExt;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
@@ -120,7 +122,8 @@ pub async fn install_requirements(window: Window, config_path: String) -> Packag
     }
 }
 
-async fn install_upgrade_basic_packages(window: &Window) -> PackageResult {
+#[tauri::command]
+pub async fn install_basic_packages(window: Window) -> PackageResult {
     let packages = vec![
         String::from("pip"),
         String::from("setuptools"),
@@ -134,7 +137,7 @@ async fn install_upgrade_basic_packages(window: &Window) -> PackageResult {
 
     if !is_online::check().await {
         ccprintlne(
-            window,
+            &window,
             "Could not connect to the internet to install/update basic packages. Please check your internet connection and try again.".to_string(),
         );
 
@@ -156,11 +159,6 @@ async fn install_upgrade_basic_packages(window: &Window) -> PackageResult {
     }
 
     PackageResult { exit_code, packages }
-}
-
-#[tauri::command]
-pub async fn install_basic_packages(window: Window) -> PackageResult {
-    install_upgrade_basic_packages(&window).await
 }
 
 #[tauri::command]
@@ -581,4 +579,9 @@ pub async fn spawn_car_for_viewing(window: Window, config: BotLooksConfig, team:
     ];
 
     issue_match_handler_command(&window, &args, true)
+}
+
+#[tauri::command]
+pub async fn get_downloaded_botpack_commit_id() -> Option<u32> {
+    get_current_tag_name()
 }

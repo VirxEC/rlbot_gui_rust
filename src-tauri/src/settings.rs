@@ -52,12 +52,11 @@ impl BotFolderSettings {
     pub fn update_config(&mut self, window: &Window, bfs: Self) {
         *self = bfs;
 
-        let path = get_config_path();
         let mut conf = load_gui_config(window);
         conf.set("bot_folder_settings", "files", serde_json::to_string(&self.files).ok());
         conf.set("bot_folder_settings", "folders", serde_json::to_string(&self.folders).ok());
 
-        if let Err(e) = conf.write(&path) {
+        if let Err(e) = conf.write(&get_config_path()) {
             ccprintlne(window, format!("Failed to write config file: {}", e));
         }
     }
@@ -428,4 +427,56 @@ pub struct GameTickPacket {
     pub game_ball: Ball,
     pub game_cars: Vec<Car>,
     pub game_info: GameInfo,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct TeamSettings {
+    pub name: String,
+    pub color: u16,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Hash, Eq, PartialEq)]
+pub struct CustomConfig {
+    pub story_path: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, Hash, Eq, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum StoryIDs {
+    Easy,
+    Default,
+    Custom,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Hash, Eq, PartialEq)]
+pub struct StorySettings {
+    pub story_id: StoryIDs,
+    pub use_custom_maps: bool,
+    pub custom_config: CustomConfig,
+}
+
+/// Represents users game state in RLBot Story Mode
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct StoryState {
+    version: u8,
+    pub story_settings: StorySettings,
+    team_settings: TeamSettings,
+    teammates: Vec<String>,
+    challenges_attempts: HashMap<String, u32>,
+    challenges_completed: HashMap<String, bool>,
+    upgrades: HashMap<String, u32>,
+}
+
+impl StoryState {
+    pub fn new(team_settings: TeamSettings, story_settings: StorySettings) -> Self {
+        Self {
+            version: 1,
+            story_settings,
+            team_settings,
+            teammates: Vec::new(),
+            challenges_attempts: HashMap::new(),
+            challenges_completed: HashMap::new(),
+            upgrades: HashMap::new(),
+        }
+    }
 }

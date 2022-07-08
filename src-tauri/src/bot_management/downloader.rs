@@ -206,7 +206,7 @@ pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, c
 }
 
 /// Load the GUI config and check the get the current version number of the botpack
-fn get_current_tag_name() -> Option<u32> {
+pub fn get_current_tag_name() -> Option<u32> {
     load_cfg(get_config_path())
         .ok()?
         .get("bot_folder_settings", "incr")?

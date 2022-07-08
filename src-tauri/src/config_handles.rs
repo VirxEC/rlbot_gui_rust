@@ -1,4 +1,5 @@
 use crate::{
+    bot_management::downloader::MapPackUpdater,
     custom_maps::find_all_custom_maps,
     rlbot::{
         agents::runnable::Runnable,
@@ -10,7 +11,7 @@ use crate::{
         },
     },
     settings::*,
-    *,
+    stories, *,
 };
 use configparser::ini::Ini;
 use glob::glob;
@@ -67,6 +68,7 @@ pub fn load_gui_config(window: &Window) -> Ini {
         conf.set("launcher_settings", "preferred_launcher", Some("epic".to_owned()));
         conf.set("launcher_settings", "use_login_tricks", Some("true".to_owned()));
         conf.set("launcher_settings", "rocket_league_exe_path", None);
+        conf.set("story_mode", "save_state", None);
 
         if let Err(e) = conf.write(&config_path) {
             ccprintlne(window, format!("Failed to write config file: {}", e));
@@ -165,6 +167,17 @@ pub async fn pick_bot_config(window: Window) {
     FileDialogBuilder::new().add_filter("Bot Cfg File", &["cfg"]).pick_file(move |path| {
         if let Some(path) = path {
             BOT_FOLDER_SETTINGS.lock().unwrap().as_mut().unwrap().add_file(&window, path.to_string_lossy().to_string());
+        }
+    });
+}
+
+#[tauri::command]
+pub async fn pick_json_file(window: Window) {
+    FileDialogBuilder::new().add_filter("JSON File", &["json"]).pick_file(move |path| {
+        if let Some(path) = path {
+            if let Err(e) = window.emit("json_file_selected", path.to_string_lossy().to_string()) {
+                ccprintlne(&window, format!("Failed to emit json_file_selected event: {}", e));
+            }
         }
     });
 }
@@ -377,4 +390,103 @@ pub async fn get_recommendations(window: Window) -> Option<AllRecommendations<Bo
             BotConfigBundle::default()
         })
     })
+}
+
+#[tauri::command]
+pub async fn story_load_save(window: Window) -> Option<StoryState> {
+    serde_json::from_str(&load_gui_config(&window).get("story_mode", "save_state")?).ok()
+}
+
+#[tauri::command]
+pub async fn story_new_save(window: Window, team_settings: TeamSettings, story_settings: StorySettings) -> StoryState {
+    let state = StoryState::new(team_settings, story_settings);
+
+    let mut conf = load_gui_config(&window);
+    conf.set("story_mode", "save_state", serde_json::to_string(&state).ok());
+
+    if let Err(e) = conf.write(get_config_path()) {
+        ccprintlne(&window, format!("Failed to write config: {}", e));
+    }
+
+    state
+}
+
+#[tauri::command]
+pub async fn get_map_pack_revision(window: Window) -> Option<String> {
+    let location = Path::new(&get_content_folder()).join(MAPPACK_FOLDER);
+    let updater = MapPackUpdater::new(location, MAPPACK_REPO.0.to_owned(), MAPPACK_REPO.1.to_owned());
+    let index = updater.get_map_index(&window);
+    if let Some(index) = index {
+        if let Some(revision) = index.get("revision") {
+            return Some(revision.to_string());
+        }
+    }
+
+    None
+}
+
+pub type JsonMap = serde_json::Map<String, serde_json::Value>;
+
+fn get_story_json(story_settings: StorySettings) -> Option<JsonMap> {
+    match story_settings.story_id {
+        StoryIDs::Default => {
+            if story_settings.use_custom_maps {
+                Some(stories::cmaps::default::json())
+            } else {
+                Some(stories::default::json())
+            }
+        }
+        StoryIDs::Easy => {
+            if story_settings.use_custom_maps {
+                Some(stories::cmaps::easy::json())
+            } else {
+                Some(stories::easy::json())
+            }
+        }
+        StoryIDs::Custom => serde_json::from_str(&read_to_string(story_settings.custom_config.story_path).ok()?).ok(),
+    }
+}
+
+fn get_story_config(story_settings: StorySettings) -> Option<JsonMap> {
+    if let Some(json) = STORIES_CACHE.lock().unwrap().as_ref().unwrap().get(&story_settings) {
+        return Some(json.to_owned());
+    }
+
+    get_story_json(story_settings)
+}
+
+fn get_map_from_story_key(story_settings: StorySettings, key: &str) -> Option<JsonMap> {
+    Some(get_story_config(story_settings)?.get(key)?.as_object()?.to_owned())
+}
+
+#[tauri::command]
+pub async fn get_story_settings(story_settings: StorySettings) -> JsonMap {
+    get_map_from_story_key(story_settings, "settings").unwrap_or_default()
+}
+
+#[tauri::command]
+pub async fn get_cities_json(story_settings: StorySettings) -> JsonMap {
+    get_map_from_story_key(story_settings, "cities").unwrap_or_default()
+}
+
+// Get the base bots config and merge it with the bots in the story config
+#[tauri::command]
+pub async fn get_bots_configs(story_settings: StorySettings) -> JsonMap {
+    let mut bots = BOTS_BASE.lock().unwrap().as_ref().unwrap().to_owned();
+
+    if let Some(more_bots) = get_map_from_story_key(story_settings, "bots") {
+        bots.extend(more_bots);
+    }
+
+    bots
+}
+
+#[tauri::command]
+pub async fn story_delete_save(window: Window) {
+    let mut conf = load_gui_config(&window);
+    conf.set("story_mode", "save_state", None);
+
+    if let Err(e) = conf.write(get_config_path()) {
+        ccprintlne(&window, format!("Failed to write config: {}", e));
+    }
 }
