@@ -122,7 +122,8 @@ pub async fn install_requirements(window: Window, config_path: String) -> Packag
     }
 }
 
-async fn install_upgrade_basic_packages(window: &Window) -> PackageResult {
+#[tauri::command]
+pub async fn install_basic_packages(window: Window) -> PackageResult {
     let packages = vec![
         String::from("pip"),
         String::from("setuptools"),
@@ -136,7 +137,7 @@ async fn install_upgrade_basic_packages(window: &Window) -> PackageResult {
 
     if !is_online::check().await {
         ccprintlne(
-            window,
+            &window,
             "Could not connect to the internet to install/update basic packages. Please check your internet connection and try again.".to_string(),
         );
 
@@ -158,11 +159,6 @@ async fn install_upgrade_basic_packages(window: &Window) -> PackageResult {
     }
 
     PackageResult { exit_code, packages }
-}
-
-#[tauri::command]
-pub async fn install_basic_packages(window: Window) -> PackageResult {
-    install_upgrade_basic_packages(&window).await
 }
 
 #[tauri::command]

@@ -990,7 +990,7 @@ export default {
 				}
 	
 				if (!this.init) {
-					if (false && !this.$route.query.check_for_updates) {
+					if (/*false && */!this.$route.query.check_for_updates) {
 						this.showProgressSpinner = true;
 						this.miniConsoleTitle = "Checking for updated packages...";
 						this.$bvModal.show("mini-console");
