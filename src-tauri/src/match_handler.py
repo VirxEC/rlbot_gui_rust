@@ -1,7 +1,6 @@
 import json
 import multiprocessing as mp
 import os
-import platform
 import shutil
 import sys
 from contextlib import contextmanager
@@ -146,6 +145,8 @@ def setup_match(
         setup_manager.launch_early_start_bot_processes()
         setup_manager.start_match()
         setup_manager.launch_bot_processes()
+        while not setup_manager.has_received_metadata_from_all_bots():
+            setup_manager.try_recieve_agent_metadata()
 
     map_file = match_config.game_map
     if map_file.endswith('.upk') or map_file.endswith('.udk'):
@@ -423,6 +424,8 @@ def spawn_car_for_viewing(looks: dict, team: int, showcase_type: str, map_name: 
     spawn_car_in_showroom(loadout_config, team, showcase_type, map_name, launcher_prefs)
 
 if __name__ == "__main__":
+    mp.set_start_method("spawn")
+    
     try:
         online = True
         while online:
