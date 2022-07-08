@@ -40,15 +40,14 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            src-tauri/target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo
 
       - name: Install Tauri CLI
-        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' && steps.cache.outputs.cache-hit != 'true' }}
+        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
         run: yarn add -D @tauri-apps/cli
 
       - name: Build GUI
-        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' && steps.cache.outputs.cache-hit != 'true' }}
+        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
         env:
           TAURI_PRIVATE_KEY: '${{ secrets.TAURI_PRIVATE_KEY }}'
           TAURI_KEY_PASSWORD: '${{ secrets.TAURI_KEY_PASSWORD }}'
@@ -68,7 +67,7 @@ jobs:
       - name: Create new latest.json
         if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
         shell: cmd
-        run: gen-latest-json.bat ${{ steps.version_check_staging.outputs.releaseVersion }} ${{ steps.version_check_staging.outputs.rawVersion }} "${{ github.event.head_commit.message }}"
+        run: gen-latest-json.bat ${{ steps.version_check_staging.outputs.releaseVersion }} ${{ steps.version_check_staging.outputs.rawVersion }}
 
       - name: Change branch to site
         if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
@@ -133,8 +132,7 @@ jobs:
             ~/.cargo/registry/index/
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
-            src-tauri/target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo
 
       - name: Install ubuntu dev packages
         if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' && steps.cache.outputs.cache-hit != 'true' }}
@@ -143,11 +141,11 @@ jobs:
           sudo apt install libwebkit2gtk-4.0-dev libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev
 
       - name: Install Tauri CLI
-        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' && steps.cache.outputs.cache-hit != 'true' }}
+        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
         run: yarn add -D @tauri-apps/cli
 
       - name: Build GUI
-        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' && steps.cache.outputs.cache-hit != 'true' }}
+        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
         run: yarn tauri build
 
       - name: Move out build files
