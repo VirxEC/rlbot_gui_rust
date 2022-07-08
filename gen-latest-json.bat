@@ -1,9 +1,5 @@
 @echo off
 
-echo %1
-echo %2
-echo %3
-
 set /p sig=<src-tauri\target\release\bundle\msi\RLBotGUI_%2_x64_en-US.msi.zip.sig
 echo %sig%
 
