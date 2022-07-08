@@ -9,9 +9,7 @@ mod rlbot;
 mod settings;
 mod stories;
 
-use crate::commands::*;
-use crate::config_handles::*;
-use crate::settings::*;
+use crate::{commands::*, config_handles::*, settings::*, stories::bots_base};
 use lazy_static::{initialize, lazy_static};
 use os_pipe::{pipe, PipeWriter};
 use serde::Serialize;
@@ -41,6 +39,7 @@ lazy_static! {
     static ref MATCH_HANDLER_STDIN: Mutex<Option<ChildStdin>> = Mutex::new(None);
     static ref CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
     static ref STORIES_CACHE: Mutex<Option<HashMap<StorySettings, JsonMap>>> = Mutex::new(None);
+    static ref BOTS_BASE: Mutex<Option<JsonMap>> = Mutex::new(None);
 }
 
 #[cfg(windows)]
@@ -316,6 +315,7 @@ fn main() {
     initialize(&MATCH_HANDLER_STDIN);
 
     *STORIES_CACHE.lock().unwrap() = Some(HashMap::new());
+    *BOTS_BASE.lock().unwrap() = Some(bots_base::json());
 
     tauri::Builder::default()
         .setup(|app| {
@@ -418,6 +418,8 @@ fn main() {
             get_map_pack_revision,
             get_cities_json,
             pick_json_file,
+            get_bots_configs,
+            story_delete_save,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

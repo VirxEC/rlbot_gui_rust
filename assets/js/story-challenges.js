@@ -370,8 +370,8 @@ export default {
     created: async function () {
         console.log(this.saveState)
         invoke("get_cities_json", { storySettings: this.saveState.story_settings }).then(cities => {
-            console.log(cities);
-            // this.bots_config = await eel.get_bots_json(this.saveState.story_config)();
+            invoke("get_bots_configs", { storySettings: this.saveState.story_settings }).then(bots => this.bots_config = bots);
+
             this.challenges = {}
             for (let city of Object.keys(cities)) {
                 this.challenges[city] = cities[city].challenges
@@ -380,8 +380,5 @@ export default {
             }
             this.switchSelectedCityToBest();
         });
-    },
-    watch: {
-
     }
 };

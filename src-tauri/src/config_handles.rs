@@ -468,3 +468,25 @@ pub async fn get_story_settings(story_settings: StorySettings) -> JsonMap {
 pub async fn get_cities_json(story_settings: StorySettings) -> JsonMap {
     get_map_from_story_key(story_settings, "cities").unwrap_or_default()
 }
+
+// Get the base bots config and merge it with the bots in the story config
+#[tauri::command]
+pub async fn get_bots_configs(story_settings: StorySettings) -> JsonMap {
+    let mut bots = BOTS_BASE.lock().unwrap().as_ref().unwrap().to_owned();
+
+    if let Some(more_bots) = get_map_from_story_key(story_settings, "bots") {
+        bots.extend(more_bots);
+    }
+
+    bots
+}
+
+#[tauri::command]
+pub async fn story_delete_save(window: Window) {
+    let mut conf = load_gui_config(&window);
+    conf.set("story_mode", "save_state", None);
+
+    if let Err(e) = conf.write(get_config_path()) {
+        ccprintlne(&window, format!("Failed to write config: {}", e));
+    }
+}

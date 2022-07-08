@@ -111,15 +111,7 @@ export default {
             console.log(`Going from ${this.ui_state} to ${targetState}`);
             this.ui_state = targetState;
         },
-        startMatch: async function (event) {
-            console.log("startMatch");
-            setTimeout(() => {
-                console.log("gonna call eel");
-                // eel.story_story_test();
-            }, 0);
-        },
         startStory: async function (event) {
-            console.log(event);
             let team_settings = {
                 name: event.teamname,
                 color: event.teamcolor,
@@ -205,14 +197,15 @@ export default {
             this.download_in_progress = false
             this.run_validation()
         },
-        deleteSave: async function () {
-            // await eel.story_delete_save()();
-            this.saveState = null;
-            this.storyStateMachine(UI_STATES.START_SCREEN);
+        deleteSave: function () {
+            invoke("story_delete_save").then(() => {
+                this.saveState = null;
+                this.storyStateMachine(UI_STATES.START_SCREEN);
+            });
         },
         launchChallenge: function ({ id, pickedTeammates }) {
             console.log("Starting match", id);
-            // eel.launch_challenge(id, pickedTeammates);
+            invoke("launch_challenge", { storySettings: this.saveState.story_settings, challengeId: id, pickedTeammates: pickedTeammates });
         },
         purchaseUpgrade: function ({ id, currentCurrency, cost }) {
             // Send eel a message to add id to purchases and reduce currency
@@ -226,7 +219,6 @@ export default {
     },
     created: async function () {
         invoke("story_load_save").then(state => {
-            console.log(state);
             if (!state) {
                 this.storyStateMachine(UI_STATES.START_SCREEN);
             } else {
