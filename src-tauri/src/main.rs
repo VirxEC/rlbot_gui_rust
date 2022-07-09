@@ -17,9 +17,8 @@ use std::collections::HashMap;
 use std::{
     env,
     ffi::OsStr,
-    fs::{create_dir_all, write},
     io::{Read, Result as IoResult},
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::{Child, ChildStdin, Command, Stdio},
     sync::Mutex,
     thread,
@@ -247,18 +246,6 @@ fn get_content_folder() -> PathBuf {
     PathBuf::from(format!("{}/.RLBotGUI", env::var("HOME").unwrap()))
 }
 
-fn bootstrap_gui_file<T: AsRef<Path>, C: AsRef<[u8]>>(content_folder: T, file_name: &str, file_contents: C) -> IoResult<()> {
-    let content_folder = content_folder.as_ref();
-    let full_path = content_folder.join(file_name);
-    println!("{}: {}", file_name, full_path.to_string_lossy());
-
-    if !content_folder.exists() {
-        create_dir_all(&full_path)?;
-    }
-
-    write(full_path, file_contents)
-}
-
 fn update_internal_console(update: &ConsoleTextUpdate) {
     let mut console_text = CONSOLE_TEXT.lock().unwrap();
     if update.replace_last {
@@ -306,12 +293,6 @@ fn emit_text(window: &Window, text: String, replace_last: bool) {
 
 fn main() {
     println!("Config path: {}", get_config_path().display());
-
-    let content_folder = get_content_folder();
-    bootstrap_gui_file(&content_folder, "get_missing_packages.py", include_str!("get_missing_packages.py")).unwrap();
-    bootstrap_gui_file(&content_folder, "custom_map_util.py", include_str!("custom_map_util.py")).unwrap();
-    bootstrap_gui_file(&content_folder, "showroom_util.py", include_str!("showroom_util.py")).unwrap();
-    bootstrap_gui_file(&content_folder, "match_handler.py", include_str!("match_handler.py")).unwrap();
 
     initialize(&CONSOLE_TEXT);
     initialize(&MATCH_HANDLER_STDIN);

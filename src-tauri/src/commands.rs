@@ -133,6 +133,7 @@ pub async fn install_basic_packages(window: Window) -> PackageResult {
         String::from("numba<0.56"),
         String::from("selenium"),
         String::from("rlbot"),
+        String::from("rlbot-smh"),
     ];
 
     if !is_online::check().await {
@@ -460,7 +461,10 @@ pub async fn save_launcher_settings(window: Window, settings: LauncherSettings) 
 fn create_match_handler(window: &Window) -> Option<ChildStdin> {
     let program = PYTHON_PATH.lock().unwrap().clone();
 
-    match get_capture_command(program, &["match_handler.py"]).stdin(Stdio::piped()).spawn() {
+    match get_capture_command(program, &["-c", "from rlbot_smh.match_handler import listen; listen()"])
+        .stdin(Stdio::piped())
+        .spawn()
+    {
         Ok(mut child) => child.stdin.take(),
         Err(err) => {
             ccprintlne(window, format!("Failed to start match handler: {}", err));
