@@ -12,8 +12,12 @@ mod stories;
 use crate::{commands::*, config_handles::*, settings::*, stories::bots_base};
 use lazy_static::{initialize, lazy_static};
 use os_pipe::{pipe, PipeWriter};
+#[cfg(windows)]
+use registry::{Hive, Security};
 use serde::Serialize;
 use std::collections::HashMap;
+#[cfg(windows)]
+use std::path::Path;
 use std::{
     env,
     ffi::OsStr,
@@ -143,7 +147,6 @@ pub fn ccprintlne(window: &Window, text: String) {
 
 #[cfg(windows)]
 fn has_chrome() -> bool {
-    use registry::{Hive, Security};
     let reg_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe";
 
     for install_type in [Hive::CurrentUser, Hive::LocalMachine].iter() {
