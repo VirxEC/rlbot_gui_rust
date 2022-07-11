@@ -17,9 +17,8 @@ use std::collections::HashMap;
 use std::{
     env,
     ffi::OsStr,
-    fs::{create_dir_all, write},
     io::{Read, Result as IoResult},
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::{Child, ChildStdin, Command, Stdio},
     sync::Mutex,
     thread,
@@ -206,7 +205,7 @@ pub fn get_capture_command<S: AsRef<OsStr>>(program: S, args: &[&str]) -> Comman
     let out_pipe = pipe.as_ref().unwrap().try_clone().unwrap();
     let err_pipe = pipe.as_ref().unwrap().try_clone().unwrap();
 
-    command.args(args).stdout(out_pipe).stderr(err_pipe);
+    command.args(args).current_dir(get_content_folder()).stdout(out_pipe).stderr(err_pipe);
 
     command
 }
@@ -247,18 +246,6 @@ fn get_content_folder() -> PathBuf {
     PathBuf::from(format!("{}/.RLBotGUI", env::var("HOME").unwrap()))
 }
 
-fn bootstrap_gui_file<T: AsRef<Path>, C: AsRef<[u8]>>(content_folder: T, file_name: &str, file_contents: C) -> IoResult<()> {
-    let content_folder = content_folder.as_ref();
-    let full_path = content_folder.join(file_name);
-    println!("{}: {}", file_name, full_path.to_string_lossy());
-
-    if !content_folder.exists() {
-        create_dir_all(&full_path)?;
-    }
-
-    write(full_path, file_contents)
-}
-
 fn update_internal_console(update: &ConsoleTextUpdate) {
     let mut console_text = CONSOLE_TEXT.lock().unwrap();
     if update.replace_last {
@@ -292,6 +279,13 @@ fn try_emit_text(window: &Window, text: String, replace_last: bool) -> (String, 
         let text = text.replace("-|-*|GTP ", "").replace("|*-|-", "");
         let gtp: GameTickPacket = serde_json::from_str(&text).unwrap();
         try_emit_signal(window, "gtp", gtp)
+    } else if text.starts_with("-|-*|STORY_RESULT ") && text.ends_with("|*-|-") {
+        println!("GOT STORY RESULT");
+        let text = text.replace("-|-*|STORY_RESULT ", "").replace("|*-|-", "");
+        println!("{}", &text);
+        let save_state: StoryState = serde_json::from_str(&text).unwrap();
+        save_state.save(window);
+        try_emit_signal(window, "load_updated_save_state", save_state)
     } else {
         issue_console_update(window, text, replace_last)
     }
@@ -306,10 +300,6 @@ fn emit_text(window: &Window, text: String, replace_last: bool) {
 
 fn main() {
     println!("Config path: {}", get_config_path().display());
-
-    let content_folder = get_content_folder();
-    bootstrap_gui_file(&content_folder, "get_missing_packages.py", include_str!("get_missing_packages.py")).unwrap();
-    bootstrap_gui_file(&content_folder, "match_handler.py", include_str!("match_handler.py")).unwrap();
 
     initialize(&CONSOLE_TEXT);
     initialize(&MATCH_HANDLER_STDIN);
@@ -420,6 +410,7 @@ fn main() {
             pick_json_file,
             get_bots_configs,
             story_delete_save,
+            launch_challenge,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -400,14 +400,7 @@ pub async fn story_load_save(window: Window) -> Option<StoryState> {
 #[tauri::command]
 pub async fn story_new_save(window: Window, team_settings: TeamSettings, story_settings: StorySettings) -> StoryState {
     let state = StoryState::new(team_settings, story_settings);
-
-    let mut conf = load_gui_config(&window);
-    conf.set("story_mode", "save_state", serde_json::to_string(&state).ok());
-
-    if let Err(e) = conf.write(get_config_path()) {
-        ccprintlne(&window, format!("Failed to write config: {}", e));
-    }
-
+    state.save(&window);
     state
 }
 
@@ -427,7 +420,7 @@ pub async fn get_map_pack_revision(window: Window) -> Option<String> {
 
 pub type JsonMap = serde_json::Map<String, serde_json::Value>;
 
-fn get_story_json(story_settings: StorySettings) -> Option<JsonMap> {
+fn get_story_json(story_settings: &StorySettings) -> Option<JsonMap> {
     match story_settings.story_id {
         StoryIDs::Default => {
             if story_settings.use_custom_maps {
@@ -443,35 +436,37 @@ fn get_story_json(story_settings: StorySettings) -> Option<JsonMap> {
                 Some(stories::easy::json())
             }
         }
-        StoryIDs::Custom => serde_json::from_str(&read_to_string(story_settings.custom_config.story_path).ok()?).ok(),
+        StoryIDs::Custom => serde_json::from_str(&read_to_string(&story_settings.custom_config.story_path).ok()?).ok(),
     }
 }
 
-fn get_story_config(story_settings: StorySettings) -> Option<JsonMap> {
-    if let Some(json) = STORIES_CACHE.lock().unwrap().as_ref().unwrap().get(&story_settings) {
+fn get_story_config(story_settings: &StorySettings) -> Option<JsonMap> {
+    if let Some(json) = STORIES_CACHE.lock().unwrap().as_ref().unwrap().get(story_settings) {
         return Some(json.to_owned());
     }
 
     get_story_json(story_settings)
 }
 
-fn get_map_from_story_key(story_settings: StorySettings, key: &str) -> Option<JsonMap> {
+fn get_map_from_story_key(story_settings: &StorySettings, key: &str) -> Option<JsonMap> {
     Some(get_story_config(story_settings)?.get(key)?.as_object()?.to_owned())
 }
 
 #[tauri::command]
 pub async fn get_story_settings(story_settings: StorySettings) -> JsonMap {
-    get_map_from_story_key(story_settings, "settings").unwrap_or_default()
+    get_map_from_story_key(&story_settings, "settings").unwrap_or_default()
+}
+
+pub fn get_cities(story_settings: &StorySettings) -> JsonMap {
+    get_map_from_story_key(story_settings, "cities").unwrap_or_default()
 }
 
 #[tauri::command]
 pub async fn get_cities_json(story_settings: StorySettings) -> JsonMap {
-    get_map_from_story_key(story_settings, "cities").unwrap_or_default()
+    get_cities(&story_settings)
 }
 
-// Get the base bots config and merge it with the bots in the story config
-#[tauri::command]
-pub async fn get_bots_configs(story_settings: StorySettings) -> JsonMap {
+pub fn get_all_bot_configs(story_settings: &StorySettings) -> JsonMap {
     let mut bots = BOTS_BASE.lock().unwrap().as_ref().unwrap().to_owned();
 
     if let Some(more_bots) = get_map_from_story_key(story_settings, "bots") {
@@ -479,6 +474,16 @@ pub async fn get_bots_configs(story_settings: StorySettings) -> JsonMap {
     }
 
     bots
+}
+
+pub fn get_all_script_configs(story_settings: &StorySettings) -> JsonMap {
+    get_map_from_story_key(story_settings, "scripts").unwrap_or_default()
+}
+
+// Get the base bots config and merge it with the bots in the story config
+#[tauri::command]
+pub async fn get_bots_configs(story_settings: StorySettings) -> JsonMap {
+    get_all_bot_configs(&story_settings)
 }
 
 #[tauri::command]

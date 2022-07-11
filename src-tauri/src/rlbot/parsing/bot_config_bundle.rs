@@ -1,6 +1,6 @@
 use crate::bot_management::cfg_helper::load_cfg;
 use crate::rlbot::agents::{base_script::SCRIPT_FILE_KEY, runnable::Runnable};
-use crate::{ccprintln, get_command_status, get_content_folder, PYTHON_PATH};
+use crate::{ccprintln, get_command_status, PYTHON_PATH};
 use configparser::ini::Ini;
 use imghdr::Type;
 use serde::{Deserialize, Serialize};
@@ -319,8 +319,7 @@ impl Runnable for BotConfigBundle {
         let requires_tkinter = self.requires_tkinter.unwrap_or(false);
 
         if let Some(req_file) = self.get_requirements_file() {
-            let script_path = get_content_folder().join("get_missing_packages.py").to_string_lossy().to_string();
-            let mut args: Vec<&str> = vec![&script_path];
+            let mut args: Vec<&str> = vec!["-c", "from rlbot_smh.get_missing_packages import run; run()"];
 
             if requires_tkinter {
                 args.push("requires_tkinter");
@@ -497,8 +496,7 @@ impl Runnable for ScriptConfigBundle {
         let python = PYTHON_PATH.lock().unwrap().to_owned();
 
         if let Some(req_file) = self.get_requirements_file() {
-            let script_path = get_content_folder().join("get_missing_packages.py").to_string_lossy().to_string();
-            let mut args: Vec<&str> = vec![&script_path];
+            let mut args: Vec<&str> = vec!["-c", "from rlbot_smh.get_missing_packages import run; run()"];
 
             if self.requires_tkinter {
                 args.push("requires_tkinter");

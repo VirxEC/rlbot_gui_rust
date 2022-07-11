@@ -258,7 +258,7 @@ export default {
 		<b-toast id="snackbar-toast" v-model="showSnackbar" toaster="b-toaster-bottom-center" body-class="d-none">
 			<template v-slot:toast-title>
 				{{snackbarContent}}
-		    </template>
+			</template>
 		</b-toast>
 
 		<b-toast id="bot-pack-available-toast" v-model="showBotpackUpdateSnackbar" title="Bot Pack Update Available!" toaster="b-toaster-bottom-center">
@@ -637,11 +637,11 @@ export default {
 			this.handleBotAddedToTeam(bot);
 		},
 		handleBotAddedToTeam: function(bot) {
-            if (bot.warn) {
-                this.$store.commit('setActiveBot', bot);
-                this.$bvModal.show('language-warning-modal');
-            }
-        },
+			if (bot.warn) {
+				this.$store.commit('setActiveBot', bot);
+				this.$bvModal.show('language-warning-modal');
+			}
+		},
 		setRandomMap: async function() {
 			if (this.randomMapPool.length == 0) {
 				let response = await fetch("json/standard-maps.json");

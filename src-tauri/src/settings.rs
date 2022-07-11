@@ -11,8 +11,10 @@ use crate::{
 use configparser::ini::Ini;
 use core::fmt;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, str::FromStr};
+use std::{collections::HashMap, fmt::Debug, str::FromStr};
 use tauri::Window;
+
+use serde_repr::*;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BotFolder {
@@ -72,7 +74,7 @@ impl BotFolderSettings {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MutatorSettings {
     pub match_length: String,
     pub max_score: String,
@@ -90,6 +92,29 @@ pub struct MutatorSettings {
     pub gravity: String,
     pub demolish: String,
     pub respawn_time: String,
+}
+
+impl Default for MutatorSettings {
+    fn default() -> Self {
+        Self {
+            match_length: MATCH_LENGTH_TYPES[0].to_owned(),
+            max_score: MAX_SCORE_TYPES[0].to_owned(),
+            overtime: OVERTIME_MUTATOR_TYPES[0].to_owned(),
+            series_length: SERIES_LENGTH_MUTATOR_TYPES[0].to_owned(),
+            game_speed: GAME_SPEED_MUTATOR_TYPES[0].to_owned(),
+            ball_max_speed: BALL_MAX_SPEED_MUTATOR_TYPES[0].to_owned(),
+            ball_type: BALL_TYPE_MUTATOR_TYPES[0].to_owned(),
+            ball_weight: BALL_WEIGHT_MUTATOR_TYPES[0].to_owned(),
+            ball_size: BALL_SIZE_MUTATOR_TYPES[0].to_owned(),
+            ball_bounciness: BALL_BOUNCINESS_MUTATOR_TYPES[0].to_owned(),
+            boost_amount: BOOST_AMOUNT_MUTATOR_TYPES[0].to_owned(),
+            rumble: RUMBLE_MUTATOR_TYPES[0].to_owned(),
+            boost_strength: BOOST_STRENGTH_MUTATOR_TYPES[0].to_owned(),
+            gravity: GRAVITY_MUTATOR_TYPES[0].to_owned(),
+            demolish: DEMOLISH_MUTATOR_TYPES[0].to_owned(),
+            respawn_time: RESPAWN_TIME_MUTATOR_TYPES[0].to_owned(),
+        }
+    }
 }
 
 impl MutatorSettings {
@@ -155,6 +180,64 @@ impl MutatorSettings {
     }
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct MiniScriptBundle {
+    pub path: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MiniMatchSettings {
+    pub map: String,
+    pub game_mode: String,
+    pub match_behavior: String,
+    pub skip_replays: bool,
+    pub instant_start: bool,
+    pub enable_lockstep: bool,
+    pub randomize_map: bool,
+    pub enable_rendering: bool,
+    pub enable_state_setting: bool,
+    pub auto_save_replay: bool,
+    pub scripts: Vec<MiniScriptBundle>,
+    pub mutators: MutatorSettings,
+}
+
+impl Default for MiniMatchSettings {
+    fn default() -> Self {
+        Self {
+            map: MAP_TYPES[0].to_owned(),
+            game_mode: GAME_MODES[0].to_owned(),
+            match_behavior: EXISTING_MATCH_BEHAVIOR_TYPES[0].to_owned(),
+            skip_replays: false,
+            instant_start: false,
+            enable_lockstep: false,
+            randomize_map: false,
+            enable_rendering: false,
+            enable_state_setting: true,
+            auto_save_replay: false,
+            scripts: Vec::new(),
+            mutators: MutatorSettings::default(),
+        }
+    }
+}
+
+impl MiniMatchSettings {
+    pub fn setup_for_start_match(&self, window: &Window, bf: &HashMap<String, BotFolder>) -> Option<Self> {
+        let mut new = self.clone();
+
+        if new.map.ends_with(".upk") || new.map.ends_with(".udk") {
+            new.map = match convert_custom_map_to_path(&new.map, bf) {
+                Some(path) => path,
+                None => {
+                    ccprintlne(window, format!("Failed to find custom map {}", new.map));
+                    return None;
+                }
+            };
+        }
+
+        Some(new)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct MatchSettings {
     pub map: String,
@@ -178,13 +261,13 @@ impl MatchSettings {
         let map = conf.get("match_settings", "map").unwrap_or_else(|| MAP_TYPES[0].to_owned());
         let game_mode = conf.get("match_settings", "game_mode").unwrap_or_else(|| GAME_MODES[0].to_owned());
         let match_behavior = conf.get("match_settings", "match_behavior").unwrap_or_else(|| EXISTING_MATCH_BEHAVIOR_TYPES[0].to_owned());
-        let skip_replays = conf.getbool("match_settings", "skip_replays").unwrap_or(Some(false)).unwrap_or(false);
-        let instant_start = conf.getbool("match_settings", "instant_start").unwrap_or(Some(false)).unwrap_or(false);
-        let enable_lockstep = conf.getbool("match_settings", "enable_lockstep").unwrap_or(Some(false)).unwrap_or(false);
-        let randomize_map = conf.getbool("match_settings", "randomize_map").unwrap_or(Some(false)).unwrap_or(false);
-        let enable_rendering = conf.getbool("match_settings", "enable_rendering").unwrap_or(Some(false)).unwrap_or(false);
-        let enable_state_setting = conf.getbool("match_settings", "enable_state_setting").unwrap_or(Some(true)).unwrap_or(true);
-        let auto_save_replay = conf.getbool("match_settings", "auto_save_replay").unwrap_or(Some(false)).unwrap_or(false);
+        let skip_replays = conf.getbool("match_settings", "skip_replays").ok().flatten().unwrap_or(false);
+        let instant_start = conf.getbool("match_settings", "instant_start").ok().flatten().unwrap_or(false);
+        let enable_lockstep = conf.getbool("match_settings", "enable_lockstep").ok().flatten().unwrap_or(false);
+        let randomize_map = conf.getbool("match_settings", "randomize_map").ok().flatten().unwrap_or(false);
+        let enable_rendering = conf.getbool("match_settings", "enable_rendering").ok().flatten().unwrap_or(false);
+        let enable_state_setting = conf.getbool("match_settings", "enable_state_setting").ok().flatten().unwrap_or(true);
+        let auto_save_replay = conf.getbool("match_settings", "auto_save_replay").ok().flatten().unwrap_or(false);
         let scripts = serde_json::from_str(&conf.get("match_settings", "scripts").unwrap_or_else(|| "[]".to_owned())).unwrap_or_default();
 
         Self {
@@ -227,27 +310,6 @@ impl MatchSettings {
         let mut new = self.clone();
         new.scripts = clean(new.scripts);
         new
-    }
-
-    pub fn setup_for_start_match(&self, window: &Window, bf: &HashMap<String, BotFolder>) -> Option<Self> {
-        let mut new = self.clone();
-
-        for script in &mut new.scripts {
-            script.info = None;
-            *script = script.cleaned();
-        }
-
-        if new.map.ends_with(".upk") || new.map.ends_with(".udk") {
-            new.map = match convert_custom_map_to_path(&new.map, bf) {
-                Some(path) => path,
-                None => {
-                    ccprintlne(window, format!("Failed to find custom map {}", new.map));
-                    return None;
-                }
-            };
-        }
-
-        Some(new)
     }
 }
 
@@ -375,10 +437,17 @@ impl LauncherSettings {
     }
 }
 
+#[derive(Serialize_repr, Deserialize_repr, Clone, Debug)]
+#[repr(u8)]
+pub enum Team {
+    Blue,
+    Orange,
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct TeamBotBundle {
     pub name: String,
-    pub team: u8,
+    pub team: Team,
     pub skill: f32,
     pub runnable_type: String,
     pub path: Option<String>,
@@ -455,16 +524,43 @@ pub struct StorySettings {
     pub custom_config: CustomConfig,
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ScoreResult {
+    team_index: Team,
+    score: usize,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct PlayerStats {
+    name: String,
+    team: Team,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct GameResults {
+    human_team: Team,
+    score: Vec<ScoreResult>,
+    stats: Vec<PlayerStats>,
+    human_won: bool,
+    timestamp: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ChallengeAttempt {
+    game_results: Option<GameResults>,
+    challenge_completed: bool,
+}
+
 /// Represents users game state in RLBot Story Mode
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct StoryState {
     version: u8,
-    pub story_settings: StorySettings,
+    story_settings: StorySettings,
     team_settings: TeamSettings,
-    teammates: Vec<String>,
-    challenges_attempts: HashMap<String, u32>,
-    challenges_completed: HashMap<String, bool>,
-    upgrades: HashMap<String, u32>,
+    teammates: Vec<usize>,
+    challenges_attempts: HashMap<String, Vec<ChallengeAttempt>>,
+    challenges_completed: HashMap<String, usize>,
+    upgrades: HashMap<String, usize>,
 }
 
 impl StoryState {
@@ -476,7 +572,28 @@ impl StoryState {
             teammates: Vec::new(),
             challenges_attempts: HashMap::new(),
             challenges_completed: HashMap::new(),
-            upgrades: HashMap::new(),
+            upgrades: HashMap::from([("currency".to_owned(), 0)]),
         }
+    }
+
+    pub fn save(&self, window: &Window) {
+        let mut conf = load_gui_config(window);
+        conf.set("story_mode", "save_state", serde_json::to_string(self).ok());
+
+        if let Err(e) = conf.write(get_config_path()) {
+            ccprintlne(window, format!("Failed to write config: {}", e));
+        }
+    }
+
+    pub const fn get_story_settings(&self) -> &StorySettings {
+        &self.story_settings
+    }
+
+    pub const fn get_upgrades(&self) -> &HashMap<String, usize> {
+        &self.upgrades
+    }
+
+    pub const fn get_team_settings(&self) -> &TeamSettings {
+        &self.team_settings
     }
 }
