@@ -72,6 +72,12 @@ export default {
             v-bind:debugMode="debugMode"
             v-if="ui_state == ${UI_STATES.STORY_CHALLENGES}">
         </story-challenges>
+
+		<b-toast id="snackbar-toast" v-model="showSnackbar" toaster="b-toaster-bottom-center" body-class="d-none">
+			<template v-slot:toast-title>
+				{{snackbarContent}}
+		    </template>
+		</b-toast>
     </b-container>
     </div>
     `,
@@ -101,6 +107,8 @@ export default {
                 console.log(saveState);
                 this.saveState = saveState;
             }),
+			showSnackbar: false,
+			snackbarContent: null,
         };
     },
     methods: {
@@ -205,7 +213,10 @@ export default {
         },
         launchChallenge: function ({ id, pickedTeammates }) {
             console.log("Starting match", id);
-            invoke("launch_challenge", { storySettings: this.saveState.story_settings, challengeId: id, pickedTeammates: pickedTeammates });
+            invoke("launch_challenge", { saveState: this.saveState, challengeId: id, pickedTeammates: pickedTeammates }).catch(error => {
+                this.showSnackbar = true;
+                this.snackbarContent = error;
+            });
         },
         purchaseUpgrade: function ({ id, currentCurrency, cost }) {
             // Send eel a message to add id to purchases and reduce currency

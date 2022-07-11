@@ -10,6 +10,7 @@ use crate::{
         parsing::{
             agent_config_parser::BotLooksConfig,
             bot_config_bundle::{BotConfigBundle, ScriptConfigBundle},
+            match_settings_config_parser::{BOOST_AMOUNT_MUTATOR_TYPES, GAME_MODES, MAP_TYPES, MAX_SCORE_TYPES, RUMBLE_MUTATOR_TYPES},
         },
         setup_manager,
     },
@@ -26,6 +27,8 @@ use std::{
     time::Instant,
 };
 use tauri::Window;
+
+const DEBUG_MODE_SHORT_GAMES: bool = false;
 
 #[tauri::command]
 pub async fn check_rlbot_python() -> HashMap<String, bool> {
@@ -133,7 +136,7 @@ pub async fn install_basic_packages(window: Window) -> PackageResult {
         String::from("numba<0.56"),
         String::from("selenium"),
         String::from("rlbot"),
-        String::from("rlbot-smh"),
+        String::from("rlbot-smh>=1.0.0"),
     ];
 
     if !is_online::check().await {
@@ -495,7 +498,7 @@ pub fn issue_match_handler_command(window: &Window, command_parts: &[String], cr
 }
 
 #[tauri::command]
-pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_settings: MatchSettings) -> bool {
+pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_settings: MiniMatchSettings) -> bool {
     let port = gateway_util::find_existing_process(&window);
 
     match setup_manager::is_rocket_league_running(port.unwrap_or(gateway_util::IDEAL_RLBOT_PORT)) {
@@ -587,4 +590,243 @@ pub async fn spawn_car_for_viewing(window: Window, config: BotLooksConfig, team:
 #[tauri::command]
 pub async fn get_downloaded_botpack_commit_id() -> Option<u32> {
     get_current_tag_name()
+}
+
+fn make_human_config(team: Team) -> TeamBotBundle {
+    TeamBotBundle {
+        name: "Human".to_owned(),
+        team,
+        skill: 1.0,
+        runnable_type: "human".to_owned(),
+        path: None,
+    }
+}
+
+fn collapse_path(cfg_path: Option<&serde_json::Value>, botpack_root: &Path) -> Option<String> {
+    let cfg_path = cfg_path?;
+
+    let mut path = PathBuf::new();
+
+    for part in cfg_path.as_array()?.iter().filter_map(|x| x.as_str()) {
+        if part == "$RLBOTPACKROOT" {
+            path.push(botpack_root)
+        } else {
+            path.push(part)
+        }
+    }
+
+    Some(path.to_string_lossy().to_string())
+}
+
+fn get_path_from_jsonmap(map: JsonMap, botpack_root: &Path) -> String {
+    collapse_path(map.get("path"), botpack_root).unwrap_or_else(|| map.get("path").and_then(|x| Some(x.as_str()?.to_string())).unwrap_or_default())
+}
+
+fn rlbot_to_player_config(player: JsonMap, team: Team, botpack_root: &Path) -> TeamBotBundle {
+    TeamBotBundle {
+        name: player.get("name").and_then(|x| x.as_str()).unwrap_or_default().to_string(),
+        team,
+        skill: 1.0,
+        runnable_type: "rlbot".to_owned(),
+        path: Some(get_path_from_jsonmap(player, botpack_root)),
+    }
+}
+
+fn pysonix_to_player_config(player: JsonMap, team: Team) -> TeamBotBundle {
+    TeamBotBundle {
+        name: player.get("name").and_then(|x| x.as_str()).unwrap_or_default().to_string(),
+        team,
+        skill: player.get("skill").and_then(|x| x.as_f64()).unwrap_or(1.0) as f32,
+        runnable_type: "psyonix".to_owned(),
+        path: None,
+    }
+}
+
+fn jsonmap_to_bot(player: JsonMap, team: Team, botpack_root: &Path) -> TeamBotBundle {
+    if player.get("type").and_then(|x| x.as_str()) == Some("psyonix") {
+        pysonix_to_player_config(player, team)
+    } else {
+        rlbot_to_player_config(player, team, botpack_root)
+    }
+}
+
+fn get_jsonmap_in_jsonmap(map: &JsonMap, key: &str) -> Option<JsonMap> {
+    Some(map.get(key)?.as_object()?.to_owned())
+}
+
+fn make_player_configs(challenge: &JsonMap, human_picks: &[String], all_bots: JsonMap, botpack_root: &Path) -> Vec<TeamBotBundle> {
+    let mut player_configs = vec![make_human_config(Team::Blue)];
+
+    if let Some(human_team_size) = challenge.get("humanTeamSize").and_then(|x| x.as_u64()) {
+        for name in human_picks[..human_team_size as usize - 1].iter() {
+            if let Some(bot) = get_jsonmap_in_jsonmap(&all_bots, name) {
+                player_configs.push(jsonmap_to_bot(bot, Team::Blue, botpack_root));
+            }
+        }
+    }
+
+    if let Some(opponents) = challenge.get("opponentBots").and_then(|x| x.as_array()) {
+        for opponent in opponents.iter().filter_map(|x| x.as_str()) {
+            if let Some(bot) = get_jsonmap_in_jsonmap(&all_bots, opponent) {
+                player_configs.push(jsonmap_to_bot(bot, Team::Orange, botpack_root));
+            }
+        }
+    }
+
+    player_configs
+}
+
+fn jsonmap_to_script(script: JsonMap, botpack_root: &Path) -> MiniScriptBundle {
+    MiniScriptBundle {
+        path: get_path_from_jsonmap(script, botpack_root),
+    }
+}
+
+fn make_script_configs(challenge: &JsonMap, all_scripts: JsonMap, botpack_root: &Path) -> Vec<MiniScriptBundle> {
+    let mut script_configs = vec![];
+
+    if let Some(scripts) = challenge.get("scripts").and_then(|x| x.as_array()) {
+        for script in scripts.iter().map(|x| x.to_string()) {
+            if let Some(script_config) = get_jsonmap_in_jsonmap(&all_scripts, &script) {
+                script_configs.push(jsonmap_to_script(script_config, botpack_root));
+            }
+        }
+    }
+
+    script_configs
+}
+
+fn make_match_config(challenge: &JsonMap, upgrades: &HashMap<String, usize>, script_configs: Vec<MiniScriptBundle>) -> MiniMatchSettings {
+    MiniMatchSettings {
+        game_mode: GAME_MODES[if challenge
+            .get("limitations") // check if the key "limitations" exists in the challenge
+            .and_then(|x| x.as_array().map(|x| x.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>())) // if it does, map it to an vec of strings
+            .map(|x| x.contains(&"half-field")) // if it contains the string "half-field", return true - false if not or something went wrong
+            .unwrap_or(false)
+        {
+            5 // Heatseeker
+        } else {
+            0 // Soccar
+        }]
+        .to_owned(),
+        map: challenge.get("map").and_then(|x| x.as_str()).unwrap_or(MAP_TYPES[0]).to_owned(), // config-defined or DFH Stadium
+        enable_state_setting: true,
+        scripts: script_configs,
+        mutators: MutatorSettings {
+            max_score: if DEBUG_MODE_SHORT_GAMES {
+                MAX_SCORE_TYPES[2].to_owned() // 3 goals
+            } else {
+                // config-defined or unlimited
+                challenge.get("max_score").and_then(|x| x.as_str()).unwrap_or(MAX_SCORE_TYPES[0]).to_owned()
+            },
+            boost_amount: BOOST_AMOUNT_MUTATOR_TYPES[if challenge.get("disabledBoost").and_then(|x| x.as_bool()).unwrap_or(false) {
+                4 // no boost
+            } else {
+                0 // normal boost
+            }]
+            .to_owned(),
+            rumble: RUMBLE_MUTATOR_TYPES[upgrades.contains_key("rumble") as usize].to_owned(), // Rumble none / default
+            ..Default::default()
+        },
+        ..Default::default()
+    }
+}
+
+fn get_id_from_challenge(challenge: &serde_json::Value) -> Option<&str> {
+    challenge.get("id")?.as_str()
+}
+
+fn find_challenge_in_city(challenge_id: &str, city: &serde_json::Value) -> Option<JsonMap> {
+    for challenge in city["challenges"].as_array()? {
+        if let Some(id) = get_id_from_challenge(challenge) {
+            if id == challenge_id {
+                if let Some(challenge) = challenge.as_object() {
+                    return Some(challenge.to_owned());
+                }
+            }
+        }
+    }
+
+    None
+}
+
+fn get_challenge_by_id(story_settings: &StorySettings, challenge_id: &str) -> Option<(serde_json::Value, JsonMap)> {
+    let cities = get_cities(story_settings);
+
+    for city in cities.values() {
+        if let Some(challenge) = find_challenge_in_city(challenge_id, city) {
+            return Some((city.clone(), challenge));
+        }
+    }
+
+    None
+}
+
+fn get_challenge_city_color(city: &serde_json::Value) -> Option<u64> {
+    city.as_object()?.get("description")?.get("color")?.as_u64()
+}
+
+#[tauri::command]
+pub async fn launch_challenge(window: Window, save_state: StoryState, challenge_id: String, picked_teammates: Vec<String>) -> Result<(), String> {
+    let story_settings = save_state.get_story_settings();
+
+    let (city, challenge) = match get_challenge_by_id(story_settings, &challenge_id) {
+        Some(challenge) => challenge,
+        None => {
+            let error = format!("Could not find challenge with id {}", challenge_id);
+            ccprintlne(&window, error.clone());
+            return Err(error);
+        }
+    };
+
+    println!("{}", serde_json::to_string_pretty(&city.as_object().unwrap().get("description").unwrap()).unwrap());
+    println!("{}", serde_json::to_string_pretty(&challenge).unwrap());
+
+    let all_bots = get_all_bot_configs(story_settings);
+    let all_scripts = get_all_script_configs(story_settings);
+
+    let botpack_root = match BOT_FOLDER_SETTINGS
+        .lock()
+        .unwrap()
+        .clone()
+        .unwrap()
+        .folders
+        .keys()
+        .map(|bf| Path::new(bf).join("RLBotPack-master"))
+        .find(|bf| bf.exists())
+    {
+        Some(bf) => bf,
+        None => {
+            let error = "Could not find RLBotPack-master folder".to_owned();
+            ccprintlne(&window, error.clone());
+            return Err(error);
+        }
+    };
+
+    let player_configs = make_player_configs(&challenge, &picked_teammates, all_bots, botpack_root.as_path());
+    let match_settings = make_match_config(&challenge, save_state.get_upgrades(), make_script_configs(&challenge, all_scripts, botpack_root.as_path()));
+    let launcher_prefs = LauncherSettings::load(&window);
+
+    println!("{}", serde_json::to_string_pretty(&player_configs).unwrap());
+
+    let args = [
+        "launch_challenge".to_owned(),
+        challenge_id,
+        serde_json::to_string(&get_challenge_city_color(&city)).unwrap(),
+        serde_json::to_string(&save_state.get_team_settings().color).unwrap(),
+        serde_json::to_string(&save_state.get_upgrades()).unwrap(),
+        serde_json::to_string(&player_configs).unwrap(),
+        serde_json::to_string(&match_settings).unwrap(),
+        serde_json::to_string(&challenge).unwrap(),
+        serde_json::to_string(&save_state).unwrap(),
+        launcher_prefs.preferred_launcher,
+        launcher_prefs.use_login_tricks.to_string(),
+        launcher_prefs.rocket_league_exe_path.unwrap_or_default(),
+    ];
+
+    println!("Issuing command: {} | ", args.join(" | "));
+
+    issue_match_handler_command(&window, &args, true);
+
+    Ok(())
 }

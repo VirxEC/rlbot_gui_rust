@@ -279,6 +279,13 @@ fn try_emit_text(window: &Window, text: String, replace_last: bool) -> (String, 
         let text = text.replace("-|-*|GTP ", "").replace("|*-|-", "");
         let gtp: GameTickPacket = serde_json::from_str(&text).unwrap();
         try_emit_signal(window, "gtp", gtp)
+    } else if text.starts_with("-|-*|STORY_RESULT ") && text.ends_with("|*-|-") {
+        println!("GOT STORY RESULT");
+        let text = text.replace("-|-*|STORY_RESULT ", "").replace("|*-|-", "");
+        println!("{}", &text);
+        let save_state: StoryState = serde_json::from_str(&text).unwrap();
+        save_state.save(window);
+        try_emit_signal(window, "load_updated_save_state", save_state)
     } else {
         issue_console_update(window, text, replace_last)
     }
@@ -403,6 +410,7 @@ fn main() {
             pick_json_file,
             get_bots_configs,
             story_delete_save,
+            launch_challenge,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

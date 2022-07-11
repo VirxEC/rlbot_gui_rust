@@ -4,6 +4,7 @@ import StoryPickTeam from './story-pick-team.js';
 import StoryRecruitList from './story-recruit-list.js';
 
 const invoke = window.__TAURI__.invoke;
+const listen = window.__TAURI__.event.listen;
 
 const DEBUG = false;
 
@@ -242,6 +243,11 @@ export default {
             cityDisplayInfo: {},
             challenges: null,
             selectedCityId: 'INTRO',
+			matchStartFailed: listen("match-start-failed", _ => {
+                this.game_in_progress = {};
+				this.snackbarContent = "Error starting the match! See the console for more details.";
+				this.showSnackbar = true;
+			}),
         };
     },
     computed: {
@@ -275,7 +281,6 @@ export default {
             return result;
         },
         recruit_list: function () {
-            const completed = this.saveState.challenges_completed;
             let recruits = {};
 
             for (let city of Object.keys(this.challenges)) {
@@ -380,5 +385,8 @@ export default {
             }
             this.switchSelectedCityToBest();
         });
+    },
+    watch: {
+
     }
 };
