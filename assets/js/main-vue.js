@@ -390,7 +390,7 @@ export default {
 		</b-modal>
 
 		<b-modal id="no-rlbot-flag-modal" title="Error while starting match" centered>
-			<p>This is probably due to Rocket League not being started by RLBot. Please close Rocket League and let RLBot open it for you. Do not start Rocket League yourself.<br /><br />If this message still appears, try restarting RLBot.</p>
+			<p>{{ errorStartingMatchContent }}<br /><br />If this message still appears, try restarting RLBot.</p>
 			<template v-slot:modal-footer>
 				<b-button @click="startMatch({'blue': blueTeam, 'orange': orangeTeam});$bvModal.hide('no-rlbot-flag-modal')" >Retry</b-button>
 				<b-button @click="$bvModal.hide('no-rlbot-flag-modal')" variant="primary">OK</b-button>
@@ -488,6 +488,7 @@ export default {
 			rec_python: null,
 			init: false,
 			miniConsoleTitle: "",
+			errorStartingMatchContent: "",
 			updateDownloadProgressPercent: listen("update-download-progress", event => {
 				this.downloadProgressPercent = event.payload.percent;
 				this.downloadStatus = event.payload.status;
@@ -607,11 +608,10 @@ export default {
 			const blueBots = this.blueTeam.map((bot) => { return {'name': bot.name, 'team': 0, 'runnable_type': bot.runnable_type, 'skill': bot.skill ? bot.skill : 1, 'path': bot.path} });
 			const orangeBots = this.orangeTeam.map((bot) => { return {'name': bot.name, 'team': 1, 'runnable_type': bot.runnable_type, 'skill': bot.skill ? bot.skill : 1, 'path': bot.path} });
 
-			invoke("start_match", { botList: blueBots.concat(orangeBots), matchSettings: this.matchSettings }).then(ok => {
-				if (!ok) {
-					this.$bvModal.show("no-rlbot-flag-modal")
-					this.matchStarting = false;
-				}
+			invoke("start_match", { botList: blueBots.concat(orangeBots), matchSettings: this.matchSettings }).catch(err_message => {
+				this.errorStartingMatchContent = err_message;
+				this.$bvModal.show("no-rlbot-flag-modal")
+				this.matchStarting = false;
 			});
 		},
 		killBots: function(event) {
@@ -726,22 +726,22 @@ export default {
 				this.showProgressSpinner = true;
 				this.miniConsoleTitle = "Creating Python Bot";
 				this.$bvModal.show("mini-console");
-				invoke("begin_python_bot", { botName: bot_name }).then(this.botLoadHandler);
+				invoke("begin_python_bot", { botName: bot_name }).then(this.botLoadHandler).catch(this.newBotErrorHandler);
 			} else if (language === 'scratch') {
 				this.showProgressSpinner = true;
 				this.miniConsoleTitle = "Creating Scratch Bot";
 				this.$bvModal.show("mini-console");
-				invoke("begin_scratch_bot", { botName: bot_name }).then(this.botLoadHandler);
+				invoke("begin_scratch_bot", { botName: bot_name }).then(this.botLoadHandler).catch(this.newBotErrorHandler);
 			} else if (language === 'python_hive') {
 				this.showProgressSpinner = true;
 				this.miniConsoleTitle = "Creating Python Hivemind Bot";
 				this.$bvModal.show("mini-console");
-				invoke("begin_python_hivemind", { hiveName: bot_name }).then(this.botLoadHandler);
+				invoke("begin_python_hivemind", { hiveName: bot_name }).then(this.botLoadHandler).catch(this.newBotErrorHandler);
 			} else if (language === 'rust') {
 				this.showProgressSpinner = true;
 				this.miniConsoleTitle = "Creating Rust Bot";
 				this.$bvModal.show("mini-console");
-				invoke("begin_rust_bot", { botName: bot_name }).then(this.botLoadHandler);
+				invoke("begin_rust_bot", { botName: bot_name }).then(this.botLoadHandler).catch(this.newBotErrorHandler);
 			}
 		},
 		prepareFolderSettingsDialog: function() {
@@ -756,16 +756,17 @@ export default {
 				invoke("get_recommendations").then(this.recommendationsReceived);
 			});
 		},
-		botLoadHandler: function (response) {
+		newBotErrorHandler: function (error) {
 			this.$bvModal.hide("mini-console");
 			this.showProgressSpinner = false;
-			if (response.error) {
-				this.snackbarContent = response.error;
-				this.showSnackbar = true;
-			} else {
-				this.folderSettings["files"][response.bot.name] = response.bot;
-				this.botsReceived([response.bot]);
-			}
+			this.snackbarContent = error;
+			this.showSnackbar = true;
+		},
+		botLoadHandler: function (bot) {
+			this.$bvModal.hide("mini-console");
+			this.showProgressSpinner = false;
+			this.folderSettings["files"][bot.name] = bot;
+			this.botsReceived([bot]);
 		},
 		botsReceived: function (bots) {
 			const freshBots = bots.filter( (bot) =>

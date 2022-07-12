@@ -15,7 +15,6 @@ pub fn is_rocket_league_running(port: u16) -> Result<bool, String> {
                 let mut has_rlbot_arg = false;
                 let mut has_port_arg = false;
                 for arg in cmd.iter().skip(1) {
-                    dbg!(arg);
                     if arg == REQUIRED_ARGS[0] {
                         has_rlbot_arg = true;
                     } else if arg == &port_arg {
@@ -29,7 +28,7 @@ pub fn is_rocket_league_running(port: u16) -> Result<bool, String> {
             }
 
             Err(format!(
-                "Rocket League is not running with '{}' and/or on port {} (with '{}').\nPlease close Rocket League and let us start it for you instead.",
+                "Please close Rocket League and let RLBot open it for you. Do not start Rocket League yourself. (Rocket League is not running with '{}' and/or on port {} (with '{}'))",
                 REQUIRED_ARGS[0], port, port_arg
             ))
         }

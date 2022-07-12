@@ -221,20 +221,21 @@ impl Default for MiniMatchSettings {
 }
 
 impl MiniMatchSettings {
-    pub fn setup_for_start_match(&self, window: &Window, bf: &HashMap<String, BotFolder>) -> Option<Self> {
+    pub fn setup_for_start_match(&self, window: &Window, bf: &HashMap<String, BotFolder>) -> Result<Self, String> {
         let mut new = self.clone();
 
         if new.map.ends_with(".upk") || new.map.ends_with(".udk") {
             new.map = match convert_custom_map_to_path(&new.map, bf) {
                 Some(path) => path,
                 None => {
-                    ccprintlne(window, format!("Failed to find custom map {}", new.map));
-                    return None;
+                    let err = format!("Failed to find custom map {}", new.map);
+                    ccprintlne(window, err.clone());
+                    return Err(err);
                 }
             };
         }
 
-        Some(new)
+        Ok(new)
     }
 }
 

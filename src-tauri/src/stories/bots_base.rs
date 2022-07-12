@@ -33,7 +33,7 @@ pub fn json() -> serde_json::Map<String, serde_json::Value> {
         "kamael": {
             "name": "Kamael",
             "type": "rlbot",
-            "path": ["$RLBOTPACKROOT", "RLBotPack", "Kamael", "Kamael.cfg"]
+            "path": ["$RLBOTPACKROOT", "RLBotPack", "Kamael_family", "Kamael.cfg"]
         },
         "botimus": {
             "name": "BoltimusPrime",
@@ -133,7 +133,7 @@ pub fn json() -> serde_json::Map<String, serde_json::Value> {
         "peter": {
             "name": "St. Peter",
             "type": "rlbot",
-            "path": ["$RLBOTPACKROOT", "RLBotPack", "Kamael", "peter.cfg"]
+            "path": ["$RLBOTPACKROOT", "RLBotPack", "Kamael_family", "peter.cfg"]
         },
         "invisibot": {
             "name": "Invisibot",

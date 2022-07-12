@@ -105,27 +105,27 @@ export default {
 			this.downloadProgressPercent = 0;
 			this.$bvModal.show("download-modal");
 			
-			invoke("install_python").then(result => {
+			invoke("install_python").then(_ => {
 				this.$bvModal.hide("download-modal");
-				this.snackbarContent = result != null ? "Successfully installed Python to your system, installing required packages" : "Uh-oh! An error happened somewhere!";
+				this.snackbarContent = "Successfully installed Python to your system, installing required packages";
 				this.showSnackbar = true;
 
-				if (result != null) {
-					this.$bvModal.show("install-console");
-					invoke("install_basic_packages").then((result) => {
-						let message = result.exit_code === 0 ? 'Successfully installed ' : 'Failed to install ';
-						message += result.packages.join(", ");
-						if (result.exit_code != 0) {
-							message += " with exit code " + result.exit_code;
-						}
-						this.snackbarContent = message;
-						this.showSnackbar = true;
-	
-						this.startup();
-					});
-				} else {
-					this.showProgressSpinner = false;
-				}
+				this.$bvModal.show("install-console");
+				invoke("install_basic_packages").then((result) => {
+					let message = result.exit_code === 0 ? 'Successfully installed ' : 'Failed to install ';
+					message += result.packages.join(", ");
+					if (result.exit_code != 0) {
+						message += " with exit code " + result.exit_code;
+					}
+					this.snackbarContent = message;
+					this.showSnackbar = true;
+
+					this.startup();
+				});
+			}).catch(error => {
+				this.showProgressSpinner = false;
+				this.snackbarContent = "Failed to install Python: " + error;
+				this.showSnackbar = true;
 			});
 		},
 		applyPythonSetup: function () {

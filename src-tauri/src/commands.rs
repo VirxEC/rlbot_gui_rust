@@ -21,6 +21,7 @@ use futures_util::StreamExt;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::{
     collections::HashMap,
+    error::Error,
     fs::{create_dir_all, File},
     io::{copy, Cursor, Write},
     path::Path,
@@ -63,34 +64,34 @@ fn ensure_bot_directory(window: &Window) -> PathBuf {
 }
 
 #[tauri::command]
-pub async fn begin_python_bot(window: Window, bot_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
+pub async fn begin_python_bot(window: Window, bot_name: String) -> Result<BotConfigBundle, String> {
     match bootstrap_python_bot(&window, bot_name, ensure_bot_directory(&window)).await {
-        Ok(config_file) => Ok(HashMap::from([("bot".to_owned(), BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap())])),
-        Err(e) => Err(HashMap::from([("error".to_owned(), e)])),
+        Ok(config_file) => Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap()),
+        Err(e) => Err(e),
     }
 }
 
 #[tauri::command]
-pub async fn begin_python_hivemind(window: Window, hive_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
+pub async fn begin_python_hivemind(window: Window, hive_name: String) -> Result<BotConfigBundle, String> {
     match bootstrap_python_hivemind(&window, hive_name, ensure_bot_directory(&window)).await {
-        Ok(config_file) => Ok(HashMap::from([("bot".to_owned(), BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap())])),
-        Err(e) => Err(HashMap::from([("error".to_owned(), e)])),
+        Ok(config_file) => Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap()),
+        Err(e) => Err(e),
     }
 }
 
 #[tauri::command]
-pub async fn begin_rust_bot(window: Window, bot_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
+pub async fn begin_rust_bot(window: Window, bot_name: String) -> Result<BotConfigBundle, String> {
     match bootstrap_rust_bot(&window, bot_name, ensure_bot_directory(&window)).await {
-        Ok(config_file) => Ok(HashMap::from([("bot".to_owned(), BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap())])),
-        Err(e) => Err(HashMap::from([("error".to_owned(), e)])),
+        Ok(config_file) => Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap()),
+        Err(e) => Err(e),
     }
 }
 
 #[tauri::command]
-pub async fn begin_scratch_bot(window: Window, bot_name: String) -> Result<HashMap<String, BotConfigBundle>, HashMap<String, String>> {
+pub async fn begin_scratch_bot(window: Window, bot_name: String) -> Result<BotConfigBundle, String> {
     match bootstrap_scratch_bot(&window, bot_name, ensure_bot_directory(&window)).await {
-        Ok(config_file) => Ok(HashMap::from([("bot".to_owned(), BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap())])),
-        Err(e) => Err(HashMap::from([("error".to_owned(), e)])),
+        Ok(config_file) => Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap()),
+        Err(e) => Err(e),
     }
 }
 
@@ -312,14 +313,25 @@ pub fn is_windows() -> bool {
     cfg!(windows)
 }
 
-#[tauri::command]
-pub async fn install_python(window: Window) -> Option<u8> {
+/// Downloads RLBot's isloated Python 3.7.9 environment and unzips it.
+/// Updates the user with continuous progress updates.
+///
+/// WORKS FOR WINDOWS ONLY
+///
+/// # Arguments
+///
+/// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
+pub async fn bootstrap_custom_python(window: &Window) -> Result<(), Box<dyn Error>> {
+    if cfg!(not(windows)) {
+        return Err("This function is only supported on Windows.".into());
+    }
+
     let content_folder = get_content_folder();
     let folder_destination = content_folder.join("Python37");
     let file_path = content_folder.join("python-3.7.9-custom-amd64.zip");
 
     let download_url = "https://virxec.github.io/rlbot_gui_rust/python-3.7.9-custom-amd64.zip";
-    let res = reqwest::Client::new().get(download_url).send().await.ok()?;
+    let res = reqwest::Client::new().get(download_url).send().await?;
     let total_size = 21_873_000;
     let mut stream = res.bytes_stream();
     let mut bytes = Vec::with_capacity(total_size);
@@ -328,38 +340,40 @@ pub async fn install_python(window: Window) -> Option<u8> {
     if !file_path.exists() {
         while let Some(new_bytes) = stream.next().await {
             // put the new bytes into bytes
-            bytes.extend_from_slice(&new_bytes.ok()?);
+            bytes.extend_from_slice(&new_bytes?);
 
             if last_update.elapsed().as_secs_f32() >= 0.1 {
                 let progress = bytes.len() as f32 / total_size as f32 * 100.0;
-                if let Err(e) = window.emit("update-download-progress", ProgressBarUpdate::new(progress, "Downloading zip...".to_owned())) {
-                    ccprintlne(&window, format!("Error when updating progress bar: {}", e));
-                }
+                window.emit("update-download-progress", ProgressBarUpdate::new(progress, "Downloading zip...".to_owned()))?;
                 last_update = Instant::now();
             }
         }
 
-        if let Err(e) = window.emit("update-download-progress", ProgressBarUpdate::new(100., "Writing zip to disk...".to_owned())) {
-            ccprintlne(&window, format!("Error when updating progress bar: {}", e));
-        }
+        window.emit("update-download-progress", ProgressBarUpdate::new(100., "Writing zip to disk...".to_owned()))?;
 
-        let mut file = File::create(&file_path).ok()?;
+        let mut file = File::create(&file_path)?;
         let mut content = Cursor::new(bytes);
-        copy(&mut content, &mut file).ok()?;
+        copy(&mut content, &mut file)?;
     }
 
-    if let Err(e) = window.emit("update-download-progress", ProgressBarUpdate::new(100., "Extracting zip...".to_owned())) {
-        ccprintlne(&window, format!("Error when updating progress bar: {}", e));
-    }
+    window.emit("update-download-progress", ProgressBarUpdate::new(100., "Extracting zip...".to_owned()))?;
 
     // Extract the zip file
-    let file = File::open(&file_path).ok()?;
-    zip_extract_fixed::extract(&window, &file, folder_destination.as_path(), false, false).ok()?;
+    zip_extract_fixed::extract(window, File::open(&file_path)?, folder_destination.as_path(), false, false)?;
 
-    // Updat the Python path
+    // Update the Python path
     *PYTHON_PATH.lock().unwrap() = folder_destination.join("python.exe").to_string_lossy().to_string();
 
-    Some(0)
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn install_python(window: Window) -> Result<(), String> {
+    bootstrap_custom_python(&window).await.map_err(|e| {
+        let e = e.to_string();
+        ccprintlne(&window, e.clone());
+        e
+    })
 }
 
 #[tauri::command]
@@ -461,6 +475,13 @@ pub async fn save_launcher_settings(window: Window, settings: LauncherSettings) 
     settings.write_to_file(&window);
 }
 
+/// Starts the match handler, which is written in Python so it can use the RLBot package (also written in Python)
+///
+/// Returns None if it fails, otherwise returns pipe for the child process's stdin
+///
+/// # Arguments
+///
+/// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
 fn create_match_handler(window: &Window) -> Option<ChildStdin> {
     let program = PYTHON_PATH.lock().unwrap().clone();
 
@@ -476,6 +497,13 @@ fn create_match_handler(window: &Window) -> Option<ChildStdin> {
     }
 }
 
+/// Send a command to the match handler
+///
+/// # Arguments
+///
+/// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
+/// * `command` - The command to send to the match handler - can be in multiple parts, for passing arguments
+/// * `create_handler` - If the match handler should be started if it's down
 pub fn issue_match_handler_command(window: &Window, command_parts: &[String], create_handler: bool) {
     let mut match_handler_stdin = MATCH_HANDLER_STDIN.lock().unwrap();
 
@@ -497,41 +525,30 @@ pub fn issue_match_handler_command(window: &Window, command_parts: &[String], cr
     }
 }
 
-#[tauri::command]
-pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_settings: MiniMatchSettings) -> bool {
-    let port = gateway_util::find_existing_process(&window);
+/// Starts a match via the match handler with the given settings
+///
+/// # Arguments
+///
+/// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
+/// * `bot_list` - A list of bots and their settings to use in the match
+/// * `match_settings` - The various match settings to use in the match, including scripts (only the path), mutators, game map, etc.
+pub async fn start_match_helper(window: &Window, bot_list: Vec<TeamBotBundle>, match_settings: MiniMatchSettings) -> Result<(), String> {
+    let port = gateway_util::find_existing_process(window);
+    let rl_is_running = setup_manager::is_rocket_league_running(port.unwrap_or(gateway_util::IDEAL_RLBOT_PORT))?;
 
-    match setup_manager::is_rocket_league_running(port.unwrap_or(gateway_util::IDEAL_RLBOT_PORT)) {
-        Ok(rl_is_running) => {
-            ccprintln(
-                &window,
-                format!("Rocket League is {}", if rl_is_running { "already running with RLBot args!" } else { "not running yet..." }),
-            );
+    ccprintln(
+        window,
+        format!("Rocket League is {}", if rl_is_running { "already running with RLBot args!" } else { "not running yet..." }),
+    );
 
-            // kill RLBot if it's running but Rocket League isn't
-            if !rl_is_running && port.is_some() {
-                kill_bots(window.clone()).await;
-                gateway_util::kill_existing_processes(&window);
-            }
-        }
-        Err(err) => {
-            ccprintlne(&window, err);
-            return false;
-        }
+    // kill RLBot if it's running but Rocket League isn't
+    if !rl_is_running && port.is_some() {
+        kill_bots(window.clone()).await;
+        gateway_util::kill_existing_processes(window);
     }
 
-    let launcher_settings = LauncherSettings::load(&window);
-
-    let match_settings = match match_settings.setup_for_start_match(&window, &BOT_FOLDER_SETTINGS.lock().unwrap().as_ref().unwrap().folders) {
-        Some(match_settings) => match_settings,
-        None => {
-            if let Err(e) = window.emit("match-start-failed", ()) {
-                ccprintlne(&window, format!("Failed to emit match-start-failed: {}", e));
-            }
-
-            return false;
-        }
-    };
+    let launcher_settings = LauncherSettings::load(window);
+    let match_settings = match_settings.setup_for_start_match(window, &BOT_FOLDER_SETTINGS.lock().unwrap().as_ref().unwrap().folders)?;
 
     let args = [
         "start_match".to_owned(),
@@ -544,9 +561,22 @@ pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_set
 
     println!("Issuing command: {} | ", args.join(" | "));
 
-    issue_match_handler_command(&window, &args, true);
+    issue_match_handler_command(window, &args, true);
 
-    true
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_settings: MiniMatchSettings) -> Result<(), String> {
+    start_match_helper(&window, bot_list, match_settings).await.map_err(|error| {
+        if let Err(e) = window.emit("match-start-failed", ()) {
+            ccprintlne(&window, format!("Failed to emit match-start-failed: {}", e));
+        }
+
+        ccprintlne(&window, error.clone());
+
+        error
+    })
 }
 
 #[tauri::command]
@@ -555,7 +585,10 @@ pub async fn kill_bots(window: Window) {
 
     let mut match_handler_stdin = MATCH_HANDLER_STDIN.lock().unwrap();
     if match_handler_stdin.is_some() {
-        match_handler_stdin.take().unwrap();
+        // take out the stdin, leaving None in it's place and then drop it
+        let _ = match_handler_stdin.take();
+        // when dropped, the stdin pipe will close
+        // the match handler will notice this and close itself down
     }
 }
 
@@ -592,6 +625,11 @@ pub async fn get_downloaded_botpack_commit_id() -> Option<u32> {
     get_current_tag_name()
 }
 
+/// Creates a TeamBotBundle that represents the human player
+///
+/// # Arguments
+///
+/// * `team` - The team the human player should be on
 fn make_human_config(team: Team) -> TeamBotBundle {
     TeamBotBundle {
         name: "Human".to_owned(),
@@ -602,6 +640,12 @@ fn make_human_config(team: Team) -> TeamBotBundle {
     }
 }
 
+/// Collapses a path, e.x. `["$RLBOTPACKROOT", "RLBotPack", "Kamael_family", "Kamael.cfg"]`, to the actual path on the file system
+///
+/// # Arguments
+///
+/// * `path` - The un-parsed JSON path to collapse
+/// * `botpack_root` - The path to the root of the RLBotPack, which will replace `$RLBOTPACKROOT`
 fn collapse_path(cfg_path: Option<&serde_json::Value>, botpack_root: &Path) -> Option<String> {
     let cfg_path = cfg_path?;
 
@@ -618,10 +662,23 @@ fn collapse_path(cfg_path: Option<&serde_json::Value>, botpack_root: &Path) -> O
     Some(path.to_string_lossy().to_string())
 }
 
+/// Get the path on the file system as defined by the path key
+///
+/// # Arguments
+///
+/// * `map` - The JSON map that contains the path key
+/// * `botpack_root` - The path to the root of the RLBotPack, which will replace `$RLBOTPACKROOT`
 fn get_path_from_jsonmap(map: JsonMap, botpack_root: &Path) -> String {
     collapse_path(map.get("path"), botpack_root).unwrap_or_else(|| map.get("path").and_then(|x| Some(x.as_str()?.to_string())).unwrap_or_default())
 }
 
+/// Load a RLBot-type bot
+///
+/// # Arguments
+///
+/// `player` - The JSON map that contains the bot's config
+/// `team` - The team the bot should be on
+/// `botpack_root` - The path to the root of the RLBotPack, which will replace `$RLBOTPACKROOT`
 fn rlbot_to_player_config(player: JsonMap, team: Team, botpack_root: &Path) -> TeamBotBundle {
     TeamBotBundle {
         name: player.get("name").and_then(|x| x.as_str()).unwrap_or_default().to_string(),
@@ -632,6 +689,12 @@ fn rlbot_to_player_config(player: JsonMap, team: Team, botpack_root: &Path) -> T
     }
 }
 
+/// Load a psyonix-type bot
+///
+/// # Arguments
+///
+/// `player` - The JSON map that contains the bot's config
+/// `team` - The team the bot should be on
 fn pysonix_to_player_config(player: JsonMap, team: Team) -> TeamBotBundle {
     TeamBotBundle {
         name: player.get("name").and_then(|x| x.as_str()).unwrap_or_default().to_string(),
@@ -642,6 +705,13 @@ fn pysonix_to_player_config(player: JsonMap, team: Team) -> TeamBotBundle {
     }
 }
 
+/// Load a bot from a JSON map
+///
+/// # Arguments
+///
+/// `player` - The JSON map that contains the bot's config
+/// `team` - The team the bot should be on
+/// `botpack_root` - The path to the root of the RLBotPack, which will replace `$RLBOTPACKROOT`
 fn jsonmap_to_bot(player: JsonMap, team: Team, botpack_root: &Path) -> TeamBotBundle {
     if player.get("type").and_then(|x| x.as_str()) == Some("psyonix") {
         pysonix_to_player_config(player, team)
@@ -650,10 +720,24 @@ fn jsonmap_to_bot(player: JsonMap, team: Team, botpack_root: &Path) -> TeamBotBu
     }
 }
 
+/// Get a JSON map from a key inside the given JSON map
+///
+/// # Arguments
+///
+/// * `map` - The JSON map that contains the key
+/// * `key` - The key to get the value from
 fn get_jsonmap_in_jsonmap(map: &JsonMap, key: &str) -> Option<JsonMap> {
     Some(map.get(key)?.as_object()?.to_owned())
 }
 
+/// Load all the bots (+ the human) for a challenge
+///
+/// # Arguments
+///
+/// * `challenge` - The JSON map that contains the key `humanTeamSize`
+/// * `human_pick` - The names of the bots that the human picked for teammates
+/// * `all_bots` - The JSON that contains a mapping of bot names to bot information
+/// * `botpack_root` - The path to the root of the RLBotPack, which will replace `$RLBOTPACKROOT`
 fn make_player_configs(challenge: &JsonMap, human_picks: &[String], all_bots: JsonMap, botpack_root: &Path) -> Vec<TeamBotBundle> {
     let mut player_configs = vec![make_human_config(Team::Blue)];
 
@@ -676,12 +760,25 @@ fn make_player_configs(challenge: &JsonMap, human_picks: &[String], all_bots: Js
     player_configs
 }
 
+/// Load a script from a JSON map
+///
+/// # Arguments
+///
+/// * `script` - The JSON map that the key "path" which points to the script's .py file
+/// * `botpack_root` - The path to the root of the RLBotPack, which will replace `$RLBOTPACKROOT`
 fn jsonmap_to_script(script: JsonMap, botpack_root: &Path) -> MiniScriptBundle {
     MiniScriptBundle {
         path: get_path_from_jsonmap(script, botpack_root),
     }
 }
 
+/// Load all of the scripts for a challenge
+///
+/// # Arguments
+///
+/// * `challenge` - The JSON map that contains the key `scripts`
+/// * `all_scripts` - The JSON that contains a mapping of script names to script information
+/// * `botpack_root` - The path to the root of the RLBotPack, which will replace `$RLBOTPACKROOT`
 fn make_script_configs(challenge: &JsonMap, all_scripts: JsonMap, botpack_root: &Path) -> Vec<MiniScriptBundle> {
     let mut script_configs = vec![];
 
@@ -696,6 +793,13 @@ fn make_script_configs(challenge: &JsonMap, all_scripts: JsonMap, botpack_root: 
     script_configs
 }
 
+/// Load the match settings for a challenge
+///
+/// # Arguments
+///
+/// * `challenge` - The JSON map that contains the key `matchSettings`
+/// * `upgrades` - The purchased upgrades
+/// * `script_configs` - The loaded scripts that will be used in the challenge
 fn make_match_config(challenge: &JsonMap, upgrades: &HashMap<String, usize>, script_configs: Vec<MiniScriptBundle>) -> MiniMatchSettings {
     MiniMatchSettings {
         game_mode: GAME_MODES[if challenge
@@ -732,10 +836,21 @@ fn make_match_config(challenge: &JsonMap, upgrades: &HashMap<String, usize>, scr
     }
 }
 
+/// Get the ID of the challenge
+///
+/// # Arguments
+///
+/// * `challenge` - The JSON map that contains the key `id`
 fn get_id_from_challenge(challenge: &serde_json::Value) -> Option<&str> {
     challenge.get("id")?.as_str()
 }
 
+/// Find the challenge with the given ID in the given city
+///
+/// # Arguments
+///
+/// * `challenge_id` - The ID of the challenge to find
+/// * `city` - The city to search in
 fn find_challenge_in_city(challenge_id: &str, city: &serde_json::Value) -> Option<JsonMap> {
     for challenge in city["challenges"].as_array()? {
         if let Some(id) = get_id_from_challenge(challenge) {
@@ -750,6 +865,12 @@ fn find_challenge_in_city(challenge_id: &str, city: &serde_json::Value) -> Optio
     None
 }
 
+/// Find the challenge and associated city from the given challenge ID
+///
+/// # Arguments
+///
+/// * `story_settings` - Information on the story configuration, used to load the inforamation about the cities and challenges
+/// * `challenge_id` - The ID of the challenge to find
 fn get_challenge_by_id(story_settings: &StorySettings, challenge_id: &str) -> Option<(serde_json::Value, JsonMap)> {
     let cities = get_cities(story_settings);
 
@@ -762,25 +883,30 @@ fn get_challenge_by_id(story_settings: &StorySettings, challenge_id: &str) -> Op
     None
 }
 
+/// Find the custom color associated with a city, if it exists
+///
+/// # Arguments
+///
+/// * `city` - The city to find the custom color for
 fn get_challenge_city_color(city: &serde_json::Value) -> Option<u64> {
     city.as_object()?.get("description")?.get("color")?.as_u64()
 }
 
-#[tauri::command]
-pub async fn launch_challenge(window: Window, save_state: StoryState, challenge_id: String, picked_teammates: Vec<String>) -> Result<(), String> {
+/// Launch a challenge for the user to play
+/// 
+/// # Arguments
+/// 
+/// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
+/// * `story_save` - The save state of the story, containing all the information about the story
+/// * `challenge_id` - The ID of the challenge to run
+/// * `picked_teammates` - The teammates that were picked by the human for teammates to use in the challenge
+fn run_challenge(window: &Window, save_state: StoryState, challenge_id: String, picked_teammates: Vec<String>) -> Result<(), Box<dyn Error>> {
     let story_settings = save_state.get_story_settings();
 
     let (city, challenge) = match get_challenge_by_id(story_settings, &challenge_id) {
         Some(challenge) => challenge,
-        None => {
-            let error = format!("Could not find challenge with id {}", challenge_id);
-            ccprintlne(&window, error.clone());
-            return Err(error);
-        }
+        None => return Err(format!("Could not find challenge with id {}", challenge_id).into()),
     };
-
-    println!("{}", serde_json::to_string_pretty(&city.as_object().unwrap().get("description").unwrap()).unwrap());
-    println!("{}", serde_json::to_string_pretty(&challenge).unwrap());
 
     let all_bots = get_all_bot_configs(story_settings);
     let all_scripts = get_all_script_configs(story_settings);
@@ -796,18 +922,12 @@ pub async fn launch_challenge(window: Window, save_state: StoryState, challenge_
         .find(|bf| bf.exists())
     {
         Some(bf) => bf,
-        None => {
-            let error = "Could not find RLBotPack-master folder".to_owned();
-            ccprintlne(&window, error.clone());
-            return Err(error);
-        }
+        None => return Err("Could not find RLBotPack-master folder".into()),
     };
 
     let player_configs = make_player_configs(&challenge, &picked_teammates, all_bots, botpack_root.as_path());
     let match_settings = make_match_config(&challenge, save_state.get_upgrades(), make_script_configs(&challenge, all_scripts, botpack_root.as_path()));
-    let launcher_prefs = LauncherSettings::load(&window);
-
-    println!("{}", serde_json::to_string_pretty(&player_configs).unwrap());
+    let launcher_prefs = LauncherSettings::load(window);
 
     let args = [
         "launch_challenge".to_owned(),
@@ -826,7 +946,16 @@ pub async fn launch_challenge(window: Window, save_state: StoryState, challenge_
 
     println!("Issuing command: {} | ", args.join(" | "));
 
-    issue_match_handler_command(&window, &args, true);
+    issue_match_handler_command(window, &args, true);
 
     Ok(())
+}
+
+#[tauri::command]
+pub async fn launch_challenge(window: Window, save_state: StoryState, challenge_id: String, picked_teammates: Vec<String>) -> Result<(), String> {
+    run_challenge(&window, save_state, challenge_id, picked_teammates).map_err(|e| {
+        let e = e.to_string();
+        ccprintlne(&window, e.clone());
+        e
+    })
 }
