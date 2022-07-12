@@ -1,149 +1,348 @@
-pub const MAP_TYPES: [&str; 60] = [
-    "DFHStadium",
-    "Mannfield",
-    "ChampionsField",
-    "UrbanCentral",
-    "BeckwithPark",
-    "UtopiaColiseum",
-    "Wasteland",
-    "NeoTokyo",
-    "AquaDome",
-    "StarbaseArc",
-    "Farmstead",
-    "SaltyShores",
-    "DFHStadium_Stormy",
-    "DFHStadium_Day",
-    "Mannfield_Stormy",
-    "Mannfield_Night",
-    "ChampionsField_Day",
-    "BeckwithPark_Stormy",
-    "BeckwithPark_Midnight",
-    "UrbanCentral_Night",
-    "UrbanCentral_Dawn",
-    "UtopiaColiseum_Dusk",
-    "DFHStadium_Snowy",
-    "Mannfield_Snowy",
-    "UtopiaColiseum_Snowy",
-    "Badlands",
-    "Badlands_Night",
-    "TokyoUnderpass",
-    "Arctagon",
-    "Pillars",
-    "Cosmic",
-    "DoubleGoal",
-    "Octagon",
-    "Underpass",
-    "UtopiaRetro",
-    "Hoops_DunkHouse",
-    "DropShot_Core707",
-    "ThrowbackStadium",
-    "ForbiddenTemple",
-    "RivalsArena",
-    "Farmstead_Night",
-    "SaltyShores_Night",
-    "NeonFields",
-    "DFHStadium_Circuit",
-    "DeadeyeCanyon",
-    "StarbaseArc_Aftermath",
-    "Wasteland_Night",
-    "BeckwithPark_GothamNight",
-    "ForbiddenTemple_Day",
-    "UrbanCentral_Haunted",
-    "ChampionsField_NFL",
-    "ThrowbackStadium_Snowy",
-    "Basin",
-    "Corridor",
-    "Loophole",
-    "Galleon",
-    "GalleonRetro",
-    "Hourglass",
-    "Barricade",
-    "Colossus",
-];
-
-pub const GAME_MODES: [&str; 7] = ["Soccer", "Hoops", "Dropshot", "Hockey", "Rumble", "Heatseeker", "Gridiron"];
-pub const EXISTING_MATCH_BEHAVIOR_TYPES: [&str; 3] = ["Restart If Different", "Restart", "Continue And Spawn"];
-
-pub const MATCH_LENGTH_TYPES: [&str; 4] = ["5 Minutes", "10 Minutes", "20 Minutes", "Unlimited"];
-pub const MAX_SCORE_TYPES: [&str; 4] = ["Unlimited", "1 Goal", "3 Goals", "5 Goals"];
-pub const OVERTIME_MUTATOR_TYPES: [&str; 3] = ["Unlimited", "+5 Max, First Score", "+5 Max, Random Team"];
-pub const SERIES_LENGTH_MUTATOR_TYPES: [&str; 4] = ["Unlimited", "3 Games", "5 Games", "7 Games"];
-pub const GAME_SPEED_MUTATOR_TYPES: [&str; 3] = ["Default", "Slo-Mo", "Time Warp"];
-pub const BALL_MAX_SPEED_MUTATOR_TYPES: [&str; 4] = ["Default", "Slow", "Fast", "Super Fast"];
-pub const BALL_TYPE_MUTATOR_TYPES: [&str; 4] = ["Default", "Cube", "Puck", "Basketball"];
-pub const BALL_WEIGHT_MUTATOR_TYPES: [&str; 4] = ["Default", "Light", "Heavy", "Super Light"];
-pub const BALL_SIZE_MUTATOR_TYPES: [&str; 4] = ["Default", "Small", "Large", "Gigantic"];
-pub const BALL_BOUNCINESS_MUTATOR_TYPES: [&str; 4] = ["Default", "Low", "High", "Super High"];
-pub const BOOST_AMOUNT_MUTATOR_TYPES: [&str; 5] = ["Default", "Unlimited", "Recharge (Slow)", "Recharge (Fast)", "No Boost"];
-pub const RUMBLE_MUTATOR_TYPES: [&str; 8] = ["None", "Default", "Slow", "Civilized", "Destruction Derby", "Spring Loaded", "Spikes Only", "Spike Rush"];
-pub const BOOST_STRENGTH_MUTATOR_TYPES: [&str; 4] = ["1x", "1.5x", "2x", "10x"];
-pub const GRAVITY_MUTATOR_TYPES: [&str; 4] = ["Default", "Low", "High", "Super High"];
-pub const DEMOLISH_MUTATOR_TYPES: [&str; 5] = ["Default", "Disabled", "Friendly Fire", "On Contact", "On Contact (FF)"];
-pub const RESPAWN_TIME_MUTATOR_TYPES: [&str; 4] = ["3 Seconds", "2 Seconds", "1 Second", "Disable Goal Reset"];
+#![allow(non_camel_case_types)]
 
 use serde::{Deserialize, Serialize};
+use serde_enum_str::{Deserialize_enum_str, Serialize_enum_str};
+use strum::{EnumIter, IntoEnumIterator};
+
+#[derive(Deserialize_enum_str, Serialize_enum_str, Clone, Debug, Default, EnumIter)]
+pub enum MapType {
+    #[default]
+    DFHStadium,
+    Mannfield,
+    ChampionsField,
+    UrbanCentral,
+    BeckwithPark,
+    UtopiaColiseum,
+    Wasteland,
+    NeoTokyo,
+    AquaDome,
+    StarbaseArc,
+    Farmstead,
+    SaltyShores,
+    DFHStadium_Stormy,
+    DFHStadium_Day,
+    Mannfield_Stormy,
+    Mannfield_Night,
+    ChampionsField_Day,
+    BeckwithPark_Stormy,
+    BeckwithPark_Midnight,
+    UrbanCentral_Night,
+    UrbanCentral_Dawn,
+    UtopiaColiseum_Dusk,
+    DFHStadium_Snowy,
+    Mannfield_Snowy,
+    UtopiaColiseum_Snowy,
+    Badlands,
+    Badlands_Night,
+    TokyoUnderpass,
+    Arctagon,
+    Pillars,
+    Cosmic,
+    DoubleGoal,
+    Octagon,
+    Underpass,
+    UtopiaRetro,
+    Hoops_DunkHouse,
+    DropShot_Core707,
+    ThrowbackStadium,
+    ForbiddenTemple,
+    RivalsArena,
+    Farmstead_Night,
+    SaltyShores_Night,
+    NeonFields,
+    DFHStadium_Circuit,
+    DeadeyeCanyon,
+    StarbaseArc_Aftermath,
+    Wasteland_Night,
+    BeckwithPark_GothamNight,
+    ForbiddenTemple_Day,
+    UrbanCentral_Haunted,
+    ChampionsField_NFL,
+    ThrowbackStadium_Snowy,
+    Basin,
+    Corridor,
+    Loophole,
+    Galleon,
+    GalleonRetro,
+    Hourglass,
+    Barricade,
+    Colossus,
+    #[serde(other)]
+    Custom(String),
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+pub enum GameMode {
+    #[default]
+    Soccer,
+    Hoops,
+    Dropshot,
+    Hockey,
+    Rumble,
+    Heatseeker,
+    Gridiron,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+pub enum ExistingMatchBehavior {
+    #[default]
+    #[serde(rename = "Restart If Different")]
+    RestartIfDifferent,
+    Restart,
+    #[serde(rename = "Continue And Spawn")]
+    ContinueAndSpawn,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+pub enum MatchLength {
+    #[default]
+    #[serde(rename = "5 Minutes")]
+    FiveMinutes,
+    #[serde(rename = "10 Minutes")]
+    TenMinutes,
+    #[serde(rename = "20 Minutes")]
+    TwentyMinutes,
+    Unlimited,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+pub enum MaxScore {
+    #[default]
+    #[serde(rename = "Unlimited")]
+    Unlimited,
+    #[serde(rename = "1 Goal")]
+    OneGoal,
+    #[serde(rename = "3 Goals")]
+    ThreeGoals,
+    #[serde(rename = "5 Goals")]
+    FiveGoals,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+pub enum Overtime {
+    #[default]
+    #[serde(rename = "Unlimited")]
+    Unlimited,
+    #[serde(rename = "+5 Max, First Score")]
+    PlusFiveMaxFirstScore,
+    #[serde(rename = "+5 Max, Random Team")]
+    PlusFiveMaxRandomTeam,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+pub enum SeriesLength {
+    #[default]
+    #[serde(rename = "Unlimited")]
+    Unlimited,
+    #[serde(rename = "3 Games")]
+    ThreeGames,
+    #[serde(rename = "5 Games")]
+    FiveGames,
+    #[serde(rename = "7 Games")]
+    SevenGames,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+pub enum GameSpeed {
+    #[default]
+    Default,
+    #[serde(rename = "Slo-Mo")]
+    SloMo,
+    #[serde(rename = "Time Warp")]
+    TimeWarp,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+pub enum BallMaxSpeed {
+    #[default]
+    Default,
+    #[serde(rename = "Slow")]
+    Slow,
+    #[serde(rename = "Fast")]
+    Fast,
+    #[serde(rename = "Super Fast")]
+    SuperFast,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+pub enum BallType {
+    #[default]
+    Default,
+    Cube,
+    Puck,
+    Basketball,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+pub enum BallWeight {
+    #[default]
+    Default,
+    Light,
+    Heavy,
+    #[serde(rename = "Super Light")]
+    SuperLight,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+pub enum BallSize {
+    #[default]
+    Default,
+    Small,
+    Large,
+    Gigantic,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+pub enum BallBounciness {
+    #[default]
+    Default,
+    Low,
+    High,
+    #[serde(rename = "Super High")]
+    SuperHigh,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+pub enum BoostAmount {
+    #[default]
+    Default,
+    Unlimited,
+    #[serde(rename = "Recharge (Slow)")]
+    RechargeSlow,
+    #[serde(rename = "Recharge (Fast)")]
+    RechargeFast,
+    #[serde(rename = "No Boost")]
+    NoBoost,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+pub enum Rumble {
+    #[default]
+    None,
+    Default,
+    Slow,
+    Civilized,
+    #[serde(rename = "Destruction Derby")]
+    DestructionDerby,
+    #[serde(rename = "Spring Loaded")]
+    SpringLoaded,
+    #[serde(rename = "Spikes Only")]
+    SpikesOnly,
+    #[serde(rename = "Spike Rush")]
+    SpikeRush,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+pub enum BoostStrength {
+    #[default]
+    Default,
+    #[serde(rename = "1x")]
+    One,
+    #[serde(rename = "1.5x")]
+    OnePointFive,
+    #[serde(rename = "2x")]
+    Two,
+    #[serde(rename = "10x")]
+    Ten,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+pub enum Gravity {
+    #[default]
+    Default,
+    Low,
+    High,
+    #[serde(rename = "Super High")]
+    SuperHigh,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+pub enum Demolish {
+    #[default]
+    Default,
+    Disabled,
+    #[serde(rename = "Friendly Fire")]
+    FriendlyFire,
+    #[serde(rename = "On Contact")]
+    OnContact,
+    #[serde(rename = "On Contact (FF)")]
+    OnContactFriendlyFire,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+pub enum RespawnTime {
+    #[default]
+    #[serde(rename = "3 Seconds")]
+    ThreeSeconds,
+    #[serde(rename = "2 Seconds")]
+    TwoSeconds,
+    #[serde(rename = "1 Second")]
+    OneSecond,
+    #[serde(rename = "Disable Goal Reset")]
+    DisableGoalReset,
+}
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Mutators {
-    pub match_length_types: Vec<String>,
-    pub max_score_types: Vec<String>,
-    pub overtime_types: Vec<String>,
-    pub series_length_types: Vec<String>,
-    pub game_speed_types: Vec<String>,
-    pub ball_max_speed_types: Vec<String>,
-    pub ball_type_types: Vec<String>,
-    pub ball_weight_types: Vec<String>,
-    pub ball_size_types: Vec<String>,
-    pub ball_bounciness_types: Vec<String>,
-    pub boost_amount_types: Vec<String>,
-    pub rumble_types: Vec<String>,
-    pub boost_strength_types: Vec<String>,
-    pub gravity_types: Vec<String>,
-    pub demolish_types: Vec<String>,
-    pub respawn_time_types: Vec<String>,
-}
-
-fn vec_to_string(vec: &[&str]) -> Vec<String> {
-    vec.iter().map(|s| s.to_string()).collect()
+    pub match_length_types: Vec<MatchLength>,
+    pub max_score_types: Vec<MaxScore>,
+    pub overtime_types: Vec<Overtime>,
+    pub series_length_types: Vec<SeriesLength>,
+    pub game_speed_types: Vec<GameSpeed>,
+    pub ball_max_speed_types: Vec<BallMaxSpeed>,
+    pub ball_type_types: Vec<BallType>,
+    pub ball_weight_types: Vec<BallWeight>,
+    pub ball_size_types: Vec<BallSize>,
+    pub ball_bounciness_types: Vec<BallBounciness>,
+    pub boost_amount_types: Vec<BoostAmount>,
+    pub rumble_types: Vec<Rumble>,
+    pub boost_strength_types: Vec<BoostStrength>,
+    pub gravity_types: Vec<Gravity>,
+    pub demolish_types: Vec<Demolish>,
+    pub respawn_time_types: Vec<RespawnTime>,
 }
 
 impl Default for Mutators {
     fn default() -> Self {
         Self {
-            match_length_types: vec_to_string(&MATCH_LENGTH_TYPES),
-            max_score_types: vec_to_string(&MAX_SCORE_TYPES),
-            overtime_types: vec_to_string(&OVERTIME_MUTATOR_TYPES),
-            series_length_types: vec_to_string(&SERIES_LENGTH_MUTATOR_TYPES),
-            game_speed_types: vec_to_string(&GAME_SPEED_MUTATOR_TYPES),
-            ball_max_speed_types: vec_to_string(&BALL_MAX_SPEED_MUTATOR_TYPES),
-            ball_type_types: vec_to_string(&BALL_TYPE_MUTATOR_TYPES),
-            ball_weight_types: vec_to_string(&BALL_WEIGHT_MUTATOR_TYPES),
-            ball_size_types: vec_to_string(&BALL_SIZE_MUTATOR_TYPES),
-            ball_bounciness_types: vec_to_string(&BALL_BOUNCINESS_MUTATOR_TYPES),
-            boost_amount_types: vec_to_string(&BOOST_AMOUNT_MUTATOR_TYPES),
-            rumble_types: vec_to_string(&RUMBLE_MUTATOR_TYPES),
-            boost_strength_types: vec_to_string(&BOOST_STRENGTH_MUTATOR_TYPES),
-            gravity_types: vec_to_string(&GRAVITY_MUTATOR_TYPES),
-            demolish_types: vec_to_string(&DEMOLISH_MUTATOR_TYPES),
-            respawn_time_types: vec_to_string(&RESPAWN_TIME_MUTATOR_TYPES),
+            match_length_types: enum_to_vec(),
+            max_score_types: enum_to_vec(),
+            overtime_types: enum_to_vec(),
+            series_length_types: enum_to_vec(),
+            game_speed_types: enum_to_vec(),
+            ball_max_speed_types: enum_to_vec(),
+            ball_type_types: enum_to_vec(),
+            ball_weight_types: enum_to_vec(),
+            ball_size_types: enum_to_vec(),
+            ball_bounciness_types: enum_to_vec(),
+            boost_amount_types: enum_to_vec(),
+            rumble_types: enum_to_vec(),
+            boost_strength_types: enum_to_vec(),
+            gravity_types: enum_to_vec(),
+            demolish_types: enum_to_vec(),
+            respawn_time_types: enum_to_vec(),
         }
     }
 }
 
+fn enum_to_vec<E: IntoEnumIterator>() -> Vec<E> {
+    E::iter().collect()
+}
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct MatchOptions {
-    pub map_types: Vec<String>,
-    pub game_modes: Vec<String>,
-    pub match_behaviours: Vec<String>,
+    pub map_types: Vec<MapType>,
+    pub game_modes: Vec<GameMode>,
+    pub match_behaviours: Vec<ExistingMatchBehavior>,
     pub mutators: Mutators,
 }
 
 impl Default for MatchOptions {
     fn default() -> Self {
         Self {
-            map_types: vec_to_string(&MAP_TYPES),
-            game_modes: vec_to_string(&GAME_MODES),
-            match_behaviours: vec_to_string(&EXISTING_MATCH_BEHAVIOR_TYPES),
+            map_types: enum_to_vec(),
+            game_modes: enum_to_vec(),
+            match_behaviours: enum_to_vec(),
             mutators: Mutators::default(),
         }
     }

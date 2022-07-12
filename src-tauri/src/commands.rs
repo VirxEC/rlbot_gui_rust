@@ -10,7 +10,7 @@ use crate::{
         parsing::{
             agent_config_parser::BotLooksConfig,
             bot_config_bundle::{BotConfigBundle, ScriptConfigBundle},
-            match_settings_config_parser::{BOOST_AMOUNT_MUTATOR_TYPES, GAME_MODES, MAP_TYPES, MAX_SCORE_TYPES, RUMBLE_MUTATOR_TYPES},
+            match_settings_config_parser::{BoostAmount, GameMode, MaxScore, Rumble},
         },
         setup_manager,
     },
@@ -802,34 +802,30 @@ fn make_script_configs(challenge: &JsonMap, all_scripts: JsonMap, botpack_root: 
 /// * `script_configs` - The loaded scripts that will be used in the challenge
 fn make_match_config(challenge: &JsonMap, upgrades: &HashMap<String, usize>, script_configs: Vec<MiniScriptBundle>) -> MiniMatchSettings {
     MiniMatchSettings {
-        game_mode: GAME_MODES[if challenge
+        game_mode: challenge
             .get("limitations") // check if the key "limitations" exists in the challenge
             .and_then(|x| x.as_array().map(|x| x.iter().filter_map(|x| x.as_str()).collect::<Vec<_>>())) // if it does, map it to an vec of strings
-            .map(|x| x.contains(&"half-field")) // if it contains the string "half-field", return true - false if not or something went wrong
-            .unwrap_or(false)
-        {
-            5 // Heatseeker
-        } else {
-            0 // Soccar
-        }]
-        .to_owned(),
-        map: challenge.get("map").and_then(|x| x.as_str()).unwrap_or(MAP_TYPES[0]).to_owned(), // config-defined or DFH Stadium
+            .unwrap_or_default() // Convert None to an empty vec for simplicity
+            .contains(&"half-field") // check if the vec contains the string "half-field"
+            .then_some(GameMode::Heatseeker) // if it does, set the game mode to Heatseeker
+            .unwrap_or_default(), // otherwise, set it to Soccer
+        map: challenge.get("map").and_then(|x| serde_json::from_value(x.to_owned()).ok()).unwrap_or_default(), // config-defined or DFH Stadium
         enable_state_setting: true,
         scripts: script_configs,
         mutators: MutatorSettings {
             max_score: if DEBUG_MODE_SHORT_GAMES {
-                MAX_SCORE_TYPES[2].to_owned() // 3 goals
+                MaxScore::ThreeGoals
             } else {
                 // config-defined or unlimited
-                challenge.get("max_score").and_then(|x| x.as_str()).unwrap_or(MAX_SCORE_TYPES[0]).to_owned()
+                challenge.get("max_score").and_then(|x| serde_json::from_value(x.to_owned()).ok()).unwrap_or_default()
             },
-            boost_amount: BOOST_AMOUNT_MUTATOR_TYPES[if challenge.get("disabledBoost").and_then(|x| x.as_bool()).unwrap_or(false) {
-                4 // no boost
-            } else {
-                0 // normal boost
-            }]
-            .to_owned(),
-            rumble: RUMBLE_MUTATOR_TYPES[upgrades.contains_key("rumble") as usize].to_owned(), // Rumble none / default
+            boost_amount: challenge
+                .get("disabledBoost")
+                .and_then(|x| x.as_bool())
+                .unwrap_or_default()
+                .then_some(BoostAmount::NoBoost)
+                .unwrap_or_default(), // config-defined or normal
+            rumble: upgrades.contains_key("rumble").then_some(Rumble::Default).unwrap_or_default(), // Rumble default / none
             ..Default::default()
         },
         ..Default::default()
@@ -893,9 +889,9 @@ fn get_challenge_city_color(city: &serde_json::Value) -> Option<u64> {
 }
 
 /// Launch a challenge for the user to play
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
 /// * `story_save` - The save state of the story, containing all the information about the story
 /// * `challenge_id` - The ID of the challenge to run
