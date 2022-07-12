@@ -37,11 +37,11 @@ pub async fn check_rlbot_python() -> HashMap<String, bool> {
 
     let python_path = PYTHON_PATH.lock().unwrap().to_owned();
 
-    if get_command_status(&python_path, vec!["--version"]) {
+    if get_command_status(&python_path, &["--version"]) {
         python_support.insert("python".to_owned(), true);
         python_support.insert(
             "rlbotpython".to_owned(),
-            get_command_status(&python_path, vec!["-c", "import rlbot; import numpy; import numba; import scipy; import selenium"]),
+            get_command_status(python_path, &["-c", "import rlbot; import numpy; import numba; import scipy; import selenium"]),
         );
     } else {
         python_support.insert("python".to_owned(), false);

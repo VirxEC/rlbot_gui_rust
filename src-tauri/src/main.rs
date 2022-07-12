@@ -68,7 +68,7 @@ fn auto_detect_python() -> Option<(String, bool)> {
         }
     }
 
-    if get_command_status("python", vec!["--version"]) {
+    if get_command_status("python", &["--version"]) {
         Some(("python".to_owned(), false))
     } else {
         None
@@ -96,7 +96,7 @@ fn get_python_from_pip(pip: &str) -> Result<String, Box<dyn Error>> {
 #[cfg(target_os = "macos")]
 fn auto_detect_python() -> Option<(String, bool)> {
     for python in ["python3.7", "python3.8", "python3.9", "python3.6", "python3"] {
-        if get_command_status(python, vec!["--version"]) {
+        if get_command_status(python, &["--version"]) {
             return Some((python.to_owned(), false));
         }
     }
@@ -112,7 +112,7 @@ fn auto_detect_python() -> Option<(String, bool)> {
     }
 
     for python in ["python3.7", "python3.8", "python3.9", "python3.6", "python3"] {
-        if get_command_status(python, vec!["--version"]) {
+        if get_command_status(python, &["--version"]) {
             return Some((python.to_owned(), false));
         }
     }
@@ -120,12 +120,18 @@ fn auto_detect_python() -> Option<(String, bool)> {
     None
 }
 
+/// Get the path to the GUI config file
 fn get_config_path() -> PathBuf {
     get_content_folder().join("config.ini")
 }
 
 /// Emits text to the console
 /// Also calls println!() to print to the console
+///
+/// # Arguments
+///
+/// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
+/// * `text` - The text to emit
 pub fn ccprintln(window: &Window, text: String) {
     println!("{}", &text);
     emit_text(window, text, false);
@@ -133,6 +139,11 @@ pub fn ccprintln(window: &Window, text: String) {
 
 /// Emits text to the console, replacing the previous line
 /// Also calls println!() to print to the console
+///
+/// # Arguments
+///
+/// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
+/// * `text` - The text to emit
 pub fn ccprintlnr(window: &Window, text: String) {
     println!("{}", &text);
     emit_text(window, text, true);
@@ -140,6 +151,11 @@ pub fn ccprintlnr(window: &Window, text: String) {
 
 /// Emits text to the console
 /// Also calls printlne!() to print to the console
+///
+/// # Arguments
+///
+/// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
+/// * `text` - The text to emit
 pub fn ccprintlne(window: &Window, text: String) {
     eprintln!("{}", &text);
     emit_text(window, text, false);
@@ -173,10 +189,16 @@ fn has_chrome() -> bool {
 #[cfg(target_os = "linux")]
 fn has_chrome() -> bool {
     // google chrome works, but many Linux users especally may prefer to use Chromium instead
-    get_command_status("google-chrome", vec!["--product-version"]) || get_command_status("chromium", vec!["--product-version"])
+    get_command_status("google-chrome", &["--product-version"]) || get_command_status("chromium", &["--product-version"])
 }
 
-fn get_command_status(program: &str, args: Vec<&str>) -> bool {
+/// Spawns a process, waits for it to finish, and returns whether or not it completed sucessfully
+///
+/// # Arguments
+///
+/// * `program` - The executable to run
+/// * `args` - The arguments to pass to the executable
+fn get_command_status<S: AsRef<OsStr>>(program: S, args: &[&str]) -> bool {
     let mut command = Command::new(program);
 
     #[cfg(windows)]
@@ -192,8 +214,16 @@ fn get_command_status(program: &str, args: Vec<&str>) -> bool {
     }
 }
 
+/// Returns a Command that, went ran, will have all it's output redirected to the GUI console
 /// Be sure to drop(command) after spawning the child process! Otherwise a deadlock could happen.
 /// This is due to how the os_pipe crate works.
+///
+/// Most of the time, you should try to use spawn_capture_process() instead.
+///
+/// # Arguments
+///
+/// * `program` - The executable to run
+/// * `args` - The arguments to pass to the executable
 pub fn get_capture_command<S: AsRef<OsStr>>(program: S, args: &[&str]) -> Command {
     let mut command = Command::new(program);
 
@@ -213,25 +243,40 @@ pub fn get_capture_command<S: AsRef<OsStr>>(program: S, args: &[&str]) -> Comman
     command
 }
 
-/// This function is esstential because is drops the command, which causes a deadlock
+/// Spawns a process that will have it's output captured and sent to the GUI console.
+/// This function is esstential because is drops the command, which avoids a deadlock.
+///
 /// Note: Child != Command
+///
+/// # Arguments
+///
+/// * `program` - The executable to run
+/// * `args` - The arguments to pass to the executable
 pub fn spawn_capture_process<S: AsRef<OsStr>>(program: S, args: &[&str]) -> IoResult<Child> {
     get_capture_command(program, args).spawn()
 }
 
+/// Spawns a process that will have it's output captured and sent to the GUI console.
+/// Wait for the process to exit, and returns the exit code.
+///
+///  Returns 2 if the process failed to start, and 1 if we failed to get the exit code but at least something happened.
+///
+/// # Arguments
+///
+/// * `program` - The executable to run
+/// * `args` - The arguments to pass to the executable
 pub fn spawn_capture_process_and_get_exit_code<S: AsRef<OsStr>>(program: S, args: &[&str]) -> i32 {
     if let Ok(mut child) = spawn_capture_process(program, args) {
-        match child.wait() {
-            Ok(exit_status) => exit_status.code().unwrap_or(1),
-            Err(_) => 2,
+        if let Ok(exit_status) = child.wait() {
+            return exit_status.code().unwrap_or(1);
         }
-    } else {
-        2
     }
+
+    2
 }
 
 pub fn check_has_rlbot() -> bool {
-    get_command_status(&*PYTHON_PATH.lock().unwrap(), vec!["-c", "import rlbot"])
+    get_command_status(&*PYTHON_PATH.lock().unwrap(), &["-c", "import rlbot"])
 }
 
 #[cfg(windows)]

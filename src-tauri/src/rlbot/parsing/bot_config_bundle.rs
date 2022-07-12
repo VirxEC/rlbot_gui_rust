@@ -347,7 +347,7 @@ impl Runnable for BotConfigBundle {
                 }
                 Err(e) => ccprintln(window, format!("Failed to calculate missing packages: {}", e)),
             }
-        } else if requires_tkinter && !get_command_status(&python, vec!["-c", "import tkinter"]) {
+        } else if requires_tkinter && !get_command_status(python, &["-c", "import tkinter"]) {
             return vec![String::from("tkinter")];
         }
 
@@ -524,7 +524,7 @@ impl Runnable for ScriptConfigBundle {
                 }
                 Err(e) => ccprintln(window, format!("Failed to calculate missing packages: {}", e)),
             }
-        } else if self.requires_tkinter && !get_command_status(&python, vec!["-c", "import tkinter"]) {
+        } else if self.requires_tkinter && !get_command_status(python, &["-c", "import tkinter"]) {
             return vec![String::from("tkinter")];
         }
 

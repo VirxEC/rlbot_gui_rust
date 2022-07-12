@@ -24,6 +24,11 @@ use std::{
 };
 use tauri::{api::dialog::FileDialogBuilder, Window};
 
+/// Loads the GUI config, creating it if it doesn't exist.
+/// 
+/// # Arguments
+/// 
+/// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
 pub fn load_gui_config(window: &Window) -> Ini {
     let mut conf = Ini::new();
     conf.set_comment_symbols(&[';']);
@@ -237,10 +242,10 @@ pub async fn save_team_settings(window: Window, blue_team: Vec<BotConfigBundle>,
 pub async fn get_language_support() -> HashMap<String, bool> {
     let mut lang_support = HashMap::new();
 
-    lang_support.insert("java".to_owned(), get_command_status("java", vec!["-version"]));
-    lang_support.insert("node".to_owned(), get_command_status("node", vec!["--version"]));
+    lang_support.insert("java".to_owned(), get_command_status("java", &["-version"]));
+    lang_support.insert("node".to_owned(), get_command_status("node", &["--version"]));
     lang_support.insert("chrome".to_owned(), has_chrome());
-    lang_support.insert("fullpython".to_owned(), get_command_status(&PYTHON_PATH.lock().unwrap(), vec!["-c", "import tkinter"]));
+    lang_support.insert("fullpython".to_owned(), get_command_status(&*PYTHON_PATH.lock().unwrap(), &["-c", "import tkinter"]));
 
     dbg!(lang_support)
 }
