@@ -22,9 +22,10 @@ use registry::{Hive, Security};
 use serde::Serialize;
 #[cfg(windows)]
 use std::path::Path;
-use std::{collections::HashMap, error::Error};
 use std::{
+    collections::HashMap,
     env,
+    error::Error,
     ffi::OsStr,
     io::Read,
     path::PathBuf,
@@ -79,9 +80,6 @@ fn auto_detect_python() -> Option<(String, bool)> {
         None
     }
 }
-
-#[cfg(windows)]
-use std::error::Error;
 
 #[cfg(windows)]
 fn get_python_from_pip(pip: &str) -> Result<String, Box<dyn Error>> {
