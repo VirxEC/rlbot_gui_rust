@@ -1,4 +1,5 @@
 #![cfg_attr(all(not(debug_assertions), target_os = "windows"), windows_subsystem = "windows")]
+#![allow(clippy::items_after_statements, clippy::wildcard_imports, clippy::unused_async)]
 
 mod bot_management;
 mod commands;
