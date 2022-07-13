@@ -62,13 +62,24 @@ pub fn load_gui_config(window: &Window) -> Ini {
 }
 
 #[tauri::command]
-pub async fn save_folder_settings(window: Window, bot_folder_settings: BotFolders) {
-    BOT_FOLDER_SETTINGS.lock().unwrap().as_mut().unwrap().update_config(&window, bot_folder_settings);
+pub async fn save_folder_settings(window: Window, bot_folder_settings: BotFolders) -> Result<(), String> {
+    BOT_FOLDER_SETTINGS
+        .lock()
+        .map_err(|err| err.to_string())?
+        .as_mut()
+        .ok_or("BOT_FOLDER_SETTINGS is None")?
+        .update_config(&window, bot_folder_settings);
+    Ok(())
 }
 
 #[tauri::command]
-pub async fn get_folder_settings() -> BotFolders {
-    BOT_FOLDER_SETTINGS.lock().unwrap().as_ref().unwrap().clone()
+pub async fn get_folder_settings() -> Result<BotFolders, String> {
+    Ok(BOT_FOLDER_SETTINGS
+        .lock()
+        .map_err(|err| err.to_string())?
+        .as_ref()
+        .ok_or("BOT_FOLDER_SETTINGS is None")?
+        .clone())
 }
 
 fn filter_hidden_bundles<T: Runnable + Clone>(bundles: &HashSet<T>) -> Vec<T> {
@@ -80,9 +91,9 @@ fn get_bots_from_directory(path: &str) -> Vec<BotConfigBundle> {
 }
 
 #[tauri::command]
-pub async fn scan_for_bots() -> Vec<BotConfigBundle> {
-    let bfs_lock = BOT_FOLDER_SETTINGS.lock().unwrap();
-    let bfs = bfs_lock.as_ref().unwrap();
+pub async fn scan_for_bots() -> Result<Vec<BotConfigBundle>, String> {
+    let bfs_lock = BOT_FOLDER_SETTINGS.lock().map_err(|err| err.to_string())?;
+    let bfs = bfs_lock.as_ref().ok_or("BOT_FOLDER_SETTINGS is None")?;
     let mut bots = Vec::new();
 
     for (path, props) in &bfs.folders {
@@ -99,7 +110,7 @@ pub async fn scan_for_bots() -> Vec<BotConfigBundle> {
         }
     }
 
-    bots
+    Ok(bots)
 }
 
 fn get_scripts_from_directory(path: &str) -> Vec<ScriptConfigBundle> {
@@ -107,9 +118,9 @@ fn get_scripts_from_directory(path: &str) -> Vec<ScriptConfigBundle> {
 }
 
 #[tauri::command]
-pub async fn scan_for_scripts() -> Vec<ScriptConfigBundle> {
-    let bfs_lock = BOT_FOLDER_SETTINGS.lock().unwrap();
-    let bfs = bfs_lock.as_ref().unwrap();
+pub async fn scan_for_scripts() -> Result<Vec<ScriptConfigBundle>, String> {
+    let bfs_lock = BOT_FOLDER_SETTINGS.lock().map_err(|err| err.to_string())?;
+    let bfs = bfs_lock.as_ref().ok_or("BOT_FOLDER_SETTINGS is None")?;
     let mut scripts = Vec::with_capacity(bfs.folders.len() + bfs.files.len());
 
     for (path, props) in &bfs.folders {
@@ -126,19 +137,23 @@ pub async fn scan_for_scripts() -> Vec<ScriptConfigBundle> {
         }
     }
 
-    scripts
+    Ok(scripts)
 }
 
 #[tauri::command]
 pub async fn pick_bot_folder(window: Window) {
-    FileDialogBuilder::new().pick_folder(move |folder_path| {
-        if let Some(path) = folder_path {
-            BOT_FOLDER_SETTINGS
-                .lock()
-                .unwrap()
-                .as_mut()
-                .unwrap()
-                .add_folder(&window, path.to_string_lossy().to_string());
+    FileDialogBuilder::new().pick_folder(move |path| {
+        if let Some(path) = path {
+            match BOT_FOLDER_SETTINGS.lock() {
+                Ok(mut bfs_lock) => {
+                    if let Some(bfs) = bfs_lock.as_mut() {
+                        bfs.add_folder(&window, path.to_string_lossy().to_string());
+                    } else {
+                        ccprintlne(&window, "BOT_FOLDER_SETTINGS is None".to_owned());
+                    }
+                }
+                Err(err) => ccprintlne(&window, format!("Failed to lock BOT_FOLDER_SETTINGS: {}", err)),
+            }
         }
     });
 }
@@ -147,7 +162,16 @@ pub async fn pick_bot_folder(window: Window) {
 pub async fn pick_bot_config(window: Window) {
     FileDialogBuilder::new().add_filter("Bot Cfg File", &["cfg"]).pick_file(move |path| {
         if let Some(path) = path {
-            BOT_FOLDER_SETTINGS.lock().unwrap().as_mut().unwrap().add_file(&window, path.to_string_lossy().to_string());
+            match BOT_FOLDER_SETTINGS.lock() {
+                Ok(mut bfs_lock) => {
+                    if let Some(bfs) = bfs_lock.as_mut() {
+                        bfs.add_file(&window, path.to_string_lossy().to_string());
+                    } else {
+                        ccprintlne(&window, "BOT_FOLDER_SETTINGS is None".to_owned());
+                    }
+                }
+                Err(err) => ccprintlne(&window, format!("Failed to lock BOT_FOLDER_SETTINGS: {}", err)),
+            }
         }
     });
 }
@@ -195,10 +219,17 @@ pub async fn save_looks(window: Window, path: String, config: BotLooksConfig) {
 }
 
 #[tauri::command]
-pub async fn get_match_options() -> MatchOptions {
+pub async fn get_match_options() -> Result<MatchOptions, String> {
     let mut mo = MatchOptions::default();
-    mo.map_types.extend(custom_maps::find_all(&BOT_FOLDER_SETTINGS.lock().unwrap().as_ref().unwrap().folders));
-    mo
+    mo.map_types.extend(custom_maps::find_all(
+        &BOT_FOLDER_SETTINGS
+            .lock()
+            .map_err(|err| err.to_string())?
+            .as_ref()
+            .ok_or("BOT_FOLDER_SETTINGS is None")?
+            .folders,
+    ));
+    Ok(mo)
 }
 
 #[tauri::command]
@@ -241,15 +272,18 @@ pub async fn save_team_settings(window: Window, blue_team: Vec<BotConfigBundle>,
 }
 
 #[tauri::command]
-pub async fn get_language_support() -> HashMap<String, bool> {
+pub async fn get_language_support() -> Result<HashMap<String, bool>, String> {
     let mut lang_support = HashMap::new();
 
     lang_support.insert("java".to_owned(), get_command_status("java", &["-version"]));
     lang_support.insert("node".to_owned(), get_command_status("node", &["--version"]));
     lang_support.insert("chrome".to_owned(), has_chrome());
-    lang_support.insert("fullpython".to_owned(), get_command_status(&*PYTHON_PATH.lock().unwrap(), &["-c", "import tkinter"]));
+    lang_support.insert(
+        "fullpython".to_owned(),
+        get_command_status(&*PYTHON_PATH.lock().map_err(|err| err.to_string())?, &["-c", "import tkinter"]),
+    );
 
-    dbg!(lang_support)
+    Ok(dbg!(lang_support))
 }
 
 #[tauri::command]
@@ -258,19 +292,21 @@ pub async fn get_detected_python_path() -> Option<(String, bool)> {
 }
 
 #[tauri::command]
-pub async fn get_python_path() -> String {
-    PYTHON_PATH.lock().unwrap().to_owned()
+pub async fn get_python_path() -> Result<String, String> {
+    Ok(PYTHON_PATH.lock().map_err(|err| err.to_string())?.to_owned())
 }
 
 #[tauri::command]
-pub async fn set_python_path(window: Window, path: String) {
-    *PYTHON_PATH.lock().unwrap() = path.clone();
+pub async fn set_python_path(window: Window, path: String) -> Result<(), String> {
+    *PYTHON_PATH.lock().map_err(|err| err.to_string())? = path.clone();
     let mut config = load_gui_config(&window);
     config.set("python_config", "path", Some(path));
 
     if let Err(e) = config.write(get_config_path()) {
         ccprintlne(&window, format!("Failed to save python path: {}", e));
     }
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -290,9 +326,9 @@ fn read_recommendations_json<P: AsRef<Path>>(path: P) -> Result<AllRecommendatio
     serde_json::from_str(&raw_json).map_err(|e| format!("Failed to parse file {}: {}", path.as_ref().to_string_lossy(), e))
 }
 
-fn get_recommendations_json(window: &Window) -> Option<AllRecommendations<String>> {
+fn get_recommendations_json(window: &Window, bfs: &BotFolders) -> Option<AllRecommendations<String>> {
     // Search for and load the json file
-    for path in BOT_FOLDER_SETTINGS.lock().unwrap().as_ref().unwrap().folders.keys() {
+    for path in bfs.folders.keys() {
         let pattern = Path::new(path).join("**/recommendations.json");
 
         for path2 in glob(&pattern.to_string_lossy().clone()).unwrap().flatten() {
@@ -308,12 +344,13 @@ fn get_recommendations_json(window: &Window) -> Option<AllRecommendations<String
 
 #[tauri::command]
 pub async fn get_recommendations(window: Window) -> Option<AllRecommendations<BotConfigBundle>> {
+    let bfs_lock = BOT_FOLDER_SETTINGS.lock().ok()?;
+    let bfs = bfs_lock.as_ref()?;
+
     // If we found the json, return the corresponding BotConfigBundles for the bots
-    get_recommendations_json(&window).map(|j| {
+    get_recommendations_json(&window, bfs).map(|j| {
         // Get a list of all the bots in (bot name, bot config file path) pairs
         let name_path_pairs = {
-            let bfs_lock = BOT_FOLDER_SETTINGS.lock().unwrap();
-            let bfs = bfs_lock.as_ref().unwrap();
             let mut bots = Vec::new();
 
             bots.par_extend(
@@ -417,7 +454,7 @@ fn get_story_json(story_settings: &StoryConfig) -> Option<JsonMap> {
 }
 
 fn get_story_config(story_settings: &StoryConfig) -> Option<JsonMap> {
-    if let Some(json) = STORIES_CACHE.lock().unwrap().as_ref().unwrap().get(story_settings) {
+    if let Some(json) = STORIES_CACHE.lock().ok()?.as_ref()?.get(story_settings) {
         return Some(json.clone());
     }
 

@@ -13,6 +13,7 @@ use std::{
     io::Read,
     path::Path,
     process::{self, Stdio},
+    str::from_utf8,
 };
 use tauri::Window;
 
@@ -289,31 +290,21 @@ impl Runnable for BotConfigBundle {
         self.supports_standalone.unwrap_or_default() && self.use_virtual_environment.unwrap_or_default()
     }
 
-    #[cfg(windows)]
     fn get_environment_path(&self) -> String {
         if self.use_virtual_environment() {
-            Path::new(self.config_directory.as_ref().unwrap())
-                .join("venv")
-                .join("scripts")
-                .join("python.exe")
-                .to_string_lossy()
-                .to_string()
-        } else {
-            PYTHON_PATH.lock().unwrap().to_owned()
+            if let Some(conf_dir) = self.config_directory.as_ref() {
+                return if cfg!(windows) {
+                    Path::new(conf_dir).join("venv").join("scripts").join("python.exe").to_string_lossy().to_string()
+                } else {
+                    Path::new(conf_dir).join("venv").join("bin").join("python").to_string_lossy().to_string()
+                };
+            }
         }
-    }
 
-    #[cfg(not(windows))]
-    fn get_environment_path(&self) -> String {
-        if self.use_virtual_environment() {
-            Path::new(self.config_directory.as_ref().unwrap())
-                .join("venv")
-                .join("bin")
-                .join("python")
-                .to_string_lossy()
-                .to_string()
+        if let Ok(path) = PYTHON_PATH.lock() {
+            path.to_owned()
         } else {
-            PYTHON_PATH.lock().unwrap().to_owned()
+            "".to_owned()
         }
     }
 
@@ -322,7 +313,11 @@ impl Runnable for BotConfigBundle {
             return Vec::new();
         }
 
-        let python = PYTHON_PATH.lock().unwrap().to_owned();
+        let python = if let Ok(path) = PYTHON_PATH.lock() {
+            path.to_owned()
+        } else {
+            return Vec::new();
+        };
 
         let requires_tkinter = self.requires_tkinter.unwrap_or_default();
 
@@ -348,7 +343,7 @@ impl Runnable for BotConfigBundle {
 
             match command.args(args).stdin(Stdio::null()).output() {
                 Ok(proc) => {
-                    let output = std::str::from_utf8(proc.stdout.as_slice()).unwrap();
+                    let output = from_utf8(proc.stdout.as_slice()).unwrap();
                     if let Ok(packages) = serde_json::from_str(output) {
                         return packages;
                     }
@@ -472,27 +467,22 @@ impl Runnable for ScriptConfigBundle {
         self.use_virtual_environment
     }
 
-    #[cfg(windows)]
     fn get_environment_path(&self) -> String {
         if self.use_virtual_environment() {
-            Path::new(&self.config_directory)
-                .join("venv")
-                .join("scripts")
-                .join("python.exe")
-                .to_str()
-                .unwrap()
-                .to_owned()
+            if cfg!(windows) {
+                Path::new(&self.config_directory)
+                    .join("venv")
+                    .join("scripts")
+                    .join("python.exe")
+                    .to_string_lossy()
+                    .to_string()
+            } else {
+                Path::new(&self.config_directory).join("venv").join("bin").join("python").to_string_lossy().to_string()
+            }
+        } else if let Ok(path) = PYTHON_PATH.lock() {
+            path.to_owned()
         } else {
-            PYTHON_PATH.lock().unwrap().to_owned()
-        }
-    }
-
-    #[cfg(not(windows))]
-    fn get_environment_path(&self) -> String {
-        if self.use_virtual_environment() {
-            Path::new(&self.config_directory).join("venv").join("bin").join("python").to_string_lossy().to_string()
-        } else {
-            PYTHON_PATH.lock().unwrap().to_owned()
+            "".to_owned()
         }
     }
 
@@ -501,7 +491,11 @@ impl Runnable for ScriptConfigBundle {
             return Vec::new();
         }
 
-        let python = PYTHON_PATH.lock().unwrap().to_owned();
+        let python = if let Ok(path) = PYTHON_PATH.lock() {
+            path.to_owned()
+        } else {
+            return Vec::new();
+        };
 
         if let Some(req_file) = self.get_requirements_file() {
             let mut args: Vec<&str> = vec!["-c", "from rlbot_smh.get_missing_packages import run; run()"];
@@ -525,7 +519,7 @@ impl Runnable for ScriptConfigBundle {
 
             match command.args(args).stdin(Stdio::null()).output() {
                 Ok(proc) => {
-                    let output = std::str::from_utf8(proc.stdout.as_slice()).unwrap();
+                    let output = from_utf8(proc.stdout.as_slice()).unwrap();
                     if let Ok(packages) = serde_json::from_str(output) {
                         return packages;
                     }

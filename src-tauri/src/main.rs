@@ -26,7 +26,7 @@ use std::{collections::HashMap, error::Error};
 use std::{
     env,
     ffi::OsStr,
-    io::{Read, Result as IoResult},
+    io::Read,
     path::PathBuf,
     process::{Child, ChildStdin, Command, Stdio},
     sync::Mutex,
@@ -225,11 +225,15 @@ fn get_command_status<S: AsRef<OsStr>>(program: S, args: &[&str]) -> bool {
 ///
 /// Most of the time, you should try to use `spawn_capture_process()` instead.
 ///
+/// # Errors
+///
+/// Returns an error when either `CAPTURE_PIPE_WRITER`'s lock is poisoned, or when the capture pipes couldn't be connected.
+///
 /// # Arguments
 ///
 /// * `program` - The executable to run
 /// * `args` - The arguments to pass to the executable
-pub fn get_capture_command<S: AsRef<OsStr>>(program: S, args: &[&str]) -> Command {
+pub fn get_capture_command<S: AsRef<OsStr>>(program: S, args: &[&str]) -> Result<Command, Box<dyn Error>> {
     let mut command = Command::new(program);
 
     #[cfg(windows)]
@@ -239,13 +243,13 @@ pub fn get_capture_command<S: AsRef<OsStr>>(program: S, args: &[&str]) -> Comman
         command.creation_flags(0x08000000);
     };
 
-    let pipe = CAPTURE_PIPE_WRITER.lock().unwrap();
-    let out_pipe = pipe.as_ref().unwrap().try_clone().unwrap();
-    let err_pipe = pipe.as_ref().unwrap().try_clone().unwrap();
+    let pipe = CAPTURE_PIPE_WRITER.lock()?;
+    let out_pipe = pipe.as_ref().ok_or("Pipe is closed")?.try_clone()?;
+    let err_pipe = pipe.as_ref().ok_or("Pipe is closed")?.try_clone()?;
 
     command.args(args).current_dir(get_content_folder()).stdout(out_pipe).stderr(err_pipe);
 
-    command
+    Ok(command)
 }
 
 /// Spawns a process that will have it's output captured and sent to the GUI console.
@@ -253,12 +257,16 @@ pub fn get_capture_command<S: AsRef<OsStr>>(program: S, args: &[&str]) -> Comman
 ///
 /// Note: Child != Command
 ///
+/// # Errors
+///
+/// Returns an error when the child process fails to start.
+///
 /// # Arguments
 ///
 /// * `program` - The executable to run
 /// * `args` - The arguments to pass to the executable
-pub fn spawn_capture_process<S: AsRef<OsStr>>(program: S, args: &[&str]) -> IoResult<Child> {
-    get_capture_command(program, args).spawn()
+pub fn spawn_capture_process<S: AsRef<OsStr>>(program: S, args: &[&str]) -> Result<Child, Box<dyn Error>> {
+    Ok(get_capture_command(program, args)?.spawn()?)
 }
 
 /// Spawns a process that will have it's output captured and sent to the GUI console.
@@ -281,9 +289,9 @@ pub fn spawn_capture_process_and_get_exit_code<S: AsRef<OsStr>>(program: S, args
 }
 
 /// Check whether or not the rlbot pip package is installed
-/// 
+///
 /// # Errors
-/// 
+///
 /// This function will return an error if `PYTHON_PATH`'s lock has been poisoned.
 pub fn check_has_rlbot() -> Result<bool, String> {
     Ok(get_command_status(&*PYTHON_PATH.lock().map_err(|err| err.to_string())?, &["-c", "import rlbot"]))
@@ -304,8 +312,8 @@ fn get_content_folder() -> PathBuf {
     PathBuf::from(format!("{}/.RLBotGUI", env::var("HOME").unwrap()))
 }
 
-fn update_internal_console(update: &ConsoleTextUpdate) {
-    let mut console_text = CONSOLE_TEXT.lock().unwrap();
+fn update_internal_console(update: &ConsoleTextUpdate) -> Result<(), String> {
+    let mut console_text = CONSOLE_TEXT.lock().map_err(|e| e.to_string())?;
     if update.replace_last {
         console_text.pop();
     }
@@ -314,6 +322,8 @@ fn update_internal_console(update: &ConsoleTextUpdate) {
     if console_text.len() > 1200 {
         console_text.drain(1200..);
     }
+
+    Ok(())
 }
 
 fn try_emit_signal<S: Serialize + Clone>(window: &Window, signal: &str, payload: S) -> (String, Option<TauriError>) {
@@ -322,7 +332,9 @@ fn try_emit_signal<S: Serialize + Clone>(window: &Window, signal: &str, payload:
 
 fn issue_console_update(window: &Window, text: String, replace_last: bool) -> (String, Option<TauriError>) {
     let update = ConsoleTextUpdate::from(text, replace_last);
-    update_internal_console(&update);
+    if let Err(e) = update_internal_console(&update) {
+        ccprintlne(window, e);
+    }
     try_emit_signal(window, "new-console-text", update)
 }
 
@@ -409,8 +421,8 @@ fn main() {
     initialize(&CONSOLE_TEXT);
     initialize(&MATCH_HANDLER_STDIN);
 
-    *STORIES_CACHE.lock().unwrap() = Some(HashMap::new());
-    *BOTS_BASE.lock().unwrap() = Some(bots_base::json());
+    *STORIES_CACHE.lock().expect("STORIES_CACHE lock was poisoned") = Some(HashMap::new());
+    *BOTS_BASE.lock().expect("BOTS_BASE lock was poisoned") = Some(bots_base::json());
 
     tauri::Builder::default()
         .setup(|app| gui_setup(app))

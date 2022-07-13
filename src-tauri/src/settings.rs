@@ -350,6 +350,12 @@ pub struct PackageResult {
     pub packages: Vec<String>,
 }
 
+impl PackageResult {
+    pub const fn new(exit_code: i32, packages: Vec<String>) -> Self {
+        Self { exit_code, packages }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MissingPackagesUpdate {
     pub index: usize,
