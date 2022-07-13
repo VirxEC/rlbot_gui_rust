@@ -9,15 +9,20 @@ mod rlbot;
 mod settings;
 mod stories;
 
-use crate::{commands::*, config_handles::*, settings::*, stories::bots_base};
+use crate::{
+    commands::*,
+    config_handles::*,
+    settings::{BotFolders, ConsoleText, ConsoleTextUpdate, GameTickPacket, StoryConfig, StoryState},
+    stories::bots_base,
+};
 use lazy_static::{initialize, lazy_static};
 use os_pipe::{pipe, PipeWriter};
 #[cfg(windows)]
 use registry::{Hive, Security};
 use serde::Serialize;
-use std::collections::HashMap;
 #[cfg(windows)]
 use std::path::Path;
+use std::{collections::HashMap, error::Error};
 use std::{
     env,
     ffi::OsStr,
@@ -27,7 +32,7 @@ use std::{
     sync::Mutex,
     thread,
 };
-use tauri::{Error as TauriError, Manager, Window};
+use tauri::{App, Error as TauriError, Manager, Window};
 
 const BOTPACK_FOLDER: &str = "RLBotPackDeletable";
 const MAPPACK_FOLDER: &str = "RLBotMapPackDeletable";
@@ -38,10 +43,10 @@ const BOTPACK_REPO_NAME: &str = "RLBotPack";
 lazy_static! {
     static ref CONSOLE_TEXT: Mutex<Vec<ConsoleText>> = Mutex::new(Vec::new());
     static ref PYTHON_PATH: Mutex<String> = Mutex::new(String::new());
-    static ref BOT_FOLDER_SETTINGS: Mutex<Option<BotFolderSettings>> = Mutex::new(None);
+    static ref BOT_FOLDER_SETTINGS: Mutex<Option<BotFolders>> = Mutex::new(None);
     static ref MATCH_HANDLER_STDIN: Mutex<Option<ChildStdin>> = Mutex::new(None);
     static ref CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
-    static ref STORIES_CACHE: Mutex<Option<HashMap<StorySettings, JsonMap>>> = Mutex::new(None);
+    static ref STORIES_CACHE: Mutex<Option<HashMap<StoryConfig, JsonMap>>> = Mutex::new(None);
     static ref BOTS_BASE: Mutex<Option<JsonMap>> = Mutex::new(None);
 }
 
@@ -215,10 +220,10 @@ fn get_command_status<S: AsRef<OsStr>>(program: S, args: &[&str]) -> bool {
 }
 
 /// Returns a Command that, went ran, will have all it's output redirected to the GUI console
-/// Be sure to drop(command) after spawning the child process! Otherwise a deadlock could happen.
-/// This is due to how the os_pipe crate works.
+/// Be sure to `drop(command)` after spawning the child process! Otherwise a deadlock could happen.
+/// This is due to how the `os_pipe` crate works.
 ///
-/// Most of the time, you should try to use spawn_capture_process() instead.
+/// Most of the time, you should try to use `spawn_capture_process()` instead.
 ///
 /// # Arguments
 ///
@@ -275,8 +280,13 @@ pub fn spawn_capture_process_and_get_exit_code<S: AsRef<OsStr>>(program: S, args
     2
 }
 
-pub fn check_has_rlbot() -> bool {
-    get_command_status(&*PYTHON_PATH.lock().unwrap(), &["-c", "import rlbot"])
+/// Check whether or not the rlbot pip package is installed
+/// 
+/// # Errors
+/// 
+/// This function will return an error if `PYTHON_PATH`'s lock has been poisoned.
+pub fn check_has_rlbot() -> Result<bool, String> {
+    Ok(get_command_status(&*PYTHON_PATH.lock().map_err(|err| err.to_string())?, &["-c", "import rlbot"]))
 }
 
 #[cfg(windows)]
@@ -346,6 +356,53 @@ fn emit_text(window: &Window, text: String, replace_last: bool) {
     }
 }
 
+fn gui_setup(app: &mut App) -> Result<(), Box<dyn Error>> {
+    let window = app.get_window("main").unwrap();
+
+    *PYTHON_PATH.lock()? = load_gui_config(&window)
+        .get("python_config", "path")
+        .unwrap_or_else(|| auto_detect_python().unwrap_or_default().0);
+    *BOT_FOLDER_SETTINGS.lock()? = Some(BotFolders::load(&window));
+
+    let (mut pipe_reader, pipe_writer) = pipe()?;
+    *CAPTURE_PIPE_WRITER.lock()? = Some(pipe_writer);
+
+    thread::spawn(move || {
+        let mut next_replace_last = false;
+        loop {
+            let mut text = String::new();
+            let mut will_replace_last = next_replace_last;
+            next_replace_last = false;
+
+            loop {
+                let mut buf = [0];
+                match pipe_reader.read(&mut buf[..]) {
+                    Ok(0) | Err(_) => break,
+                    Ok(_) => {
+                        let string = String::from_utf8_lossy(&buf).clone();
+                        if &string == "\n" {
+                            if text.is_empty() && will_replace_last {
+                                will_replace_last = false;
+                                continue;
+                            }
+
+                            break;
+                        } else if &string == "\r" {
+                            next_replace_last = true;
+                            break;
+                        }
+                        text.push_str(&string);
+                    }
+                };
+            }
+
+            emit_text(&window, text, will_replace_last);
+        }
+    });
+
+    Ok(())
+}
+
 fn main() {
     println!("Config path: {}", get_config_path().display());
 
@@ -356,52 +413,7 @@ fn main() {
     *BOTS_BASE.lock().unwrap() = Some(bots_base::json());
 
     tauri::Builder::default()
-        .setup(|app| {
-            let window = app.get_window("main").unwrap();
-
-            *PYTHON_PATH.lock().unwrap() = load_gui_config(&window)
-                .get("python_config", "path")
-                .unwrap_or_else(|| auto_detect_python().unwrap_or_default().0);
-            *BOT_FOLDER_SETTINGS.lock().unwrap() = Some(BotFolderSettings::load(&window));
-
-            let (mut pipe_reader, pipe_writer) = pipe().unwrap();
-            *CAPTURE_PIPE_WRITER.lock().unwrap() = Some(pipe_writer);
-
-            thread::spawn(move || {
-                let mut next_replace_last = false;
-                loop {
-                    let mut text = String::new();
-                    let mut will_replace_last = next_replace_last;
-                    next_replace_last = false;
-
-                    loop {
-                        let mut buf = [0];
-                        match pipe_reader.read(&mut buf[..]) {
-                            Ok(0) | Err(_) => break,
-                            Ok(_) => {
-                                let string = String::from_utf8_lossy(&buf).to_owned();
-                                if &string == "\n" {
-                                    if text.is_empty() && will_replace_last {
-                                        will_replace_last = false;
-                                        continue;
-                                    }
-
-                                    break;
-                                } else if &string == "\r" {
-                                    next_replace_last = true;
-                                    break;
-                                }
-                                text.push_str(&string);
-                            }
-                        };
-                    }
-
-                    emit_text(&window, text, will_replace_last);
-                }
-            });
-
-            Ok(())
-        })
+        .setup(|app| gui_setup(app))
         .invoke_handler(tauri::generate_handler![
             get_folder_settings,
             save_folder_settings,

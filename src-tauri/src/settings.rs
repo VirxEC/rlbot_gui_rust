@@ -1,7 +1,7 @@
 use crate::{
     ccprintlne,
     config_handles::load_gui_config,
-    custom_maps::convert_custom_map_to_path,
+    custom_maps::convert_to_path,
     get_config_path,
     rlbot::parsing::{
         bot_config_bundle::{Clean, ScriptConfigBundle},
@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug, str::FromStr};
 use tauri::Window;
 
-use serde_repr::*;
+use serde_repr::{Deserialize_repr, Serialize_repr};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BotFolder {
@@ -36,12 +36,12 @@ impl FromStr for BotFolder {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BotFolderSettings {
+pub struct BotFolders {
     pub files: HashMap<String, BotFolder>,
     pub folders: HashMap<String, BotFolder>,
 }
 
-impl BotFolderSettings {
+impl BotFolders {
     pub fn load(window: &Window) -> Self {
         let conf = load_gui_config(window);
         let files = serde_json::from_str(&conf.get("bot_folder_settings", "files").unwrap_or_else(|| String::from("[]"))).unwrap_or_default();
@@ -79,7 +79,7 @@ fn set_value_in_conf<T: Default + serde::Serialize>(conf: &mut Ini, section: &st
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct MutatorSettings {
+pub struct MutatorConfig {
     pub match_length: MatchLength,
     pub max_score: MaxScore,
     pub overtime: Overtime,
@@ -98,7 +98,7 @@ pub struct MutatorSettings {
     pub respawn_time: RespawnTime,
 }
 
-impl MutatorSettings {
+impl MutatorConfig {
     pub fn load(window: &Window) -> Self {
         let conf = load_gui_config(window);
 
@@ -181,7 +181,7 @@ pub struct MiniScriptBundle {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MiniMatchSettings {
+pub struct MiniMatchConfig {
     pub map: MapType,
     pub game_mode: GameMode,
     pub match_behavior: ExistingMatchBehavior,
@@ -193,10 +193,10 @@ pub struct MiniMatchSettings {
     pub enable_state_setting: bool,
     pub auto_save_replay: bool,
     pub scripts: Vec<MiniScriptBundle>,
-    pub mutators: MutatorSettings,
+    pub mutators: MutatorConfig,
 }
 
-impl Default for MiniMatchSettings {
+impl Default for MiniMatchConfig {
     fn default() -> Self {
         Self {
             map: MapType::default(),
@@ -210,17 +210,17 @@ impl Default for MiniMatchSettings {
             enable_state_setting: true,
             auto_save_replay: false,
             scripts: Vec::new(),
-            mutators: MutatorSettings::default(),
+            mutators: MutatorConfig::default(),
         }
     }
 }
 
-impl MiniMatchSettings {
+impl MiniMatchConfig {
     pub fn setup_for_start_match(&self, window: &Window, bf: &HashMap<String, BotFolder>) -> Result<Self, String> {
         let mut new = self.clone();
 
         if let MapType::Custom(path) = &mut new.map {
-            *path = convert_custom_map_to_path(path, bf).ok_or_else(|| {
+            *path = convert_to_path(path, bf).ok_or_else(|| {
                 let err = format!("Failed to find custom map {}", path);
                 ccprintlne(window, err.clone());
                 err
@@ -232,7 +232,7 @@ impl MiniMatchSettings {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct MatchSettings {
+pub struct MatchConfig {
     pub map: MapType,
     pub game_mode: GameMode,
     pub match_behavior: ExistingMatchBehavior,
@@ -244,10 +244,10 @@ pub struct MatchSettings {
     pub enable_state_setting: bool,
     pub auto_save_replay: bool,
     pub scripts: Vec<ScriptConfigBundle>,
-    pub mutators: MutatorSettings,
+    pub mutators: MutatorConfig,
 }
 
-impl MatchSettings {
+impl MatchConfig {
     pub fn load(window: &Window) -> Self {
         let conf = load_gui_config(window);
 
@@ -275,7 +275,7 @@ impl MatchSettings {
             enable_state_setting,
             auto_save_replay,
             scripts,
-            mutators: MutatorSettings::load(window),
+            mutators: MutatorConfig::load(window),
         }
     }
 
@@ -309,13 +309,13 @@ impl MatchSettings {
 
     pub fn cleaned_scripts(&self) -> Self {
         let mut new = self.clone();
-        new.scripts = clean(new.scripts);
+        new.scripts = clean(&new.scripts);
         new
     }
 }
 
-pub fn clean<T: Clean>(items: Vec<T>) -> Vec<T> {
-    items.iter().map(|i| i.cleaned()).collect()
+pub fn clean<T: Clean>(items: &[T]) -> Vec<T> {
+    items.iter().map(Clean::cleaned).collect()
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -408,13 +408,13 @@ impl ConsoleTextUpdate {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct LauncherSettings {
+pub struct LauncherConfig {
     pub preferred_launcher: String,
     pub use_login_tricks: bool,
     pub rocket_league_exe_path: Option<String>,
 }
 
-impl LauncherSettings {
+impl LauncherConfig {
     pub fn load(window: &Window) -> Self {
         let config = load_gui_config(window);
 
@@ -500,7 +500,7 @@ pub struct GameTickPacket {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct TeamSettings {
+pub struct StoryTeamConfig {
     pub name: String,
     pub color: u16,
 }
@@ -519,7 +519,7 @@ pub enum StoryIDs {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Hash, Eq, PartialEq)]
-pub struct StorySettings {
+pub struct StoryConfig {
     pub story_id: StoryIDs,
     pub use_custom_maps: bool,
     pub custom_config: CustomConfig,
@@ -556,8 +556,8 @@ pub struct ChallengeAttempt {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct StoryState {
     version: u8,
-    story_settings: StorySettings,
-    team_settings: TeamSettings,
+    story_settings: StoryConfig,
+    team_settings: StoryTeamConfig,
     teammates: Vec<usize>,
     challenges_attempts: HashMap<String, Vec<ChallengeAttempt>>,
     challenges_completed: HashMap<String, usize>,
@@ -565,7 +565,7 @@ pub struct StoryState {
 }
 
 impl StoryState {
-    pub fn new(team_settings: TeamSettings, story_settings: StorySettings) -> Self {
+    pub fn new(team_settings: StoryTeamConfig, story_settings: StoryConfig) -> Self {
         Self {
             version: 1,
             story_settings,
@@ -586,7 +586,7 @@ impl StoryState {
         }
     }
 
-    pub const fn get_story_settings(&self) -> &StorySettings {
+    pub const fn get_story_settings(&self) -> &StoryConfig {
         &self.story_settings
     }
 
@@ -594,7 +594,7 @@ impl StoryState {
         &self.upgrades
     }
 
-    pub const fn get_team_settings(&self) -> &TeamSettings {
+    pub const fn get_team_settings(&self) -> &StoryTeamConfig {
         &self.team_settings
     }
 }

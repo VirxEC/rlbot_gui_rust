@@ -1,5 +1,3 @@
-#![allow(non_camel_case_types)]
-
 use serde::{Deserialize, Serialize};
 use serde_enum_str::{Deserialize_enum_str, Serialize_enum_str};
 use strum::{EnumIter, IntoEnumIterator};
@@ -7,7 +5,8 @@ use strum::{EnumIter, IntoEnumIterator};
 #[derive(Deserialize_enum_str, Serialize_enum_str, Clone, Debug, Default, EnumIter)]
 pub enum MapType {
     #[default]
-    DFHStadium,
+    #[serde(rename = "DFHStadium")]
+    DfhStadium,
     Mannfield,
     ChampionsField,
     UrbanCentral,
@@ -19,21 +18,35 @@ pub enum MapType {
     StarbaseArc,
     Farmstead,
     SaltyShores,
-    DFHStadium_Stormy,
-    DFHStadium_Day,
-    Mannfield_Stormy,
-    Mannfield_Night,
-    ChampionsField_Day,
-    BeckwithPark_Stormy,
-    BeckwithPark_Midnight,
-    UrbanCentral_Night,
-    UrbanCentral_Dawn,
-    UtopiaColiseum_Dusk,
-    DFHStadium_Snowy,
-    Mannfield_Snowy,
-    UtopiaColiseum_Snowy,
+    #[serde(rename = "DFHStadium_Stormy")]
+    DfhStadiumStormy,
+    #[serde(rename = "DFHStadium_Day")]
+    DfhStadiumDay,
+    #[serde(rename = "Mannfield_Stormy")]
+    MannfieldStormy,
+    #[serde(rename = "Mannfield_Night")]
+    MannfieldNight,
+    #[serde(rename = "ChampionsField_Day")]
+    ChampionsFieldDay,
+    #[serde(rename = "BeckwithPark_Stormy")]
+    BeckwithParkStormy,
+    #[serde(rename = "BeckwithPark_Midnight")]
+    BeckwithParkMidnight,
+    #[serde(rename = "UrbanCentral_Night")]
+    UrbanCentralNight,
+    #[serde(rename = "UrbanCentral_Dawn")]
+    UrbanCentralDawn,
+    #[serde(rename = "UtopiaColiseum_Dusk")]
+    UtopiaColiseumDusk,
+    #[serde(rename = "DFHStadium_Snowy")]
+    DfhStadiumSnowy,
+    #[serde(rename = "Mannfield_Snowy")]
+    MannfieldSnowy,
+    #[serde(rename = "UtopiaColiseum_Snowy")]
+    UtopiaColiseumSnowy,
     Badlands,
-    Badlands_Night,
+    #[serde(rename = "Badlands_Night")]
+    BadlandsNight,
     TokyoUnderpass,
     Arctagon,
     Pillars,
@@ -42,23 +55,34 @@ pub enum MapType {
     Octagon,
     Underpass,
     UtopiaRetro,
-    Hoops_DunkHouse,
-    DropShot_Core707,
+    #[serde(rename = "Hoops_DunkHouse")]
+    HoopsDunkHouse,
+    #[serde(rename = "DropShot_Core707")]
+    DropShotCore707,
     ThrowbackStadium,
     ForbiddenTemple,
     RivalsArena,
-    Farmstead_Night,
-    SaltyShores_Night,
+    #[serde(rename = "Farmstead_Night")]
+    FarmsteadNight,
+    #[serde(rename = "SaltyShores_Night")]
+    SaltyShoresNight,
     NeonFields,
-    DFHStadium_Circuit,
+    #[serde(rename = "DFHStadium_Circuit")]
+    DFHStadiumCircuit,
     DeadeyeCanyon,
-    StarbaseArc_Aftermath,
-    Wasteland_Night,
-    BeckwithPark_GothamNight,
-    ForbiddenTemple_Day,
-    UrbanCentral_Haunted,
-    ChampionsField_NFL,
-    ThrowbackStadium_Snowy,
+    #[serde(rename = "StarbaseArc_Aftermath")]
+    StarbaseArcAftermath,
+    #[serde(rename = "Wasteland_Night")]
+    WastelandNight,
+    BeckwithParkGothamNight,
+    #[serde(rename = "ForbiddenTemple_Day")]
+    ForbiddenTempleDay,
+    #[serde(rename = "UrbanCentral_Haunted")]
+    UrbanCentralHaunted,
+    #[serde(rename = "ChampionsField_NFL")]
+    ChampionsFieldNFL,
+    #[serde(rename = "ThrowbackStadium_Snowy")]
+    ThrowbackStadiumSnowy,
     Basin,
     Corridor,
     Loophole,

@@ -10,21 +10,18 @@ pub fn is_rocket_league_running(port: u16) -> Result<bool, String> {
 
     match rl_procs.next() {
         Some(process_info) => {
-            let cmd = process_info.cmd();
-            if cmd.len() > 1 {
-                let mut has_rlbot_arg = false;
-                let mut has_port_arg = false;
-                for arg in cmd.iter().skip(1) {
-                    if arg == REQUIRED_ARGS[0] {
-                        has_rlbot_arg = true;
-                    } else if arg == &port_arg {
-                        has_port_arg = true;
-                    }
+            let mut has_rlbot_arg = false;
+            let mut has_port_arg = false;
+            for arg in process_info.cmd().iter().skip(1) {
+                if arg == REQUIRED_ARGS[0] {
+                    has_rlbot_arg = true;
+                } else if arg == &port_arg {
+                    has_port_arg = true;
                 }
+            }
 
-                if has_port_arg && has_rlbot_arg {
-                    return Ok(true);
-                }
+            if has_port_arg && has_rlbot_arg {
+                return Ok(true);
             }
 
             Err(format!(

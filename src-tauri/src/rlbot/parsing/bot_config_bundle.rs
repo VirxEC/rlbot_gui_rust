@@ -1,11 +1,19 @@
-use crate::bot_management::cfg_helper::load_cfg;
-use crate::rlbot::agents::{base_script::SCRIPT_FILE_KEY, runnable::Runnable};
-use crate::{ccprintln, get_command_status, PYTHON_PATH};
+use crate::{
+    bot_management::cfg_helper::load_cfg,
+    ccprintln, get_command_status,
+    rlbot::agents::{base_script::SCRIPT_FILE_KEY, runnable::Runnable},
+    PYTHON_PATH,
+};
 use configparser::ini::Ini;
 use imghdr::Type;
 use serde::{Deserialize, Serialize};
-use std::process::{self, Stdio};
-use std::{fs, io::Read, path::Path};
+use std::{
+    borrow::ToOwned,
+    fs,
+    io::Read,
+    path::Path,
+    process::{self, Stdio},
+};
 use tauri::Window;
 
 pub const PYTHON_FILE_KEY: &str = "python_file";
@@ -38,7 +46,7 @@ pub struct DevInfo {
 }
 
 impl DevInfo {
-    pub fn from_config(config: Ini) -> Self {
+    pub fn from_config(config: &Ini) -> Self {
         let developer = config.get(BOT_CONFIG_DETAILS_HEADER, "developer").unwrap_or_default();
         let description = config.get(BOT_CONFIG_DETAILS_HEADER, "description").unwrap_or_default();
         let fun_fact = config.get(BOT_CONFIG_DETAILS_HEADER, "fun_fact").unwrap_or_default();
@@ -48,7 +56,7 @@ impl DevInfo {
             .get(BOT_CONFIG_DETAILS_HEADER, "tags")
             .unwrap_or_default()
             .split(", ")
-            .map(|s| s.to_owned())
+            .map(ToOwned::to_owned)
             .collect();
 
         Self {
@@ -105,7 +113,7 @@ fn get_file_extension(vec: &[u8]) -> Option<&'static str> {
 pub fn to_base64(path: &str) -> Option<String> {
     if let Ok(file) = &mut fs::File::open(path) {
         let mut vec = Vec::new();
-        let _ = file.read_to_end(&mut vec);
+        file.read_to_end(&mut vec).ok()?;
 
         get_file_extension(&vec).map(|extension| format!("data:image/{};base64,{}", extension, base64::encode(vec).replace("\r\n", "")))
     } else {
@@ -178,12 +186,12 @@ impl BotConfigBundle {
             return Err("Python file not found".to_owned());
         }
 
-        let t_logo = conf.get(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY).unwrap_or_else(|| String::from("logo.png"));
-        let ta_logo = format!("{}/{}", config_directory, t_logo);
+        let relative_logo_path = conf.get(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY).unwrap_or_else(|| String::from("logo.png"));
+        let absolute_logo_path = format!("{}/{}", config_directory, relative_logo_path);
 
         let logo = None;
 
-        let info = Some(DevInfo::from_config(conf));
+        let info = Some(DevInfo::from_config(&conf));
 
         let runnable_type = String::from("rlbot");
         let warn = None;
@@ -191,7 +199,7 @@ impl BotConfigBundle {
         let missing_python_packages = None;
 
         let path = Some(path);
-        let logo_path = Some(ta_logo);
+        let logo_path = Some(absolute_logo_path);
         let config_directory = Some(config_directory);
 
         Ok(Self {
@@ -412,14 +420,14 @@ impl ScriptConfigBundle {
             return Err("Script file not found".to_owned());
         }
 
-        let t_logo = conf.get(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY).unwrap_or_else(|| String::from("logo.png"));
-        let ta_logo = format!("{}/{}", config_directory, t_logo);
+        let relative_logo_path = conf.get(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY).unwrap_or_else(|| String::from("logo.png"));
+        let absolute_logo_path = format!("{}/{}", config_directory, relative_logo_path);
         let logo = None;
 
-        let info = Some(DevInfo::from_config(conf));
+        let info = Some(DevInfo::from_config(&conf));
 
         let missing_python_packages = None;
-        let logo_path = Some(ta_logo);
+        let logo_path = Some(absolute_logo_path);
 
         Ok(Self {
             name,

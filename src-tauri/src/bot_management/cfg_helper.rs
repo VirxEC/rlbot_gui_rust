@@ -20,7 +20,7 @@ pub fn load_cfg<T: AsRef<Path>>(path: T) -> Result<Ini, String> {
 ///
 /// * `conf`: The CFG file that needs to be saved
 /// * `path`: Where to save the CFG file to
-pub fn save_cfg<T: AsRef<Path>>(conf: Ini, path: T) -> Result<(), String> {
+pub fn save_cfg<T: AsRef<Path>>(conf: &Ini, path: T) -> Result<(), String> {
     conf.write(path).map_err(|e| format!("Failed to save config file: {}", e))?;
     Ok(())
 }
@@ -36,5 +36,5 @@ pub fn save_cfg<T: AsRef<Path>>(conf: Ini, path: T) -> Result<(), String> {
 pub fn change_key_in_cfg<T: AsRef<Path>>(path: T, section: &str, key: &str, value: String) -> Result<(), String> {
     let mut conf = load_cfg(&path)?;
     conf.set(section, key, Some(value));
-    save_cfg(conf, path)
+    save_cfg(&conf, path)
 }

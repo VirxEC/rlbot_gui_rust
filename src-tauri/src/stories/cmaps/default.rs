@@ -199,5 +199,5 @@ pub fn json() -> serde_json::Map<String, serde_json::Value> {
                 ]
             }
         }
-    }).as_object().unwrap().to_owned()
+    }).as_object().unwrap().clone()
 }
