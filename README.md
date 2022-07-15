@@ -87,7 +87,9 @@ You're going to have to compile the GUI yourself:
 
 ### Prerequisites
 
-A system with *16gb of RAM* is recommended, *minimum 8gb* required. If you have less than 16gb, you may not be able to build the GUI while having other apps open (like your editor or Rocket League).
+- 16gb of RAM *(minimum 8gb required, might not be able to have other apps open while compiling)*
+- 64gb+ free space *(asumming fresh Windows install with no build tools, Rocket League, git, IDE, etc)*
+- For non-Windows: SSD *(debug binary is around 500mb on Linux)*
 
 **Windows**
 
