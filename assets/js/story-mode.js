@@ -25,6 +25,9 @@ export default {
 		</b-navbar-brand>
 		<b-navbar-nav class="ml-auto">
 			<alter-save-state v-model="saveState" v-if="debugMode"/>
+			<b-button @click="$router.push('/console')" variant="dark" class="ml-2">
+				Console
+			</b-button>
 			<b-dropdown class="ml-4" right variant="dark">
 				<template v-slot:button-content>
 					Menu
@@ -218,14 +221,22 @@ export default {
 				this.snackbarContent = error;
 			});
 		},
-		purchaseUpgrade: function ({ id, currentCurrency, cost }) {
+		purchaseUpgrade: function ({ id, cost }) {
 			// Send eel a message to add id to purchases and reduce currency
 			console.log("Will purchase: ", id);
-			// eel.purchase_upgrade(id, currentCurrency, cost);
+			invoke("purchase_upgrade", { saveState: this.saveState, upgradeId: id, cost: cost }).then(save_state => {
+				if (save_state != null) {
+					this.saveState = save_state;
+				}
+			});
 		},
-		recruit: function ({ id, currentCurrency }) {
+		recruit: function ({ id }) {
 			console.log("Will recruit ", id);
-			// eel.recruit(id, currentCurrency);
+			invoke("recruit", { saveState: this.saveState, id: id }).then(save_state => {
+				if (save_state != null) {
+					this.saveState = save_state;
+				}
+			});
 		}
 	},
 	created: async function () {

@@ -223,7 +223,7 @@ export default {
 								<story-recruit-list 
 									v-bind:recruitables="recruit_list"
 									v-bind:currency="saveState.upgrades.currency"
-									@recruit="$emit('recruit', {id: $event, currentCurrency: saveState.upgrades.currency})"
+									@recruit="$emit('recruit', {id: $event})"
 								>
 								</story-recruit-list>
 							</b-tab>

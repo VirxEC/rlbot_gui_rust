@@ -482,6 +482,9 @@ fn main() {
             get_bots_configs,
             story_delete_save,
             launch_challenge,
+            story_save_state,
+            purchase_upgrade,
+            recruit,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

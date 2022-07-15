@@ -564,13 +564,15 @@ pub struct StoryState {
     version: u8,
     story_settings: StoryConfig,
     team_settings: StoryTeamConfig,
-    teammates: Vec<usize>,
+    teammates: Vec<String>,
     challenges_attempts: HashMap<String, Vec<ChallengeAttempt>>,
     challenges_completed: HashMap<String, usize>,
     upgrades: HashMap<String, usize>,
 }
 
 impl StoryState {
+    const CURRENCY_KEY: &'static str = "currency";
+
     pub fn new(team_settings: StoryTeamConfig, story_settings: StoryConfig) -> Self {
         Self {
             version: 1,
@@ -579,7 +581,7 @@ impl StoryState {
             teammates: Vec::new(),
             challenges_attempts: HashMap::new(),
             challenges_completed: HashMap::new(),
-            upgrades: HashMap::from([("currency".to_owned(), 0)]),
+            upgrades: HashMap::from([(Self::CURRENCY_KEY.to_owned(), 0)]),
         }
     }
 
@@ -590,6 +592,34 @@ impl StoryState {
         if let Err(e) = conf.write(get_config_path()) {
             ccprintlne(window, format!("Failed to write config: {}", e));
         }
+    }
+
+    pub fn add_purchase(&mut self, id: String, cost: usize) -> Result<(), String> {
+        let current_currency = *self.upgrades.get(Self::CURRENCY_KEY).ok_or("The key 'currency' was not found")?;
+        if current_currency < cost {
+            return Err(format!("Not enough currency to purchase {}", id));
+        }
+
+        if self.upgrades.contains_key(&id) {
+            return Err(format!("Purchase already made: {}", id));
+        }
+
+        self.upgrades.insert(id, 1);
+        self.upgrades.insert(Self::CURRENCY_KEY.to_owned(), current_currency - cost);
+
+        Ok(())
+    }
+
+    pub fn add_recruit(&mut self, id: String) -> Result<(), String> {
+        let current_currency = *self.upgrades.get(Self::CURRENCY_KEY).ok_or("The key 'currency' was not found")?;
+        if current_currency < 1 {
+            return Err(format!("Not enough currency to recruit {}", id));
+        }
+
+        self.teammates.push(id);
+        self.upgrades.insert(Self::CURRENCY_KEY.to_owned(), current_currency - 1);
+
+        Ok(())
     }
 
     pub const fn get_story_settings(&self) -> &StoryConfig {

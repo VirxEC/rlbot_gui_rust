@@ -418,6 +418,23 @@ pub async fn story_new_save(window: Window, team_settings: StoryTeamConfig, stor
 }
 
 #[tauri::command]
+pub async fn story_save_state(window: Window, story_state: Option<StoryState>) {
+    if let Some(story_state) = story_state {
+        story_state.save(&window);
+    }
+}
+
+#[tauri::command]
+pub async fn story_delete_save(window: Window) {
+    let mut conf = load_gui_config(&window);
+    conf.set("story_mode", "save_state", None);
+
+    if let Err(e) = conf.write(get_config_path()) {
+        ccprintlne(&window, format!("Failed to write config: {}", e));
+    }
+}
+
+#[tauri::command]
 pub async fn get_map_pack_revision(window: Window) -> Option<String> {
     let location = Path::new(&get_content_folder()).join(MAPPACK_FOLDER);
     let updater = MapPackUpdater::new(location, MAPPACK_REPO.0.to_owned(), MAPPACK_REPO.1.to_owned());
@@ -497,14 +514,4 @@ pub fn get_all_script_configs(story_settings: &StoryConfig) -> JsonMap {
 #[tauri::command]
 pub async fn get_bots_configs(story_settings: StoryConfig) -> JsonMap {
     get_all_bot_configs(&story_settings)
-}
-
-#[tauri::command]
-pub async fn story_delete_save(window: Window) {
-    let mut conf = load_gui_config(&window);
-    conf.set("story_mode", "save_state", None);
-
-    if let Err(e) = conf.write(get_config_path()) {
-        ccprintlne(&window, format!("Failed to write config: {}", e));
-    }
 }

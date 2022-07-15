@@ -259,7 +259,6 @@ pub enum Rumble {
 #[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
 pub enum BoostStrength {
     #[default]
-    Default,
     #[serde(rename = "1x")]
     One,
     #[serde(rename = "1.5x")]

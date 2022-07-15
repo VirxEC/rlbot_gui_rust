@@ -519,13 +519,14 @@ fn create_match_handler(window: &Window) -> Option<ChildStdin> {
 /// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
 /// * `command` - The command to send to the match handler - can be in multiple parts, for passing arguments
 /// * `create_handler` - If the match handler should be started if it's down
-pub fn issue_match_handler_command(window: &Window, command_parts: &[String], create_handler: bool) -> Result<(), String> {
+pub fn issue_match_handler_command(window: &Window, command_parts: &[String], mut create_handler: bool) -> Result<(), String> {
     let mut match_handler_stdin = MATCH_HANDLER_STDIN.lock().map_err(|err| err.to_string())?;
 
     if match_handler_stdin.is_none() {
         if create_handler {
             ccprintln(window, "Starting match handler!".to_owned());
             *match_handler_stdin = create_match_handler(window);
+            create_handler = false;
         } else {
             ccprintln(window, "Not issuing command to handler as it's down and I was told to not start it".to_owned());
             return Ok(());
@@ -537,20 +538,23 @@ pub fn issue_match_handler_command(window: &Window, command_parts: &[String], cr
 
     if stdin.write_all(command.as_bytes()).is_err() {
         drop(match_handler_stdin.take());
-        Err("Failed to write to match handler".to_owned())
+        if create_handler {
+            ccprintln(window, "Failed to write to match handler, trying to restart...".to_owned());
+            issue_match_handler_command(window, command_parts, true)
+        } else {
+            Err("Failed to write to match handler".to_owned())
+        }
     } else {
         Ok(())
     }
 }
 
-/// Starts a match via the match handler with the given settings
-///
+/// Perform pre-match startup checks
+/// 
 /// # Arguments
-///
+/// 
 /// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
-/// * `bot_list` - A list of bots and their settings to use in the match
-/// * `match_settings` - The various match settings to use in the match, including scripts (only the path), mutators, game map, etc.
-pub async fn start_match_helper(window: &Window, bot_list: Vec<TeamBotBundle>, match_settings: MiniMatchConfig) -> Result<(), String> {
+async fn pre_start_match(window: &Window) -> Result<(), String> {
     let port = gateway_util::find_existing_process(window);
     let rl_is_running = setup_manager::is_rocket_league_running(port.unwrap_or(gateway_util::IDEAL_RLBOT_PORT))?;
 
@@ -564,6 +568,19 @@ pub async fn start_match_helper(window: &Window, bot_list: Vec<TeamBotBundle>, m
         kill_bots(window.clone()).await?;
         gateway_util::kill_existing_processes(window);
     }
+
+    Ok(())
+}
+
+/// Starts a match via the match handler with the given settings
+///
+/// # Arguments
+///
+/// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
+/// * `bot_list` - A list of bots and their settings to use in the match
+/// * `match_settings` - The various match settings to use in the match, including scripts (only the path), mutators, game map, etc.
+async fn start_match_helper(window: &Window, bot_list: Vec<TeamBotBundle>, match_settings: MiniMatchConfig) -> Result<(), String> {
+    pre_start_match(window).await?;
 
     let launcher_settings = LauncherConfig::load(window);
     let match_settings = match_settings.setup_for_start_match(
@@ -925,7 +942,9 @@ fn get_challenge_city_color(city: &serde_json::Value) -> Option<u64> {
 /// * `story_save` - The save state of the story, containing all the information about the story
 /// * `challenge_id` - The ID of the challenge to run
 /// * `picked_teammates` - The teammates that were picked by the human for teammates to use in the challenge
-fn run_challenge(window: &Window, save_state: &StoryState, challenge_id: String, picked_teammates: &[String]) -> Result<(), Box<dyn Error>> {
+async fn run_challenge(window: &Window, save_state: &StoryState, challenge_id: String, picked_teammates: &[String]) -> Result<(), Box<dyn Error>> {
+    pre_start_match(window).await?;
+
     let story_settings = save_state.get_story_settings();
 
     let (city, challenge) = match get_challenge_by_id(story_settings, &challenge_id) {
@@ -978,9 +997,37 @@ fn run_challenge(window: &Window, save_state: &StoryState, challenge_id: String,
 
 #[tauri::command]
 pub async fn launch_challenge(window: Window, save_state: StoryState, challenge_id: String, picked_teammates: Vec<String>) -> Result<(), String> {
-    run_challenge(&window, &save_state, challenge_id, &picked_teammates).map_err(|e| {
-        let e = e.to_string();
+    run_challenge(&window, &save_state, challenge_id, &picked_teammates).await.map_err(|err| {
+        if let Err(e) = window.emit("match-start-failed", ()) {
+            ccprintlne(&window, format!("Failed to emit match-start-failed: {}", e));
+        }
+
+        let e = err.to_string();
         ccprintlne(&window, e.clone());
         e
     })
+}
+
+#[tauri::command]
+pub async fn purchase_upgrade(window: Window, mut save_state: StoryState, upgrade_id: String, cost: usize) -> Option<StoryState> {
+    if let Err(e) = save_state.add_purchase(upgrade_id, cost) {
+        ccprintlne(&window, e);
+        return None;
+    }
+
+    save_state.save(&window);
+
+    Some(save_state)
+}
+
+#[tauri::command]
+pub async fn recruit(window: Window, mut save_state: StoryState, id: String) -> Option<StoryState> {
+    if let Err(e) = save_state.add_recruit(id) {
+        ccprintlne(&window, e);
+        return None;
+    }
+
+    save_state.save(&window);
+
+    Some(save_state)
 }
