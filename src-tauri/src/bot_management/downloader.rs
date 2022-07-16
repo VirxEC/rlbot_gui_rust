@@ -10,6 +10,7 @@ use std::{
     error::Error,
     fs::{read_dir, remove_dir, remove_file, File},
     io::{BufRead, BufReader, Cursor, Error as IoError, ErrorKind as IoErrorKind, Read, Write},
+    ops::ControlFlow,
     path::{Path, PathBuf},
     time::Instant,
 };
@@ -297,7 +298,7 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
 
     let mut handles = Vec::new();
 
-    for tag in current_tag_name + 1..latest_release_tag + 1 {
+    for tag in (current_tag_name + 1)..=latest_release_tag {
         let url = get_url_from_tag(&repo_full_name, tag);
 
         handles.push(task::spawn(async move { Client::new().get(url).send().await }));
@@ -321,67 +322,13 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
             }
         };
 
-        let download = match resp {
-            Ok(download) => download,
-            Err(e) => {
-                ccprintlne(window, format!("Failed to download upgrade zip: {}", e));
-                break;
-            }
-        };
-
         let progress = progress + 1. / (total_patches as f32 * 2.) * 100.;
         if let Err(e) = window.emit("update-download-progress", ProgressBarUpdate::new(progress, format!("Applying patch incr-{}...", tag))) {
             ccprintlne(window, format!("Error when updating progress bar: {}", e));
         }
 
-        let bytes = match download.bytes().await {
-            Ok(bytes) => bytes,
-            Err(e) => {
-                ccprintlne(window, format!("Failed to download upgrade zip: {}", e));
-                break;
-            }
-        };
-
-        if let Err(e) = zip_extract_fixed::extract(window, Cursor::new(&bytes), local_folder_path.as_path(), false, true) {
-            ccprintlne(window, format!("Failed to extract upgrade zip: {}", e));
+        if let ControlFlow::Break(_) = apply_patch(resp, window, &local_folder_path, &tag_deleted_files_path).await {
             break;
-        }
-
-        match File::open(&tag_deleted_files_path) {
-            Ok(file) => {
-                let mut last_ok = false;
-                let mut count = 0;
-                for line in BufReader::new(file).lines().flatten() {
-                    let line = line.replace('\0', "").replace('\r', "");
-                    if !line.is_empty() {
-                        let file_name = local_folder_path.join(line);
-                        if let Err(e) = remove_file(&file_name) {
-                            ccprintlne(window, format!("Failed to delete {}: {}", file_name.display(), e));
-                            last_ok = false;
-                        } else {
-                            let text = format!("Deleted {}", file_name.display());
-                            if last_ok {
-                                ccprintlnr(window, text);
-                            } else {
-                                ccprintln(window, text);
-                            }
-                            last_ok = true;
-                            count += 1;
-                        }
-                    }
-                }
-
-                let text = format!("Deleted {} files", count);
-                if last_ok {
-                    ccprintlnr(window, text);
-                } else {
-                    ccprintln(window, text);
-                }
-            }
-            Err(e) => {
-                ccprintlne(window, format!("Failed to open .deleted file: {}", e));
-                break;
-            }
         }
 
         config.set("bot_folder_settings", "incr", Some(format!("incr-{}", tag)));
@@ -408,6 +355,75 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
     } else {
         BotpackStatus::Skipped("Failed to update the botpack...".to_owned())
     }
+}
+
+/// Applies a single patch to the botpack
+///
+/// # Arguments
+///
+/// * `resp`: The response from the HTTP request
+/// * `window`: A reference to the GUI, obtained from a `#[tauri::command]` function
+/// * `local_folder_path`: The path to the local folder containing the botpack
+/// * `tag_deleted_files_path`: The path to the file containing the deleted files for the patch
+async fn apply_patch(resp: Result<reqwest::Response, reqwest::Error>, window: &Window, local_folder_path: &Path, tag_deleted_files_path: &Path) -> ControlFlow<()> {
+    let download = match resp {
+        Ok(download) => download,
+        Err(e) => {
+            ccprintlne(window, format!("Failed to download upgrade zip: {}", e));
+            return ControlFlow::Break(());
+        }
+    };
+
+    let bytes = match download.bytes().await {
+        Ok(bytes) => bytes,
+        Err(e) => {
+            ccprintlne(window, format!("Failed to download upgrade zip: {}", e));
+            return ControlFlow::Break(());
+        }
+    };
+
+    if let Err(e) = zip_extract_fixed::extract(window, Cursor::new(&bytes), local_folder_path, false, true) {
+        ccprintlne(window, format!("Failed to extract upgrade zip: {}", e));
+        return ControlFlow::Break(());
+    }
+
+    match File::open(tag_deleted_files_path) {
+        Ok(file) => {
+            let mut last_ok = false;
+            let mut count = 0;
+            for line in BufReader::new(file).lines().flatten() {
+                let line = line.replace('\0', "").replace('\r', "");
+                if !line.is_empty() {
+                    let file_name = local_folder_path.join(line);
+                    if let Err(e) = remove_file(&file_name) {
+                        ccprintlne(window, format!("Failed to delete {}: {}", file_name.display(), e));
+                        last_ok = false;
+                    } else {
+                        let text = format!("Deleted {}", file_name.display());
+                        if last_ok {
+                            ccprintlnr(window, text);
+                        } else {
+                            ccprintln(window, text);
+                        }
+                        last_ok = true;
+                        count += 1;
+                    }
+                }
+            }
+
+            let text = format!("Deleted {} files", count);
+            if last_ok {
+                ccprintlnr(window, text);
+            } else {
+                ccprintln(window, text);
+            }
+        }
+        Err(e) => {
+            ccprintlne(window, format!("Failed to open .deleted file: {}", e));
+            return ControlFlow::Break(());
+        }
+    }
+    ControlFlow::Continue(())
 }
 
 pub struct MapPackUpdater {
@@ -459,7 +475,7 @@ impl MapPackUpdater {
         }
     }
 
-    /// Compares the old_index with current index and for any
+    /// Compares the `old_index` with current index and for any
     /// maps that have updated the revision, we grab them
     /// from the latest revision
     pub async fn needs_update(&self, window: &Window) -> BotpackStatus {
@@ -490,7 +506,7 @@ impl MapPackUpdater {
         }
     }
 
-    fn extract_maps_from_index(index: serde_json::Value) -> HashMap<String, u64> {
+    fn extract_maps_from_index(index: &serde_json::Value) -> HashMap<String, u64> {
         index["maps"]
             .as_array()
             .unwrap()
@@ -499,12 +515,12 @@ impl MapPackUpdater {
             .collect::<HashMap<String, u64>>()
     }
 
-    /// Compares the old_index with current index and for any
+    /// Compares the `old_index` with current index and for any
     /// maps that have updated the revision, we grab them
     /// from the latest revision
     pub async fn hydrate_map_pack(&self, window: &Window, old_index: Option<serde_json::Value>) {
         let new_maps = match self.get_map_index(window) {
-            Some(index) => Self::extract_maps_from_index(index),
+            Some(index) => Self::extract_maps_from_index(&index),
             None => {
                 ccprintlne(window, "Failed to get index.json".to_owned());
                 return;
@@ -512,14 +528,14 @@ impl MapPackUpdater {
         };
 
         let old_maps = match old_index {
-            Some(index) => Self::extract_maps_from_index(index),
+            Some(index) => Self::extract_maps_from_index(&index),
             None => HashMap::new(),
         };
 
         let mut to_fetch = HashSet::new();
-        for (path, revision) in new_maps.iter() {
+        for (path, revision) in &new_maps {
             if !old_maps.contains_key(path) || old_maps[path] < *revision {
-                to_fetch.insert(path.to_owned());
+                to_fetch.insert(path.clone());
             }
         }
 
@@ -528,9 +544,9 @@ impl MapPackUpdater {
         }
 
         let mut filename_to_path = HashMap::new();
-        for path in to_fetch.iter() {
+        for path in &to_fetch {
             let filename = Path::new(path).file_name().unwrap().to_string_lossy();
-            filename_to_path.insert(filename.to_string(), path.to_owned());
+            filename_to_path.insert(filename.to_string(), path.clone());
         }
 
         let url = format!("https://api.github.com/repos/{}/{}/releases/latest", self.repo_owner, self.repo_name);

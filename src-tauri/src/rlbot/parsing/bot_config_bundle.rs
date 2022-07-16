@@ -1,11 +1,20 @@
-use crate::bot_management::cfg_helper::load_cfg;
-use crate::rlbot::agents::{base_script::SCRIPT_FILE_KEY, runnable::Runnable};
-use crate::{ccprintln, get_command_status, PYTHON_PATH};
+use crate::{
+    bot_management::cfg_helper::load_cfg,
+    ccprintln, get_command_status,
+    rlbot::agents::{base_script::SCRIPT_FILE_KEY, runnable::Runnable},
+    PYTHON_PATH,
+};
 use configparser::ini::Ini;
 use imghdr::Type;
 use serde::{Deserialize, Serialize};
-use std::process::{self, Stdio};
-use std::{fs, io::Read, path::Path};
+use std::{
+    borrow::ToOwned,
+    fs,
+    io::Read,
+    path::Path,
+    process::{self, Stdio},
+    str::from_utf8,
+};
 use tauri::Window;
 
 pub const PYTHON_FILE_KEY: &str = "python_file";
@@ -38,7 +47,7 @@ pub struct DevInfo {
 }
 
 impl DevInfo {
-    pub fn from_config(config: Ini) -> Self {
+    pub fn from_config(config: &Ini) -> Self {
         let developer = config.get(BOT_CONFIG_DETAILS_HEADER, "developer").unwrap_or_default();
         let description = config.get(BOT_CONFIG_DETAILS_HEADER, "description").unwrap_or_default();
         let fun_fact = config.get(BOT_CONFIG_DETAILS_HEADER, "fun_fact").unwrap_or_default();
@@ -48,7 +57,7 @@ impl DevInfo {
             .get(BOT_CONFIG_DETAILS_HEADER, "tags")
             .unwrap_or_default()
             .split(", ")
-            .map(|s| s.to_owned())
+            .map(ToOwned::to_owned)
             .collect();
 
         Self {
@@ -105,7 +114,7 @@ fn get_file_extension(vec: &[u8]) -> Option<&'static str> {
 pub fn to_base64(path: &str) -> Option<String> {
     if let Ok(file) = &mut fs::File::open(path) {
         let mut vec = Vec::new();
-        let _ = file.read_to_end(&mut vec);
+        file.read_to_end(&mut vec).ok()?;
 
         get_file_extension(&vec).map(|extension| format!("data:image/{};base64,{}", extension, base64::encode(vec).replace("\r\n", "")))
     } else {
@@ -149,7 +158,7 @@ impl BotConfigBundle {
         let name = conf.get(BOT_CONFIG_MODULE_HEADER, NAME_KEY);
         let looks_path = conf.get(BOT_CONFIG_MODULE_HEADER, LOOKS_CONFIG_KEY).map(|path| format!("{}/{}", config_directory, path));
         let python_path = conf.get(BOT_CONFIG_MODULE_HEADER, PYTHON_FILE_KEY).map(|path| format!("{}/{}", config_directory, path));
-        let supports_standalone = conf.get(BOT_CONFIG_MODULE_HEADER, SUPPORTS_STANDALONE).map(|s| s.parse::<bool>().unwrap_or(false));
+        let supports_standalone = conf.get(BOT_CONFIG_MODULE_HEADER, SUPPORTS_STANDALONE).map(|s| s.parse::<bool>().unwrap_or_default());
         let use_virtual_environment = conf.getbool(BOT_CONFIG_MODULE_HEADER, USE_VIRTUAL_ENVIRONMENT_KEY).unwrap_or(None);
         let requirements_file = conf
             .get(BOT_CONFIG_MODULE_HEADER, REQUIREMENTS_FILE_KEY)
@@ -178,12 +187,12 @@ impl BotConfigBundle {
             return Err("Python file not found".to_owned());
         }
 
-        let t_logo = conf.get(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY).unwrap_or_else(|| String::from("logo.png"));
-        let ta_logo = format!("{}/{}", config_directory, t_logo);
+        let relative_logo_path = conf.get(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY).unwrap_or_else(|| String::from("logo.png"));
+        let absolute_logo_path = format!("{}/{}", config_directory, relative_logo_path);
 
         let logo = None;
 
-        let info = Some(DevInfo::from_config(conf));
+        let info = Some(DevInfo::from_config(&conf));
 
         let runnable_type = String::from("rlbot");
         let warn = None;
@@ -191,7 +200,7 @@ impl BotConfigBundle {
         let missing_python_packages = None;
 
         let path = Some(path);
-        let logo_path = Some(ta_logo);
+        let logo_path = Some(absolute_logo_path);
         let config_directory = Some(config_directory);
 
         Ok(Self {
@@ -278,34 +287,24 @@ impl Runnable for BotConfigBundle {
     }
 
     fn use_virtual_environment(&self) -> bool {
-        self.supports_standalone.unwrap_or(false) && self.use_virtual_environment.unwrap_or(false)
+        self.supports_standalone.unwrap_or_default() && self.use_virtual_environment.unwrap_or_default()
     }
 
-    #[cfg(windows)]
     fn get_environment_path(&self) -> String {
         if self.use_virtual_environment() {
-            Path::new(self.config_directory.as_ref().unwrap())
-                .join("venv")
-                .join("scripts")
-                .join("python.exe")
-                .to_string_lossy()
-                .to_string()
-        } else {
-            PYTHON_PATH.lock().unwrap().to_owned()
+            if let Some(conf_dir) = self.config_directory.as_ref() {
+                return if cfg!(windows) {
+                    Path::new(conf_dir).join("venv").join("scripts").join("python.exe").to_string_lossy().to_string()
+                } else {
+                    Path::new(conf_dir).join("venv").join("bin").join("python").to_string_lossy().to_string()
+                };
+            }
         }
-    }
 
-    #[cfg(not(windows))]
-    fn get_environment_path(&self) -> String {
-        if self.use_virtual_environment() {
-            Path::new(self.config_directory.as_ref().unwrap())
-                .join("venv")
-                .join("bin")
-                .join("python")
-                .to_string_lossy()
-                .to_string()
+        if let Ok(path) = PYTHON_PATH.lock() {
+            path.to_owned()
         } else {
-            PYTHON_PATH.lock().unwrap().to_owned()
+            "".to_owned()
         }
     }
 
@@ -314,9 +313,13 @@ impl Runnable for BotConfigBundle {
             return Vec::new();
         }
 
-        let python = PYTHON_PATH.lock().unwrap().to_owned();
+        let python = if let Ok(path) = PYTHON_PATH.lock() {
+            path.to_owned()
+        } else {
+            return Vec::new();
+        };
 
-        let requires_tkinter = self.requires_tkinter.unwrap_or(false);
+        let requires_tkinter = self.requires_tkinter.unwrap_or_default();
 
         if let Some(req_file) = self.get_requirements_file() {
             let mut args: Vec<&str> = vec!["-c", "from rlbot_smh.get_missing_packages import run; run()"];
@@ -340,14 +343,14 @@ impl Runnable for BotConfigBundle {
 
             match command.args(args).stdin(Stdio::null()).output() {
                 Ok(proc) => {
-                    let output = std::str::from_utf8(proc.stdout.as_slice()).unwrap();
+                    let output = from_utf8(proc.stdout.as_slice()).unwrap();
                     if let Ok(packages) = serde_json::from_str(output) {
                         return packages;
                     }
                 }
                 Err(e) => ccprintln(window, format!("Failed to calculate missing packages: {}", e)),
             }
-        } else if requires_tkinter && !get_command_status(&python, vec!["-c", "import tkinter"]) {
+        } else if requires_tkinter && !get_command_status(python, &["-c", "import tkinter"]) {
             return vec![String::from("tkinter")];
         }
 
@@ -393,11 +396,11 @@ impl ScriptConfigBundle {
         let path = config_path.to_string_lossy().to_string();
         let config_directory = config_path.parent().unwrap().to_string_lossy().to_string();
         let config_file_name = config_path.file_name().unwrap().to_string_lossy().to_string();
-        let use_virtual_environment = conf.getbool(BOT_CONFIG_MODULE_HEADER, USE_VIRTUAL_ENVIRONMENT_KEY).unwrap_or(None).unwrap_or(false);
+        let use_virtual_environment = conf.getbool(BOT_CONFIG_MODULE_HEADER, USE_VIRTUAL_ENVIRONMENT_KEY).unwrap_or(None).unwrap_or_default();
         let requirements_file = conf
             .get(BOT_CONFIG_MODULE_HEADER, REQUIREMENTS_FILE_KEY)
             .map(|path| format!("{}/{}", config_directory, path));
-        let requires_tkinter = conf.getbool(BOT_CONFIG_MODULE_HEADER, REQUIRES_TKINTER).unwrap_or(None).unwrap_or(false);
+        let requires_tkinter = conf.getbool(BOT_CONFIG_MODULE_HEADER, REQUIRES_TKINTER).unwrap_or(None).unwrap_or_default();
 
         let script_file = conf
             .get(BOT_CONFIG_MODULE_HEADER, SCRIPT_FILE_KEY)
@@ -412,14 +415,14 @@ impl ScriptConfigBundle {
             return Err("Script file not found".to_owned());
         }
 
-        let t_logo = conf.get(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY).unwrap_or_else(|| String::from("logo.png"));
-        let ta_logo = format!("{}/{}", config_directory, t_logo);
+        let relative_logo_path = conf.get(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY).unwrap_or_else(|| String::from("logo.png"));
+        let absolute_logo_path = format!("{}/{}", config_directory, relative_logo_path);
         let logo = None;
 
-        let info = Some(DevInfo::from_config(conf));
+        let info = Some(DevInfo::from_config(&conf));
 
         let missing_python_packages = None;
-        let logo_path = Some(ta_logo);
+        let logo_path = Some(absolute_logo_path);
 
         Ok(Self {
             name,
@@ -464,27 +467,22 @@ impl Runnable for ScriptConfigBundle {
         self.use_virtual_environment
     }
 
-    #[cfg(windows)]
     fn get_environment_path(&self) -> String {
         if self.use_virtual_environment() {
-            Path::new(&self.config_directory)
-                .join("venv")
-                .join("scripts")
-                .join("python.exe")
-                .to_str()
-                .unwrap()
-                .to_owned()
+            if cfg!(windows) {
+                Path::new(&self.config_directory)
+                    .join("venv")
+                    .join("scripts")
+                    .join("python.exe")
+                    .to_string_lossy()
+                    .to_string()
+            } else {
+                Path::new(&self.config_directory).join("venv").join("bin").join("python").to_string_lossy().to_string()
+            }
+        } else if let Ok(path) = PYTHON_PATH.lock() {
+            path.to_owned()
         } else {
-            PYTHON_PATH.lock().unwrap().to_owned()
-        }
-    }
-
-    #[cfg(not(windows))]
-    fn get_environment_path(&self) -> String {
-        if self.use_virtual_environment() {
-            Path::new(&self.config_directory).join("venv").join("bin").join("python").to_string_lossy().to_string()
-        } else {
-            PYTHON_PATH.lock().unwrap().to_owned()
+            "".to_owned()
         }
     }
 
@@ -493,7 +491,11 @@ impl Runnable for ScriptConfigBundle {
             return Vec::new();
         }
 
-        let python = PYTHON_PATH.lock().unwrap().to_owned();
+        let python = if let Ok(path) = PYTHON_PATH.lock() {
+            path.to_owned()
+        } else {
+            return Vec::new();
+        };
 
         if let Some(req_file) = self.get_requirements_file() {
             let mut args: Vec<&str> = vec!["-c", "from rlbot_smh.get_missing_packages import run; run()"];
@@ -517,14 +519,14 @@ impl Runnable for ScriptConfigBundle {
 
             match command.args(args).stdin(Stdio::null()).output() {
                 Ok(proc) => {
-                    let output = std::str::from_utf8(proc.stdout.as_slice()).unwrap();
+                    let output = from_utf8(proc.stdout.as_slice()).unwrap();
                     if let Ok(packages) = serde_json::from_str(output) {
                         return packages;
                     }
                 }
                 Err(e) => ccprintln(window, format!("Failed to calculate missing packages: {}", e)),
             }
-        } else if self.requires_tkinter && !get_command_status(&python, vec!["-c", "import tkinter"]) {
+        } else if self.requires_tkinter && !get_command_status(python, &["-c", "import tkinter"]) {
             return vec![String::from("tkinter")];
         }
 

@@ -1,3 +1,4 @@
+#[allow(clippy::too_many_lines)]
 pub fn json() -> serde_json::Map<String, serde_json::Value> {
     serde_json::json!({
         "settings": {
@@ -188,5 +189,5 @@ pub fn json() -> serde_json::Map<String, serde_json::Value> {
                 ]
             }
         }
-    }).as_object().unwrap().to_owned()
+    }).as_object().unwrap().clone()
 }

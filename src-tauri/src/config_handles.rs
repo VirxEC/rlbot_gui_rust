@@ -1,17 +1,19 @@
 use crate::{
     bot_management::downloader::MapPackUpdater,
-    custom_maps::find_all_custom_maps,
+    custom_maps,
     rlbot::{
         agents::runnable::Runnable,
         parsing::{
             agent_config_parser::BotLooksConfig,
             bot_config_bundle::{BotConfigBundle, ScriptConfigBundle},
             directory_scanner::{scan_directory_for_bot_configs, scan_directory_for_script_configs},
-            match_settings_config_parser::*,
+            match_settings_config_parser::MatchOptions,
         },
     },
     settings::*,
-    stories, *,
+    stories,
+    stories::bots_base,
+    *,
 };
 use configparser::ini::Ini;
 use glob::glob;
@@ -24,6 +26,11 @@ use std::{
 };
 use tauri::{api::dialog::FileDialogBuilder, Window};
 
+/// Loads the GUI config, creating it if it doesn't exist.
+///
+/// # Arguments
+///
+/// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
 pub fn load_gui_config(window: &Window) -> Ini {
     let mut conf = Ini::new();
     conf.set_comment_symbols(&[';']);
@@ -37,33 +44,7 @@ pub fn load_gui_config(window: &Window) -> Ini {
         conf.set("bot_folder_settings", "files", Some("{}".to_owned()));
         conf.set("bot_folder_settings", "folders", Some("{}".to_owned()));
         conf.set("bot_folder_settings", "incr", None);
-        conf.set("match_settings", "map", Some(MAP_TYPES[0].to_owned()));
-        conf.set("match_settings", "game_mode", Some(GAME_MODES[0].to_owned()));
-        conf.set("match_settings", "match_behavior", Some(EXISTING_MATCH_BEHAVIOR_TYPES[0].to_owned()));
-        conf.set("match_settings", "skip_replays", Some("false".to_owned()));
-        conf.set("match_settings", "instant_start", Some("false".to_owned()));
-        conf.set("match_settings", "enable_lockstep", Some("false".to_owned()));
-        conf.set("match_settings", "randomize_map", Some("false".to_owned()));
-        conf.set("match_settings", "enable_rendering", Some("false".to_owned()));
-        conf.set("match_settings", "enable_state_setting", Some("true".to_owned()));
-        conf.set("match_settings", "auto_save_replay", Some("false".to_owned()));
-        conf.set("match_settings", "scripts", Some("[]".to_owned()));
-        conf.set("mutator_settings", "match_length", Some(MATCH_LENGTH_TYPES[0].to_owned()));
-        conf.set("mutator_settings", "max_score", Some(MAX_SCORE_TYPES[0].to_owned()));
-        conf.set("mutator_settings", "overtime", Some(OVERTIME_MUTATOR_TYPES[0].to_owned()));
-        conf.set("mutator_settings", "series_length", Some(SERIES_LENGTH_MUTATOR_TYPES[0].to_owned()));
-        conf.set("mutator_settings", "game_speed", Some(GAME_SPEED_MUTATOR_TYPES[0].to_owned()));
-        conf.set("mutator_settings", "ball_max_speed", Some(BALL_MAX_SPEED_MUTATOR_TYPES[0].to_owned()));
-        conf.set("mutator_settings", "ball_type", Some(BALL_TYPE_MUTATOR_TYPES[0].to_owned()));
-        conf.set("mutator_settings", "ball_weight", Some(BALL_WEIGHT_MUTATOR_TYPES[0].to_owned()));
-        conf.set("mutator_settings", "ball_size", Some(BALL_SIZE_MUTATOR_TYPES[0].to_owned()));
-        conf.set("mutator_settings", "ball_bounciness", Some(BALL_BOUNCINESS_MUTATOR_TYPES[0].to_owned()));
-        conf.set("mutator_settings", "boost_amount", Some(BOOST_AMOUNT_MUTATOR_TYPES[0].to_owned()));
-        conf.set("mutator_settings", "rumble", Some(RUMBLE_MUTATOR_TYPES[0].to_owned()));
-        conf.set("mutator_settings", "boost_strength", Some(BOOST_STRENGTH_MUTATOR_TYPES[0].to_owned()));
-        conf.set("mutator_settings", "gravity", Some(GRAVITY_MUTATOR_TYPES[0].to_owned()));
-        conf.set("mutator_settings", "demolish", Some(DEMOLISH_MUTATOR_TYPES[0].to_owned()));
-        conf.set("mutator_settings", "respawn_time", Some(RESPAWN_TIME_MUTATOR_TYPES[0].to_owned()));
+        MatchConfig::default().save_to_config(&mut conf);
         conf.set("python_config", "path", Some(auto_detect_python().unwrap_or_default().0));
         conf.set("launcher_settings", "preferred_launcher", Some("epic".to_owned()));
         conf.set("launcher_settings", "use_login_tricks", Some("true".to_owned()));
@@ -81,36 +62,47 @@ pub fn load_gui_config(window: &Window) -> Ini {
 }
 
 #[tauri::command]
-pub async fn save_folder_settings(window: Window, bot_folder_settings: BotFolderSettings) {
-    BOT_FOLDER_SETTINGS.lock().unwrap().as_mut().unwrap().update_config(&window, bot_folder_settings)
+pub async fn save_folder_settings(window: Window, bot_folder_settings: BotFolders) -> Result<(), String> {
+    BOT_FOLDER_SETTINGS
+        .lock()
+        .map_err(|err| err.to_string())?
+        .as_mut()
+        .ok_or("BOT_FOLDER_SETTINGS is None")?
+        .update_config(&window, bot_folder_settings);
+    Ok(())
 }
 
 #[tauri::command]
-pub async fn get_folder_settings() -> BotFolderSettings {
-    BOT_FOLDER_SETTINGS.lock().unwrap().as_ref().unwrap().clone()
+pub async fn get_folder_settings() -> Result<BotFolders, String> {
+    Ok(BOT_FOLDER_SETTINGS
+        .lock()
+        .map_err(|err| err.to_string())?
+        .as_ref()
+        .ok_or("BOT_FOLDER_SETTINGS is None")?
+        .clone())
 }
 
-fn filter_hidden_bundles<T: Runnable + Clone>(bundles: HashSet<T>) -> Vec<T> {
+fn filter_hidden_bundles<T: Runnable + Clone>(bundles: &HashSet<T>) -> Vec<T> {
     bundles.iter().filter(|b| !b.get_config_file_name().starts_with('_')).cloned().collect()
 }
 
 fn get_bots_from_directory(path: &str) -> Vec<BotConfigBundle> {
-    filter_hidden_bundles(scan_directory_for_bot_configs(path))
+    filter_hidden_bundles(&scan_directory_for_bot_configs(path))
 }
 
 #[tauri::command]
-pub async fn scan_for_bots() -> Vec<BotConfigBundle> {
-    let bfs_lock = BOT_FOLDER_SETTINGS.lock().unwrap();
-    let bfs = bfs_lock.as_ref().unwrap();
+pub async fn scan_for_bots() -> Result<Vec<BotConfigBundle>, String> {
+    let bfs_lock = BOT_FOLDER_SETTINGS.lock().map_err(|err| err.to_string())?;
+    let bfs = bfs_lock.as_ref().ok_or("BOT_FOLDER_SETTINGS is None")?;
     let mut bots = Vec::new();
 
-    for (path, props) in bfs.folders.iter() {
+    for (path, props) in &bfs.folders {
         if props.visible {
             bots.extend(get_bots_from_directory(&*path));
         }
     }
 
-    for (path, props) in bfs.files.iter() {
+    for (path, props) in &bfs.files {
         if props.visible {
             if let Ok(bundle) = BotConfigBundle::minimal_from_path(Path::new(path)) {
                 bots.push(bundle);
@@ -118,26 +110,26 @@ pub async fn scan_for_bots() -> Vec<BotConfigBundle> {
         }
     }
 
-    bots
+    Ok(bots)
 }
 
 fn get_scripts_from_directory(path: &str) -> Vec<ScriptConfigBundle> {
-    filter_hidden_bundles(scan_directory_for_script_configs(path))
+    filter_hidden_bundles(&scan_directory_for_script_configs(path))
 }
 
 #[tauri::command]
-pub async fn scan_for_scripts() -> Vec<ScriptConfigBundle> {
-    let bfs_lock = BOT_FOLDER_SETTINGS.lock().unwrap();
-    let bfs = bfs_lock.as_ref().unwrap();
+pub async fn scan_for_scripts() -> Result<Vec<ScriptConfigBundle>, String> {
+    let bfs_lock = BOT_FOLDER_SETTINGS.lock().map_err(|err| err.to_string())?;
+    let bfs = bfs_lock.as_ref().ok_or("BOT_FOLDER_SETTINGS is None")?;
     let mut scripts = Vec::with_capacity(bfs.folders.len() + bfs.files.len());
 
-    for (path, props) in bfs.folders.iter() {
+    for (path, props) in &bfs.folders {
         if props.visible {
             scripts.extend(get_scripts_from_directory(&*path));
         }
     }
 
-    for (path, props) in bfs.files.iter() {
+    for (path, props) in &bfs.files {
         if props.visible {
             if let Ok(bundle) = ScriptConfigBundle::minimal_from_path(Path::new(path)) {
                 scripts.push(bundle);
@@ -145,19 +137,23 @@ pub async fn scan_for_scripts() -> Vec<ScriptConfigBundle> {
         }
     }
 
-    scripts
+    Ok(scripts)
 }
 
 #[tauri::command]
 pub async fn pick_bot_folder(window: Window) {
-    FileDialogBuilder::new().pick_folder(move |folder_path| {
-        if let Some(path) = folder_path {
-            BOT_FOLDER_SETTINGS
-                .lock()
-                .unwrap()
-                .as_mut()
-                .unwrap()
-                .add_folder(&window, path.to_string_lossy().to_string());
+    FileDialogBuilder::new().pick_folder(move |path| {
+        if let Some(path) = path {
+            match BOT_FOLDER_SETTINGS.lock() {
+                Ok(mut bfs_lock) => {
+                    if let Some(bfs) = bfs_lock.as_mut() {
+                        bfs.add_folder(&window, path.to_string_lossy().to_string());
+                    } else {
+                        ccprintlne(&window, "BOT_FOLDER_SETTINGS is None".to_owned());
+                    }
+                }
+                Err(err) => ccprintlne(&window, format!("Failed to lock BOT_FOLDER_SETTINGS: {}", err)),
+            }
         }
     });
 }
@@ -166,7 +162,16 @@ pub async fn pick_bot_folder(window: Window) {
 pub async fn pick_bot_config(window: Window) {
     FileDialogBuilder::new().add_filter("Bot Cfg File", &["cfg"]).pick_file(move |path| {
         if let Some(path) = path {
-            BOT_FOLDER_SETTINGS.lock().unwrap().as_mut().unwrap().add_file(&window, path.to_string_lossy().to_string());
+            match BOT_FOLDER_SETTINGS.lock() {
+                Ok(mut bfs_lock) => {
+                    if let Some(bfs) = bfs_lock.as_mut() {
+                        bfs.add_file(&window, path.to_string_lossy().to_string());
+                    } else {
+                        ccprintlne(&window, "BOT_FOLDER_SETTINGS is None".to_owned());
+                    }
+                }
+                Err(err) => ccprintlne(&window, format!("Failed to lock BOT_FOLDER_SETTINGS: {}", err)),
+            }
         }
     });
 }
@@ -214,19 +219,26 @@ pub async fn save_looks(window: Window, path: String, config: BotLooksConfig) {
 }
 
 #[tauri::command]
-pub async fn get_match_options() -> MatchOptions {
+pub async fn get_match_options() -> Result<MatchOptions, String> {
     let mut mo = MatchOptions::default();
-    mo.map_types.extend(find_all_custom_maps(&BOT_FOLDER_SETTINGS.lock().unwrap().as_ref().unwrap().folders));
-    mo
+    mo.map_types.extend(custom_maps::find_all(
+        &BOT_FOLDER_SETTINGS
+            .lock()
+            .map_err(|err| err.to_string())?
+            .as_ref()
+            .ok_or("BOT_FOLDER_SETTINGS is None")?
+            .folders,
+    ));
+    Ok(mo)
 }
 
 #[tauri::command]
-pub async fn get_match_settings(window: Window) -> MatchSettings {
-    MatchSettings::load(&window)
+pub async fn get_match_settings(window: Window) -> MatchConfig {
+    MatchConfig::load(&window)
 }
 
 #[tauri::command]
-pub async fn save_match_settings(window: Window, settings: MatchSettings) {
+pub async fn save_match_settings(window: Window, settings: MatchConfig) {
     settings.cleaned_scripts().save_config(&window);
 }
 
@@ -251,8 +263,8 @@ pub async fn get_team_settings(window: Window) -> HashMap<String, Vec<BotConfigB
 #[tauri::command]
 pub async fn save_team_settings(window: Window, blue_team: Vec<BotConfigBundle>, orange_team: Vec<BotConfigBundle>) {
     let mut config = load_gui_config(&window);
-    config.set("team_settings", "blue_team", Some(serde_json::to_string(&clean(blue_team)).unwrap()));
-    config.set("team_settings", "orange_team", Some(serde_json::to_string(&clean(orange_team)).unwrap()));
+    config.set("team_settings", "blue_team", Some(serde_json::to_string(&clean(&blue_team)).unwrap()));
+    config.set("team_settings", "orange_team", Some(serde_json::to_string(&clean(&orange_team)).unwrap()));
 
     if let Err(e) = config.write(get_config_path()) {
         ccprintlne(&window, format!("Failed to save team settings: {}", e));
@@ -260,15 +272,18 @@ pub async fn save_team_settings(window: Window, blue_team: Vec<BotConfigBundle>,
 }
 
 #[tauri::command]
-pub async fn get_language_support() -> HashMap<String, bool> {
+pub async fn get_language_support() -> Result<HashMap<String, bool>, String> {
     let mut lang_support = HashMap::new();
 
-    lang_support.insert("java".to_owned(), get_command_status("java", vec!["-version"]));
-    lang_support.insert("node".to_owned(), get_command_status("node", vec!["--version"]));
+    lang_support.insert("java".to_owned(), get_command_status("java", &["-version"]));
+    lang_support.insert("node".to_owned(), get_command_status("node", &["--version"]));
     lang_support.insert("chrome".to_owned(), has_chrome());
-    lang_support.insert("fullpython".to_owned(), get_command_status(&PYTHON_PATH.lock().unwrap(), vec!["-c", "import tkinter"]));
+    lang_support.insert(
+        "fullpython".to_owned(),
+        get_command_status(&*PYTHON_PATH.lock().map_err(|err| err.to_string())?, &["-c", "import tkinter"]),
+    );
 
-    dbg!(lang_support)
+    Ok(dbg!(lang_support))
 }
 
 #[tauri::command]
@@ -277,19 +292,21 @@ pub async fn get_detected_python_path() -> Option<(String, bool)> {
 }
 
 #[tauri::command]
-pub async fn get_python_path() -> String {
-    PYTHON_PATH.lock().unwrap().to_owned()
+pub async fn get_python_path() -> Result<String, String> {
+    Ok(PYTHON_PATH.lock().map_err(|err| err.to_string())?.to_owned())
 }
 
 #[tauri::command]
-pub async fn set_python_path(window: Window, path: String) {
-    *PYTHON_PATH.lock().unwrap() = path.to_owned();
+pub async fn set_python_path(window: Window, path: String) -> Result<(), String> {
+    *PYTHON_PATH.lock().map_err(|err| err.to_string())? = path.clone();
     let mut config = load_gui_config(&window);
     config.set("python_config", "path", Some(path));
 
     if let Err(e) = config.write(get_config_path()) {
         ccprintlne(&window, format!("Failed to save python path: {}", e));
     }
+
+    Ok(())
 }
 
 #[tauri::command]
@@ -303,26 +320,21 @@ pub async fn pick_appearance_file(window: Window) {
     });
 }
 
-fn get_recommendations_json(window: &Window) -> Option<AllRecommendations<String>> {
+fn read_recommendations_json<P: AsRef<Path>>(path: P) -> Result<AllRecommendations<String>, String> {
+    let raw_json = read_to_string(&path).map_err(|e| format!("Failed to read {}", e))?;
+
+    serde_json::from_str(&raw_json).map_err(|e| format!("Failed to parse file {}: {}", path.as_ref().to_string_lossy(), e))
+}
+
+fn get_recommendations_json(window: &Window, bfs: &BotFolders) -> Option<AllRecommendations<String>> {
     // Search for and load the json file
-    for path in BOT_FOLDER_SETTINGS.lock().unwrap().as_ref().unwrap().folders.keys() {
+    for path in bfs.folders.keys() {
         let pattern = Path::new(path).join("**/recommendations.json");
 
-        for path2 in glob(&pattern.to_string_lossy().to_owned()).unwrap().flatten() {
-            let raw_json = match read_to_string(&path2) {
-                Ok(s) => s,
-                Err(_) => {
-                    ccprintlne(window, format!("Failed to read {}", path2.to_string_lossy()));
-                    continue;
-                }
-            };
-
-            match serde_json::from_str(&raw_json) {
-                Ok(j) => return Some(j),
-                Err(e) => {
-                    ccprintlne(window, format!("Failed to parse file {}: {}", path2.to_string_lossy(), e));
-                    continue;
-                }
+        for path2 in glob(&pattern.to_string_lossy().clone()).unwrap().flatten() {
+            match read_recommendations_json(path2) {
+                Ok(recommendations) => return Some(recommendations),
+                Err(e) => ccprintlne(window, e),
             }
         }
     }
@@ -332,12 +344,13 @@ fn get_recommendations_json(window: &Window) -> Option<AllRecommendations<String
 
 #[tauri::command]
 pub async fn get_recommendations(window: Window) -> Option<AllRecommendations<BotConfigBundle>> {
+    let bfs_lock = BOT_FOLDER_SETTINGS.lock().ok()?;
+    let bfs = bfs_lock.as_ref()?;
+
     // If we found the json, return the corresponding BotConfigBundles for the bots
-    get_recommendations_json(&window).map(|j| {
+    get_recommendations_json(&window, bfs).map(|j| {
         // Get a list of all the bots in (bot name, bot config file path) pairs
         let name_path_pairs = {
-            let bfs_lock = BOT_FOLDER_SETTINGS.lock().unwrap();
-            let bfs = bfs_lock.as_ref().unwrap();
             let mut bots = Vec::new();
 
             bots.par_extend(
@@ -346,7 +359,7 @@ pub async fn get_recommendations(window: Window) -> Option<AllRecommendations<Bo
                     .filter_map(|(path, props)| {
                         if props.visible {
                             let pattern = Path::new(path).join("**/*.cfg");
-                            let paths = glob(&pattern.to_string_lossy().to_owned()).unwrap().flatten().collect::<Vec<_>>();
+                            let paths = glob(&pattern.to_string_lossy().clone()).unwrap().flatten().collect::<Vec<_>>();
 
                             Some(paths.par_iter().filter_map(|path| BotConfigBundle::name_from_path(path.as_path()).ok()).collect::<Vec<_>>())
                         } else {
@@ -365,7 +378,7 @@ pub async fn get_recommendations(window: Window) -> Option<AllRecommendations<Bo
             bots
         };
 
-        let has_rlbot = check_has_rlbot();
+        let has_rlbot = check_has_rlbot().unwrap_or_default();
 
         // Load all of the bot config bundles
         j.change_generic(&|bot_name| {
@@ -398,10 +411,27 @@ pub async fn story_load_save(window: Window) -> Option<StoryState> {
 }
 
 #[tauri::command]
-pub async fn story_new_save(window: Window, team_settings: TeamSettings, story_settings: StorySettings) -> StoryState {
+pub async fn story_new_save(window: Window, team_settings: StoryTeamConfig, story_settings: StoryConfig) -> StoryState {
     let state = StoryState::new(team_settings, story_settings);
     state.save(&window);
     state
+}
+
+#[tauri::command]
+pub async fn story_save_state(window: Window, story_state: Option<StoryState>) {
+    if let Some(story_state) = story_state {
+        story_state.save(&window);
+    }
+}
+
+#[tauri::command]
+pub async fn story_delete_save(window: Window) {
+    let mut conf = load_gui_config(&window);
+    conf.set("story_mode", "save_state", None);
+
+    if let Err(e) = conf.write(get_config_path()) {
+        ccprintlne(&window, format!("Failed to write config: {}", e));
+    }
 }
 
 #[tauri::command]
@@ -420,7 +450,7 @@ pub async fn get_map_pack_revision(window: Window) -> Option<String> {
 
 pub type JsonMap = serde_json::Map<String, serde_json::Value>;
 
-fn get_story_json(story_settings: &StorySettings) -> Option<JsonMap> {
+fn get_story_json(story_settings: &StoryConfig) -> Option<JsonMap> {
     match story_settings.story_id {
         StoryIDs::Default => {
             if story_settings.use_custom_maps {
@@ -440,34 +470,34 @@ fn get_story_json(story_settings: &StorySettings) -> Option<JsonMap> {
     }
 }
 
-fn get_story_config(story_settings: &StorySettings) -> Option<JsonMap> {
-    if let Some(json) = STORIES_CACHE.lock().unwrap().as_ref().unwrap().get(story_settings) {
-        return Some(json.to_owned());
+fn get_story_config(story_settings: &StoryConfig) -> Option<JsonMap> {
+    if let Some(json) = STORIES_CACHE.lock().ok()?.as_ref()?.get(story_settings) {
+        return Some(json.clone());
     }
 
     get_story_json(story_settings)
 }
 
-fn get_map_from_story_key(story_settings: &StorySettings, key: &str) -> Option<JsonMap> {
-    Some(get_story_config(story_settings)?.get(key)?.as_object()?.to_owned())
+fn get_map_from_story_key(story_settings: &StoryConfig, key: &str) -> Option<JsonMap> {
+    Some(get_story_config(story_settings)?.get(key)?.as_object()?.clone())
 }
 
 #[tauri::command]
-pub async fn get_story_settings(story_settings: StorySettings) -> JsonMap {
+pub async fn get_story_settings(story_settings: StoryConfig) -> JsonMap {
     get_map_from_story_key(&story_settings, "settings").unwrap_or_default()
 }
 
-pub fn get_cities(story_settings: &StorySettings) -> JsonMap {
+pub fn get_cities(story_settings: &StoryConfig) -> JsonMap {
     get_map_from_story_key(story_settings, "cities").unwrap_or_default()
 }
 
 #[tauri::command]
-pub async fn get_cities_json(story_settings: StorySettings) -> JsonMap {
+pub async fn get_cities_json(story_settings: StoryConfig) -> JsonMap {
     get_cities(&story_settings)
 }
 
-pub fn get_all_bot_configs(story_settings: &StorySettings) -> JsonMap {
-    let mut bots = BOTS_BASE.lock().unwrap().as_ref().unwrap().to_owned();
+pub fn get_all_bot_configs(story_settings: &StoryConfig) -> JsonMap {
+    let mut bots = bots_base::json();
 
     if let Some(more_bots) = get_map_from_story_key(story_settings, "bots") {
         bots.extend(more_bots);
@@ -476,22 +506,12 @@ pub fn get_all_bot_configs(story_settings: &StorySettings) -> JsonMap {
     bots
 }
 
-pub fn get_all_script_configs(story_settings: &StorySettings) -> JsonMap {
+pub fn get_all_script_configs(story_settings: &StoryConfig) -> JsonMap {
     get_map_from_story_key(story_settings, "scripts").unwrap_or_default()
 }
 
 // Get the base bots config and merge it with the bots in the story config
 #[tauri::command]
-pub async fn get_bots_configs(story_settings: StorySettings) -> JsonMap {
+pub async fn get_bots_configs(story_settings: StoryConfig) -> JsonMap {
     get_all_bot_configs(&story_settings)
-}
-
-#[tauri::command]
-pub async fn story_delete_save(window: Window) {
-    let mut conf = load_gui_config(&window);
-    conf.set("story_mode", "save_state", None);
-
-    if let Err(e) = conf.write(get_config_path()) {
-        ccprintlne(&window, format!("Failed to write config: {}", e));
-    }
 }

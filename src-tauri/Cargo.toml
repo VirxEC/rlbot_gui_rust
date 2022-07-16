@@ -1,13 +1,13 @@
 [package]
 name = "rl-bot-gui"
-version = "1.0.12"
+version = "1.0.13"
 description = "The RLBot GUI ported to Rust"
 authors = ["VirxEC"]
 license = "MIT"
 repository = "https://github.com/VirxEC/rlbot_gui_rust"
 default-run = "rl-bot-gui"
 edition = "2021"
-rust-version = "1.61"
+rust-version = "1.62"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -40,6 +40,8 @@ futures-util = "0.3"
 sysinfo = "0.24"
 os_pipe = "1.0"
 tokio = { version = "1.19", features = ["rt"] }
+strum = { version = "0.24", features = ["derive"] }
+serde-enum-str = "0.2.5"
 
 [target.'cfg(windows)'.dependencies]
 registry = "1.2"

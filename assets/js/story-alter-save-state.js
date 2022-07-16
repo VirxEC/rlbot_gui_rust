@@ -1,3 +1,4 @@
+const invoke = window.__TAURI__.invoke;
 
 export default {
 	name: 'alter-save-state',
@@ -26,8 +27,8 @@ export default {
 		sendJSON: function () {
 			let state = JSON.parse(this.text)
 			console.log(state);
-			this.$emit('input', JSON.parse(this.text));
-			// eel.story_save_fake_state(state)
+			this.$emit('input', state);
+			invoke("story_save_state", { storyState: state });
 		}
 	}
 };

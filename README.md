@@ -87,8 +87,22 @@ You're going to have to compile the GUI yourself:
 
 ### Prerequisites
 
-1. Follow the [Tauri prerequisites guide](https://tauri.app/v1/guides/getting-started/prerequisites).
-2. A system with 16gb of RAM is recommended. If you have less, you may not be able to build the GUI while having other apps open (like your editor).
+- 16gb of RAM *(minimum 8gb required, might not be able to have other apps open while compiling)*
+- 64gb+ free space *(asumming fresh Windows install with no build tools, Rocket League, git, IDE, etc)*
+- For non-Windows: SSD *(debug binary is around 500mb on Linux)*
+
+**Windows**
+
+1. Download [the `rustup` tool](https://static.rust-lang.org/rustup/dist/x86_64-pc-windows-msvc/rustup-init.exe)
+2. Run the exe, and Rust will be installed on your system. If you're prompted to `Automatically install Visual Studio 2022 Community edition`, you must type `y`.
+   You should then be prompted to install the required C++ Build Tools and Windows SDK as seen here: ![rust-bt](https://user-images.githubusercontent.com/35614515/179043763-e147e306-b31b-409c-8208-ec8044201bb5.png)
+
+- To update the `rustup` tool, run `rustup self update` in your terminal
+- To update Rust, run `rustup update stable` in your terminal
+
+**Other**
+
+Follow the [Tauri prerequisites guide](https://tauri.app/v1/guides/getting-started/prerequisites).
 
 ### Setup
 

@@ -26,7 +26,7 @@ use tauri::Window;
 
 pub const CREATED_BOTS_FOLDER: &str = "MyBots";
 
-/// Downloads a ZIP from a given URL and unpacks it to top_dir, updating progress in the window along the way
+/// Downloads a ZIP from a given URL and unpacks it to `top_dir`, updating progress in the window along the way
 ///
 /// # Arguments
 ///
@@ -66,7 +66,12 @@ pub async fn bootstrap_python_bot(window: &Window, bot_name: String, directory: 
 
     change_key_in_cfg(&config_file, BOT_CONFIG_MODULE_HEADER, NAME_KEY, bot_name)?;
 
-    BOT_FOLDER_SETTINGS.lock().unwrap().as_mut().unwrap().add_file(window, config_file.clone());
+    BOT_FOLDER_SETTINGS
+        .lock()
+        .map_err(|err| err.to_string())?
+        .as_mut()
+        .ok_or("BOT_FOLDER_SETTINGS is None")?
+        .add_file(window, config_file.clone());
 
     if open::that(python_file).is_err() {
         // We don't want to return an error here, because the bot was successfully created
@@ -125,7 +130,7 @@ pub async fn bootstrap_python_hivemind(window: &Window, hive_name: String, direc
     hive_name.hash(&mut hasher);
     let mut hive_key = hasher.finish();
     // add random number between 100000 and 999999 to hive_id
-    hive_key += rand::random::<u64>() % 1000000;
+    hive_key += rand::random::<u64>() % 1_000_000;
 
     replace_all_regex_in_file(&drone_file, &Regex::new(r"hive_key = .*$").unwrap(), format!("hive_key = \"{}\"", hive_key))
         .map_err(|e| format!("Failed to replace hive_key in drone.py: {}", e))?;
@@ -139,7 +144,12 @@ pub async fn bootstrap_python_hivemind(window: &Window, hive_name: String, direc
 
     let config_file = config_file.to_string_lossy();
 
-    BOT_FOLDER_SETTINGS.lock().unwrap().as_mut().unwrap().add_file(window, config_file.to_string());
+    BOT_FOLDER_SETTINGS
+        .lock()
+        .map_err(|err| err.to_string())?
+        .as_mut()
+        .ok_or("BOT_FOLDER_SETTINGS is None")?
+        .add_file(window, config_file.to_string());
 
     if open::that(hive_file).is_err() {
         ccprintln(
@@ -175,7 +185,7 @@ pub async fn bootstrap_rust_bot(window: &Window, bot_name: String, directory: Pa
     conf.set(BOT_CONFIG_MODULE_HEADER, NAME_KEY, Some(bot_name.clone()));
     conf.set(BOT_CONFIG_PARAMS_HEADER, EXECUTABLE_PATH_KEY, Some(format!("../target/debug/{}.exe", bot_name)));
 
-    save_cfg(conf, &config_file)?;
+    save_cfg(&conf, &config_file)?;
 
     let cargo_toml_file = top_dir.join("Cargo.toml");
 
@@ -184,7 +194,7 @@ pub async fn bootstrap_rust_bot(window: &Window, bot_name: String, directory: Pa
     conf.set("package", "name", Some(format!("\"{}\"", sanitized_name)));
     conf.set("package", "authors", Some("[\"\"]".to_owned()));
 
-    save_cfg(conf, cargo_toml_file)?;
+    save_cfg(&conf, cargo_toml_file)?;
 
     if open::that(top_dir.join("src").join("main.rs")).is_err() {
         ccprintln(
@@ -248,7 +258,7 @@ pub async fn bootstrap_scratch_bot(window: &Window, bot_name: String, directory:
     let random_port = rand::thread_rng().gen_range(20000..65000);
     conf.set(BOT_CONFIG_PARAMS_HEADER, "port", Some(random_port.to_string()));
 
-    save_cfg(conf, &config_file)?;
+    save_cfg(&conf, &config_file)?;
 
     // delete the old config file
     remove_file(old_config_file).map_err(|e| format!("Failed to delete old config file: {}", e))?;

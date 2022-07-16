@@ -69,7 +69,6 @@ export default {
 			console.log("In purchases", item.id);
 			this.$emit('purchase_upgrade', {
 				id: item.id,
-				currentCurrency: this.upgradeSaveState.currency,
 				cost: item.cost
 			});
 		}
