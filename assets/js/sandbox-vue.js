@@ -25,7 +25,10 @@ export default {
 				<span class="rlbot-brand" style="flex: 1">RLBot Sandbox</span>
 			</b-navbar-brand>
 			<b-navbar-nav class="ml-auto">
-				<b-button @click="watching = false; $router.replace('/')" variant="dark">
+				<b-button @click="$router.push('/console')" variant="dark" class="ml-2">
+					Console
+				</b-button>
+				<b-button @click="watching = false; $router.replace('/')" variant="dark" class="ml-2">
 					Back
 				</b-button>
 			</b-navbar-nav>

@@ -14,7 +14,6 @@ use crate::{
     commands::*,
     config_handles::*,
     settings::{BotFolders, ConsoleText, ConsoleTextUpdate, GameTickPacket, StoryConfig, StoryState},
-    stories::bots_base,
 };
 use lazy_static::{initialize, lazy_static};
 use os_pipe::{pipe, PipeWriter};
@@ -414,6 +413,11 @@ fn gui_setup(app: &mut App) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[tauri::command]
+fn is_debug_build() -> bool {
+    cfg!(debug_assertions)
+}
+
 fn main() {
     println!("Config path: {}", get_config_path().display());
 
@@ -421,7 +425,6 @@ fn main() {
     initialize(&MATCH_HANDLER_STDIN);
 
     *STORIES_CACHE.lock().expect("STORIES_CACHE lock was poisoned") = Some(HashMap::new());
-    *BOTS_BASE.lock().expect("BOTS_BASE lock was poisoned") = Some(bots_base::json());
 
     tauri::Builder::default()
         .setup(|app| gui_setup(app))
@@ -485,6 +488,7 @@ fn main() {
             story_save_state,
             purchase_upgrade,
             recruit,
+            is_debug_build,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

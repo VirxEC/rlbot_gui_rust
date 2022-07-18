@@ -991,27 +991,33 @@ export default {
 				}
 	
 				if (!this.init) {
-					if (/*false && */!this.$route.query.check_for_updates) {
-						this.showProgressSpinner = true;
-						this.miniConsoleTitle = "Checking for updated packages...";
-						this.$bvModal.show("mini-console");
-						invoke("install_basic_packages").then((result) => {
-							let message = result.exit_code === 0 ? 'Successfully checked for updates to ' : 'Failed to check for updates to ';
-							message += result.packages.join(", ");
-							if (result.exit_code != 0) {
-								message += ` with exit code ${result.exit_code}; See Console for details.`;
+					invoke("is_debug_build").then(isDebugBuild => {
+						if (!isDebugBuild && !this.$route.query.check_for_updates) {
+							this.showProgressSpinner = true;
+							this.miniConsoleTitle = "Checking for updated packages...";
+							this.$bvModal.show("mini-console");
+							invoke("install_basic_packages").then((result) => {
+								let message = result.exit_code === 0 ? 'Successfully checked for updates to ' : 'Failed to check for updates to ';
+								message += result.packages.join(", ");
+								if (result.exit_code != 0) {
+									message += ` with exit code ${result.exit_code}; See Console for details.`;
+								}
+								this.snackbarContent = message;
+								this.showSnackbar = true;
+								this.showProgressSpinner = false;
+
+								this.$bvModal.hide("mini-console");
+
+								this.startup_inner()
+							});
+						} else {
+							if (isDebugBuild) {
+								this.snackbarContent = "Not checking for updates because you're using a debug build";
+								this.showSnackbar = true;
 							}
-							this.snackbarContent = message;
-							this.showSnackbar = true;
-							this.showProgressSpinner = false;
-
-							this.$bvModal.hide("mini-console");
-
 							this.startup_inner()
-						});
-					} else {
-						this.startup_inner()
-					}
+						}
+					});
 				}
 			});
 		},

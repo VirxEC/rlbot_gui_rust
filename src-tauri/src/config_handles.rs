@@ -385,7 +385,7 @@ pub async fn get_recommendations(window: Window) -> Option<AllRecommendations<Bo
             for (name, path) in &name_path_pairs {
                 if name == bot_name {
                     if let Ok(mut bundle) = BotConfigBundle::minimal_from_path(Path::new(path)) {
-                        bundle.logo = bundle.get_logo();
+                        bundle.logo = bundle.load_logo();
 
                         if has_rlbot {
                             let missing_packages = bundle.get_missing_packages(&window);
@@ -497,7 +497,17 @@ pub async fn get_cities_json(story_settings: StoryConfig) -> JsonMap {
 }
 
 pub fn get_all_bot_configs(story_settings: &StoryConfig) -> JsonMap {
-    let mut bots = bots_base::json();
+    let mut bots = {
+        let mut bots_base_lock = BOTS_BASE.lock().expect("BOTS_BASE lock poisoned");
+        match bots_base_lock.as_ref() {
+            Some(bots) => bots.clone(),
+            None => {
+                let bots = bots_base::json();
+                *bots_base_lock = Some(bots.clone());
+                bots
+            }
+        }
+    };
 
     if let Some(more_bots) = get_map_from_story_key(story_settings, "bots") {
         bots.extend(more_bots);
