@@ -17,7 +17,6 @@ use crate::{
 };
 use configparser::ini::Ini;
 use glob::glob;
-use rayon::iter::{IntoParallelRefIterator, ParallelExtend, ParallelIterator};
 use std::{
     collections::{HashMap, HashSet},
     fs::{create_dir_all, read_to_string},
@@ -353,15 +352,15 @@ pub async fn get_recommendations(window: Window) -> Option<AllRecommendations<Bo
         let name_path_pairs = {
             let mut bots = Vec::new();
 
-            bots.par_extend(
+            bots.extend(
                 bfs.folders
-                    .par_iter()
+                    .iter()
                     .filter_map(|(path, props)| {
                         if props.visible {
                             let pattern = Path::new(path).join("**/*.cfg");
                             let paths = glob(&pattern.to_string_lossy().clone()).unwrap().flatten().collect::<Vec<_>>();
 
-                            Some(paths.par_iter().filter_map(|path| BotConfigBundle::name_from_path(path.as_path()).ok()).collect::<Vec<_>>())
+                            Some(paths.iter().filter_map(|path| BotConfigBundle::name_from_path(path.as_path()).ok()).collect::<Vec<_>>())
                         } else {
                             None
                         }
@@ -369,9 +368,9 @@ pub async fn get_recommendations(window: Window) -> Option<AllRecommendations<Bo
                     .flatten(),
             );
 
-            bots.par_extend(
+            bots.extend(
                 bfs.files
-                    .par_iter()
+                    .iter()
                     .filter_map(|(path, props)| if props.visible { BotConfigBundle::name_from_path(Path::new(path)).ok() } else { None }),
             );
 

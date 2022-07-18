@@ -1057,7 +1057,7 @@ export default {
 		},
 		displayHumanInBotPool: function() {
 			// only display Human when it's not on any of the teams
-			return !this.blueTeam.concat(this.orangeTeam).some(bot => bot.type === "human");
+			return !this.blueTeam.concat(this.orangeTeam).some(bot => bot.runnable_type === "human");
 		},
 	},
 	created: function () {
