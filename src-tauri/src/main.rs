@@ -366,13 +366,17 @@ fn emit_text(window: &Window, text: String, replace_last: bool) {
     }
 }
 
+fn gui_setup_load_config(window: &Window) -> Result<(), Box<dyn Error>> {
+    let gui_config = load_gui_config(window);
+    *PYTHON_PATH.lock()? = gui_config.get("python_config", "path").unwrap_or_else(|| auto_detect_python().unwrap_or_default().0);
+    *BOT_FOLDER_SETTINGS.lock()? = Some(BotFolders::load_from_conf(&gui_config));
+    Ok(())
+}
+
 fn gui_setup(app: &mut App) -> Result<(), Box<dyn Error>> {
     let window = app.get_window("main").unwrap();
 
-    *PYTHON_PATH.lock()? = load_gui_config(&window)
-        .get("python_config", "path")
-        .unwrap_or_else(|| auto_detect_python().unwrap_or_default().0);
-    *BOT_FOLDER_SETTINGS.lock()? = Some(BotFolders::load(&window));
+    gui_setup_load_config(&window)?;
 
     let (mut pipe_reader, pipe_writer) = pipe()?;
     *CAPTURE_PIPE_WRITER.lock()? = Some(pipe_writer);

@@ -66,7 +66,7 @@ fn ensure_bot_directory(window: &Window) -> PathBuf {
 #[tauri::command]
 pub async fn begin_python_bot(window: Window, bot_name: String) -> Result<BotConfigBundle, String> {
     match bootstrap_python_bot(&window, bot_name, ensure_bot_directory(&window)).await {
-        Ok(config_file) => Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap()),
+        Ok(config_file) => BotConfigBundle::minimal_from_path(Path::new(&config_file)),
         Err(e) => Err(e),
     }
 }
@@ -74,7 +74,7 @@ pub async fn begin_python_bot(window: Window, bot_name: String) -> Result<BotCon
 #[tauri::command]
 pub async fn begin_python_hivemind(window: Window, hive_name: String) -> Result<BotConfigBundle, String> {
     match bootstrap_python_hivemind(&window, hive_name, ensure_bot_directory(&window)).await {
-        Ok(config_file) => Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap()),
+        Ok(config_file) => BotConfigBundle::minimal_from_path(Path::new(&config_file)),
         Err(e) => Err(e),
     }
 }
@@ -82,7 +82,7 @@ pub async fn begin_python_hivemind(window: Window, hive_name: String) -> Result<
 #[tauri::command]
 pub async fn begin_rust_bot(window: Window, bot_name: String) -> Result<BotConfigBundle, String> {
     match bootstrap_rust_bot(&window, bot_name, ensure_bot_directory(&window)).await {
-        Ok(config_file) => Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap()),
+        Ok(config_file) => BotConfigBundle::minimal_from_path(Path::new(&config_file)),
         Err(e) => Err(e),
     }
 }
@@ -90,7 +90,7 @@ pub async fn begin_rust_bot(window: Window, bot_name: String) -> Result<BotConfi
 #[tauri::command]
 pub async fn begin_scratch_bot(window: Window, bot_name: String) -> Result<BotConfigBundle, String> {
     match bootstrap_scratch_bot(&window, bot_name, ensure_bot_directory(&window)).await {
-        Ok(config_file) => Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap()),
+        Ok(config_file) => BotConfigBundle::minimal_from_path(Path::new(&config_file)),
         Err(e) => Err(e),
     }
 }
@@ -551,8 +551,8 @@ async fn start_match_helper(window: &Window, bot_list: Vec<TeamBotBundle>, match
 
     let args = [
         "start_match".to_owned(),
-        serde_json::to_string(&bot_list).unwrap().as_str().to_owned(),
-        serde_json::to_string(&match_settings).unwrap().as_str().to_owned(),
+        serde_json::to_string(&bot_list).map_err(|e| e.to_string())?.as_str().to_owned(),
+        serde_json::to_string(&match_settings).map_err(|e| e.to_string())?.as_str().to_owned(),
         launcher_settings.preferred_launcher,
         launcher_settings.use_login_tricks.to_string(),
         launcher_settings.rocket_league_exe_path.unwrap_or_default(),
@@ -601,7 +601,7 @@ pub async fn fetch_game_tick_packet_json(window: Window) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn set_state(window: Window, state: HashMap<String, serde_json::Value>) -> Result<(), String> {
-    issue_match_handler_command(&window, &["set_state".to_owned(), serde_json::to_string(&state).unwrap()], false)
+    issue_match_handler_command(&window, &["set_state".to_owned(), serde_json::to_string(&state).map_err(|e| e.to_string())?], false)
 }
 
 #[tauri::command]
@@ -610,7 +610,7 @@ pub async fn spawn_car_for_viewing(window: Window, config: BotLooksConfig, team:
 
     let args = [
         "spawn_car_for_viewing".to_owned(),
-        serde_json::to_string(&config).unwrap(),
+        serde_json::to_string(&config).map_err(|e| e.to_string())?,
         team.to_string(),
         showcase_type,
         map,
@@ -932,13 +932,13 @@ async fn run_challenge(window: &Window, save_state: &StoryState, challenge_id: S
     let args = [
         "launch_challenge".to_owned(),
         challenge_id,
-        serde_json::to_string(&get_challenge_city_color(&city)).unwrap(),
-        serde_json::to_string(&save_state.get_team_settings().color).unwrap(),
-        serde_json::to_string(&save_state.get_upgrades()).unwrap(),
-        serde_json::to_string(&player_configs).unwrap(),
-        serde_json::to_string(&match_settings).unwrap(),
-        serde_json::to_string(&challenge).unwrap(),
-        serde_json::to_string(&save_state).unwrap(),
+        serde_json::to_string(&get_challenge_city_color(&city)).map_err(|e| e.to_string())?,
+        serde_json::to_string(&save_state.get_team_settings().color).map_err(|e| e.to_string())?,
+        serde_json::to_string(&save_state.get_upgrades()).map_err(|e| e.to_string())?,
+        serde_json::to_string(&player_configs).map_err(|e| e.to_string())?,
+        serde_json::to_string(&match_settings).map_err(|e| e.to_string())?,
+        serde_json::to_string(&challenge).map_err(|e| e.to_string())?,
+        serde_json::to_string(&save_state).map_err(|e| e.to_string())?,
         launcher_prefs.preferred_launcher,
         launcher_prefs.use_login_tricks.to_string(),
         launcher_prefs.rocket_league_exe_path.unwrap_or_default(),
