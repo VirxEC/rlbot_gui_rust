@@ -165,6 +165,27 @@ pub async fn get_console_texts() -> Result<Vec<ConsoleText>, String> {
     Ok(CONSOLE_TEXT.lock().map_err(|err| err.to_string())?.clone())
 }
 
+#[tauri::command]
+pub async fn get_console_input_commands() -> Result<Vec<String>, String> {
+    Ok(CONSOLE_INPUT_COMMANDS.lock().map_err(|err| err.to_string())?.clone())
+}
+
+#[tauri::command]
+pub async fn run_command(input: String) -> Result<i32, String> {
+    let args = input.split_whitespace().collect::<Vec<_>>();
+
+    if args.is_empty() {
+        return Ok(1);
+    }
+
+    CONSOLE_INPUT_COMMANDS.lock().map_err(|err| err.to_string())?.push(input.clone());
+
+    let (program, args) = args.split_at(1);
+
+    // spawn capture process
+    Ok(spawn_capture_process_and_get_exit_code(program[0], args))
+}
+
 fn get_missing_packages_generic<T: Runnable + Send + Sync>(window: &Window, runnables: Vec<T>) -> Vec<MissingPackagesUpdate> {
     if check_has_rlbot().unwrap_or_default() {
         runnables

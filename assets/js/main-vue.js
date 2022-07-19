@@ -954,6 +954,7 @@ export default {
 				this.quickReloadWarnings();
 			}
 
+			this.packageString = "";
 			this.$bvModal.hide("mini-console");
 		},
 		installPackage: function () {

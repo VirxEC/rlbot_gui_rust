@@ -43,6 +43,7 @@ const BOTPACK_REPO_NAME: &str = "RLBotPack";
 
 lazy_static! {
     static ref CONSOLE_TEXT: Mutex<Vec<ConsoleText>> = Mutex::new(Vec::new());
+    static ref CONSOLE_INPUT_COMMANDS: Mutex<Vec<String>> = Mutex::new(Vec::new());
     static ref PYTHON_PATH: Mutex<String> = Mutex::new(String::new());
     static ref BOT_FOLDER_SETTINGS: Mutex<Option<BotFolders>> = Mutex::new(None);
     static ref MATCH_HANDLER_STDIN: Mutex<Option<ChildStdin>> = Mutex::new(None);
@@ -315,7 +316,7 @@ fn update_internal_console(update: &ConsoleTextUpdate) -> Result<(), String> {
     if update.replace_last {
         console_text.pop();
     }
-    console_text.push(update.content.clone());
+    console_text.insert(0, update.content.clone());
 
     if console_text.len() > 1200 {
         console_text.drain(1200..);
@@ -426,6 +427,7 @@ fn main() {
     println!("Config path: {}", get_config_path().display());
 
     initialize(&CONSOLE_TEXT);
+    initialize(&CONSOLE_INPUT_COMMANDS);
     initialize(&MATCH_HANDLER_STDIN);
 
     *STORIES_CACHE.lock().expect("STORIES_CACHE lock was poisoned") = Some(HashMap::new());
@@ -460,6 +462,7 @@ fn main() {
             install_requirements,
             install_basic_packages,
             get_console_texts,
+            get_console_input_commands,
             get_detected_python_path,
             get_missing_bot_packages,
             get_missing_script_packages,
@@ -493,6 +496,7 @@ fn main() {
             purchase_upgrade,
             recruit,
             is_debug_build,
+            run_command,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
