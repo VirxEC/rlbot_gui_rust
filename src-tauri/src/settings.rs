@@ -23,7 +23,7 @@ pub struct BotFolder {
 
 impl fmt::Display for BotFolder {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", serde_json::to_string(self).unwrap())
+        write!(f, "{}", serde_json::to_string(self).expect("Failed to serialize BotFolder"))
     }
 }
 
@@ -42,8 +42,7 @@ pub struct BotFolders {
 }
 
 impl BotFolders {
-    pub fn load(window: &Window) -> Self {
-        let conf = load_gui_config(window);
+    pub fn load_from_conf(conf: &Ini) -> Self {
         let files = serde_json::from_str(&conf.get("bot_folder_settings", "files").unwrap_or_else(|| String::from("[]"))).unwrap_or_default();
 
         let folders = serde_json::from_str(&*conf.get("bot_folder_settings", "folders").unwrap_or_else(|| String::from("[]"))).unwrap_or_default();

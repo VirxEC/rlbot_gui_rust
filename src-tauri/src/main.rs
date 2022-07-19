@@ -14,7 +14,6 @@ use crate::{
     commands::*,
     config_handles::*,
     settings::{BotFolders, ConsoleText, ConsoleTextUpdate, GameTickPacket, StoryConfig, StoryState},
-    stories::bots_base,
 };
 use lazy_static::{initialize, lazy_static};
 use os_pipe::{pipe, PipeWriter};
@@ -44,6 +43,7 @@ const BOTPACK_REPO_NAME: &str = "RLBotPack";
 
 lazy_static! {
     static ref CONSOLE_TEXT: Mutex<Vec<ConsoleText>> = Mutex::new(Vec::new());
+    static ref CONSOLE_INPUT_COMMANDS: Mutex<Vec<String>> = Mutex::new(Vec::new());
     static ref PYTHON_PATH: Mutex<String> = Mutex::new(String::new());
     static ref BOT_FOLDER_SETTINGS: Mutex<Option<BotFolders>> = Mutex::new(None);
     static ref MATCH_HANDLER_STDIN: Mutex<Option<ChildStdin>> = Mutex::new(None);
@@ -316,7 +316,7 @@ fn update_internal_console(update: &ConsoleTextUpdate) -> Result<(), String> {
     if update.replace_last {
         console_text.pop();
     }
-    console_text.push(update.content.clone());
+    console_text.insert(0, update.content.clone());
 
     if console_text.len() > 1200 {
         console_text.drain(1200..);
@@ -367,13 +367,17 @@ fn emit_text(window: &Window, text: String, replace_last: bool) {
     }
 }
 
+fn gui_setup_load_config(window: &Window) -> Result<(), Box<dyn Error>> {
+    let gui_config = load_gui_config(window);
+    *PYTHON_PATH.lock()? = gui_config.get("python_config", "path").unwrap_or_else(|| auto_detect_python().unwrap_or_default().0);
+    *BOT_FOLDER_SETTINGS.lock()? = Some(BotFolders::load_from_conf(&gui_config));
+    Ok(())
+}
+
 fn gui_setup(app: &mut App) -> Result<(), Box<dyn Error>> {
     let window = app.get_window("main").unwrap();
 
-    *PYTHON_PATH.lock()? = load_gui_config(&window)
-        .get("python_config", "path")
-        .unwrap_or_else(|| auto_detect_python().unwrap_or_default().0);
-    *BOT_FOLDER_SETTINGS.lock()? = Some(BotFolders::load(&window));
+    gui_setup_load_config(&window)?;
 
     let (mut pipe_reader, pipe_writer) = pipe()?;
     *CAPTURE_PIPE_WRITER.lock()? = Some(pipe_writer);
@@ -414,14 +418,19 @@ fn gui_setup(app: &mut App) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[tauri::command]
+fn is_debug_build() -> bool {
+    cfg!(debug_assertions)
+}
+
 fn main() {
     println!("Config path: {}", get_config_path().display());
 
     initialize(&CONSOLE_TEXT);
+    initialize(&CONSOLE_INPUT_COMMANDS);
     initialize(&MATCH_HANDLER_STDIN);
 
     *STORIES_CACHE.lock().expect("STORIES_CACHE lock was poisoned") = Some(HashMap::new());
-    *BOTS_BASE.lock().expect("BOTS_BASE lock was poisoned") = Some(bots_base::json());
 
     tauri::Builder::default()
         .setup(|app| gui_setup(app))
@@ -453,6 +462,7 @@ fn main() {
             install_requirements,
             install_basic_packages,
             get_console_texts,
+            get_console_input_commands,
             get_detected_python_path,
             get_missing_bot_packages,
             get_missing_script_packages,
@@ -485,6 +495,8 @@ fn main() {
             story_save_state,
             purchase_upgrade,
             recruit,
+            is_debug_build,
+            run_command,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

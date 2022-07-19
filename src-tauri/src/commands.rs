@@ -66,7 +66,7 @@ fn ensure_bot_directory(window: &Window) -> PathBuf {
 #[tauri::command]
 pub async fn begin_python_bot(window: Window, bot_name: String) -> Result<BotConfigBundle, String> {
     match bootstrap_python_bot(&window, bot_name, ensure_bot_directory(&window)).await {
-        Ok(config_file) => Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap()),
+        Ok(config_file) => BotConfigBundle::minimal_from_path(Path::new(&config_file)),
         Err(e) => Err(e),
     }
 }
@@ -74,7 +74,7 @@ pub async fn begin_python_bot(window: Window, bot_name: String) -> Result<BotCon
 #[tauri::command]
 pub async fn begin_python_hivemind(window: Window, hive_name: String) -> Result<BotConfigBundle, String> {
     match bootstrap_python_hivemind(&window, hive_name, ensure_bot_directory(&window)).await {
-        Ok(config_file) => Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap()),
+        Ok(config_file) => BotConfigBundle::minimal_from_path(Path::new(&config_file)),
         Err(e) => Err(e),
     }
 }
@@ -82,7 +82,7 @@ pub async fn begin_python_hivemind(window: Window, hive_name: String) -> Result<
 #[tauri::command]
 pub async fn begin_rust_bot(window: Window, bot_name: String) -> Result<BotConfigBundle, String> {
     match bootstrap_rust_bot(&window, bot_name, ensure_bot_directory(&window)).await {
-        Ok(config_file) => Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap()),
+        Ok(config_file) => BotConfigBundle::minimal_from_path(Path::new(&config_file)),
         Err(e) => Err(e),
     }
 }
@@ -90,7 +90,7 @@ pub async fn begin_rust_bot(window: Window, bot_name: String) -> Result<BotConfi
 #[tauri::command]
 pub async fn begin_scratch_bot(window: Window, bot_name: String) -> Result<BotConfigBundle, String> {
     match bootstrap_scratch_bot(&window, bot_name, ensure_bot_directory(&window)).await {
-        Ok(config_file) => Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file)).unwrap()),
+        Ok(config_file) => BotConfigBundle::minimal_from_path(Path::new(&config_file)),
         Err(e) => Err(e),
     }
 }
@@ -166,21 +166,42 @@ pub async fn get_console_texts() -> Result<Vec<ConsoleText>, String> {
 }
 
 #[tauri::command]
-pub async fn get_missing_bot_packages(window: Window, bots: Vec<BotConfigBundle>) -> Vec<MissingPackagesUpdate> {
+pub async fn get_console_input_commands() -> Result<Vec<String>, String> {
+    Ok(CONSOLE_INPUT_COMMANDS.lock().map_err(|err| err.to_string())?.clone())
+}
+
+#[tauri::command]
+pub async fn run_command(input: String) -> Result<i32, String> {
+    let args = input.split_whitespace().collect::<Vec<_>>();
+
+    if args.is_empty() {
+        return Ok(1);
+    }
+
+    CONSOLE_INPUT_COMMANDS.lock().map_err(|err| err.to_string())?.push(input.clone());
+
+    let (program, args) = args.split_at(1);
+
+    // spawn capture process
+    Ok(spawn_capture_process_and_get_exit_code(program[0], args))
+}
+
+fn get_missing_packages_generic<T: Runnable + Send + Sync>(window: &Window, runnables: Vec<T>) -> Vec<MissingPackagesUpdate> {
     if check_has_rlbot().unwrap_or_default() {
-        bots.par_iter()
+        runnables
+            .par_iter()
             .enumerate()
-            .filter_map(|(index, bot)| {
-                if bot.runnable_type == *"rlbot" {
-                    let mut warn = bot.warn.clone();
-                    let mut missing_packages = bot.missing_python_packages.clone();
+            .filter_map(|(index, runnable)| {
+                if runnable.is_rlbot_controlled() {
+                    let mut warn = runnable.warn().clone();
+                    let mut missing_packages = runnable.missing_python_packages().clone();
 
                     if let Some(missing_packages) = &missing_packages {
                         if warn == Some("pythonpkg".to_owned()) && missing_packages.is_empty() {
                             warn = None;
                         }
                     } else {
-                        let bot_missing_packages = bot.get_missing_packages(&window);
+                        let bot_missing_packages = runnable.get_missing_packages(window);
 
                         if bot_missing_packages.is_empty() {
                             warn = None;
@@ -191,7 +212,7 @@ pub async fn get_missing_bot_packages(window: Window, bots: Vec<BotConfigBundle>
                         missing_packages = Some(bot_missing_packages);
                     }
 
-                    if warn != bot.warn || missing_packages != bot.missing_python_packages {
+                    if &warn != runnable.warn() || &missing_packages != runnable.missing_python_packages() {
                         return Some(MissingPackagesUpdate { index, warn, missing_packages });
                     }
                 }
@@ -200,10 +221,11 @@ pub async fn get_missing_bot_packages(window: Window, bots: Vec<BotConfigBundle>
             })
             .collect()
     } else {
-        bots.par_iter()
+        runnables
+            .par_iter()
             .enumerate()
-            .filter_map(|(index, bot)| {
-                if bot.runnable_type == *"rlbot" && (bot.warn.is_some() || bot.missing_python_packages.is_some()) {
+            .filter_map(|(index, runnable)| {
+                if runnable.is_rlbot_controlled() && (runnable.warn().is_some() || runnable.missing_python_packages().is_some()) {
                     Some(MissingPackagesUpdate {
                         index,
                         warn: None,
@@ -215,91 +237,42 @@ pub async fn get_missing_bot_packages(window: Window, bots: Vec<BotConfigBundle>
             })
             .collect()
     }
+}
+
+#[tauri::command]
+pub async fn get_missing_bot_packages(window: Window, bots: Vec<BotConfigBundle>) -> Vec<MissingPackagesUpdate> {
+    get_missing_packages_generic(&window, bots)
 }
 
 #[tauri::command]
 pub async fn get_missing_script_packages(window: Window, scripts: Vec<ScriptConfigBundle>) -> Vec<MissingPackagesUpdate> {
-    if check_has_rlbot().unwrap_or_default() {
-        scripts
-            .par_iter()
-            .enumerate()
-            .filter_map(|(index, script)| {
-                let mut warn = script.warn.clone();
-                let mut missing_packages = script.missing_python_packages.clone();
+    get_missing_packages_generic(&window, scripts)
+}
 
-                if let Some(missing_packages) = &missing_packages {
-                    if warn == Some("pythonpkg".to_owned()) && missing_packages.is_empty() {
-                        warn = None;
-                    }
-                } else {
-                    let script_missing_packages = script.get_missing_packages(&window);
-
-                    if script_missing_packages.is_empty() {
-                        warn = None;
-                    } else {
-                        warn = Some("pythonpkg".to_owned());
-                    }
-
-                    missing_packages = Some(script_missing_packages);
+fn get_missing_logos_generic<T: Runnable + Send + Sync>(runnables: Vec<T>) -> Vec<LogoUpdate> {
+    runnables
+        .par_iter()
+        .enumerate()
+        .filter_map(|(index, runnable)| {
+            if runnable.is_rlbot_controlled() && runnable.logo().is_none() {
+                if let Some(logo) = runnable.load_logo() {
+                    return Some(LogoUpdate { index, logo });
                 }
+            }
 
-                if warn != script.warn || missing_packages != script.missing_python_packages {
-                    Some(MissingPackagesUpdate { index, warn, missing_packages })
-                } else {
-                    None
-                }
-            })
-            .collect()
-    } else {
-        scripts
-            .par_iter()
-            .enumerate()
-            .filter_map(|(index, script)| {
-                if script.warn.is_some() || script.missing_python_packages.is_some() {
-                    Some(MissingPackagesUpdate {
-                        index,
-                        warn: None,
-                        missing_packages: None,
-                    })
-                } else {
-                    None
-                }
-            })
-            .collect()
-    }
+            None
+        })
+        .collect()
 }
 
 #[tauri::command]
 pub async fn get_missing_bot_logos(bots: Vec<BotConfigBundle>) -> Vec<LogoUpdate> {
-    bots.par_iter()
-        .enumerate()
-        .filter_map(|(index, bot)| {
-            if bot.runnable_type == *"rlbot" && bot.logo.is_none() {
-                if let Some(logo) = bot.get_logo() {
-                    return Some(LogoUpdate { index, logo });
-                }
-            }
-
-            None
-        })
-        .collect()
+    get_missing_logos_generic(bots)
 }
 
 #[tauri::command]
 pub async fn get_missing_script_logos(scripts: Vec<ScriptConfigBundle>) -> Vec<LogoUpdate> {
-    scripts
-        .par_iter()
-        .enumerate()
-        .filter_map(|(index, script)| {
-            if script.logo.is_none() {
-                if let Some(logo) = script.get_logo() {
-                    return Some(LogoUpdate { index, logo });
-                }
-            }
-
-            None
-        })
-        .collect()
+    get_missing_logos_generic(scripts)
 }
 
 #[tauri::command]
@@ -550,9 +523,9 @@ pub fn issue_match_handler_command(window: &Window, command_parts: &[String], mu
 }
 
 /// Perform pre-match startup checks
-/// 
+///
 /// # Arguments
-/// 
+///
 /// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
 async fn pre_start_match(window: &Window) -> Result<(), String> {
     let port = gateway_util::find_existing_process(window);
@@ -563,10 +536,14 @@ async fn pre_start_match(window: &Window) -> Result<(), String> {
         format!("Rocket League is {}", if rl_is_running { "already running with RLBot args!" } else { "not running yet..." }),
     );
 
-    // kill RLBot if it's running but Rocket League isn't
-    if !rl_is_running && port.is_some() {
+    if port.is_some() {
+        // kill the current bots if they're running
         kill_bots(window.clone()).await?;
-        gateway_util::kill_existing_processes(window);
+
+        // kill RLBot if it's running but Rocket League isn't
+        if !rl_is_running {
+            gateway_util::kill_existing_processes(window);
+        }
     }
 
     Ok(())
@@ -595,8 +572,8 @@ async fn start_match_helper(window: &Window, bot_list: Vec<TeamBotBundle>, match
 
     let args = [
         "start_match".to_owned(),
-        serde_json::to_string(&bot_list).unwrap().as_str().to_owned(),
-        serde_json::to_string(&match_settings).unwrap().as_str().to_owned(),
+        serde_json::to_string(&bot_list).map_err(|e| e.to_string())?.as_str().to_owned(),
+        serde_json::to_string(&match_settings).map_err(|e| e.to_string())?.as_str().to_owned(),
         launcher_settings.preferred_launcher,
         launcher_settings.use_login_tricks.to_string(),
         launcher_settings.rocket_league_exe_path.unwrap_or_default(),
@@ -645,7 +622,7 @@ pub async fn fetch_game_tick_packet_json(window: Window) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn set_state(window: Window, state: HashMap<String, serde_json::Value>) -> Result<(), String> {
-    issue_match_handler_command(&window, &["set_state".to_owned(), serde_json::to_string(&state).unwrap()], false)
+    issue_match_handler_command(&window, &["set_state".to_owned(), serde_json::to_string(&state).map_err(|e| e.to_string())?], false)
 }
 
 #[tauri::command]
@@ -654,7 +631,7 @@ pub async fn spawn_car_for_viewing(window: Window, config: BotLooksConfig, team:
 
     let args = [
         "spawn_car_for_viewing".to_owned(),
-        serde_json::to_string(&config).unwrap(),
+        serde_json::to_string(&config).map_err(|e| e.to_string())?,
         team.to_string(),
         showcase_type,
         map,
@@ -957,9 +934,9 @@ async fn run_challenge(window: &Window, save_state: &StoryState, challenge_id: S
 
     let botpack_root = match BOT_FOLDER_SETTINGS
         .lock()
-        .unwrap()
+        .expect("BOT_FOLDER_SETTINGS lock poisoned")
         .clone()
-        .unwrap()
+        .expect("BOT_FOLDER_SETTINGS is None")
         .folders
         .keys()
         .map(|bf| Path::new(bf).join("RLBotPack-master"))
@@ -976,13 +953,13 @@ async fn run_challenge(window: &Window, save_state: &StoryState, challenge_id: S
     let args = [
         "launch_challenge".to_owned(),
         challenge_id,
-        serde_json::to_string(&get_challenge_city_color(&city)).unwrap(),
-        serde_json::to_string(&save_state.get_team_settings().color).unwrap(),
-        serde_json::to_string(&save_state.get_upgrades()).unwrap(),
-        serde_json::to_string(&player_configs).unwrap(),
-        serde_json::to_string(&match_settings).unwrap(),
-        serde_json::to_string(&challenge).unwrap(),
-        serde_json::to_string(&save_state).unwrap(),
+        serde_json::to_string(&get_challenge_city_color(&city)).map_err(|e| e.to_string())?,
+        serde_json::to_string(&save_state.get_team_settings().color).map_err(|e| e.to_string())?,
+        serde_json::to_string(&save_state.get_upgrades()).map_err(|e| e.to_string())?,
+        serde_json::to_string(&player_configs).map_err(|e| e.to_string())?,
+        serde_json::to_string(&match_settings).map_err(|e| e.to_string())?,
+        serde_json::to_string(&challenge).map_err(|e| e.to_string())?,
+        serde_json::to_string(&save_state).map_err(|e| e.to_string())?,
         launcher_prefs.preferred_launcher,
         launcher_prefs.use_login_tricks.to_string(),
         launcher_prefs.rocket_league_exe_path.unwrap_or_default(),

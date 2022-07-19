@@ -4,7 +4,7 @@ const listen = window.__TAURI__.event.listen;
 export default {
 	name: 'console',
 	template: /*html*/`
-	<div class="overflow-auto flex-grow-1">
+	<div class="overflow-hidden flex-grow-1">
 	<b-navbar class="navbar">
 		<b-navbar-brand>
 			<img class="logo" src="imgs/rlbot_logo.png">
@@ -17,8 +17,12 @@ export default {
 		</b-navbar-nav>
 	</b-navbar>
 	<b-container fluid>
-		<b-card no-body class="bot-pool p-1" style="white-space: pre-wrap;">
-			<span :style="'color:' + (text.color ? text.color : 'black') + ';'" v-for="text in consoleTexts.slice().reverse()">
+		<b-card no-body class="bot-pool console-text-pool p-1">
+			<b-form @submit="onSubmit" novalidate>
+				<b-form-input v-on:keyup.down="onDown" v-on:keyup.up="onUp" v-model="inputCommand" id="console-input" placeholder="Enter command..."></b-form-input>
+			</b-form>
+			<hr>
+			<span :style="'color:' + (text.color ? text.color : 'black') + ';'" v-for="text in consoleTexts">
 				<span>{{ text.text }}</span><br>
 			</span>
 		</b-card>
@@ -28,6 +32,10 @@ export default {
 	components: {},
 	data () {
 		return {
+			inputCommand: "",
+			savedInputCommand: "",
+			previousCommands: [],
+			commandsIndex: -1,
 			consoleTexts: [],
 			newTextListener: listen('new-console-text', event => {
 				let update = event.payload;
@@ -35,7 +43,7 @@ export default {
 					this.consoleTexts.pop();
 				}
 				
-				this.consoleTexts.push(update.content);
+				this.consoleTexts.unshift(update.content);
 
 				if (this.consoleTexts.length > 1200) {
 					this.consoleTexts = this.consoleTexts.slice(this.consoleTexts.length - 1200);
@@ -44,9 +52,49 @@ export default {
 		}
 	},
 	methods: {
+		onUp: function(event) {
+			if (this.commandsIndex < this.previousCommands.length - 1) {
+				if (this.commandsIndex == -1) {
+					this.savedInputCommand = this.inputCommand;
+				}
+
+				this.commandsIndex += 1;
+				this.inputCommand = this.previousCommands[this.commandsIndex];
+			}
+		},
+		onDown: function(event) {
+			if (this.commandsIndex > -1) {
+				this.commandsIndex -= 1;
+
+				if (this.commandsIndex == -1) {
+					this.inputCommand = this.savedInputCommand;
+				} else {
+					this.inputCommand = this.previousCommands[this.commandsIndex];
+				}
+			}
+		},
+		onSubmit: function() {
+			if (this.inputCommand.length == 0) {
+				return;
+			}
+
+			if (this.previousCommands[0] != this.inputCommand) {
+				this.previousCommands.unshift(this.inputCommand)
+			}
+
+			invoke("run_command",  { input: this.inputCommand }).then(exitCode => console.log(exitCode));
+
+			this.inputCommand = "";		
+			this.savedInputCommand = "";	
+			this.commandsIndex = -1;
+		},
 		startup: function() {
-			invoke("get_console_texts").then((texts) => {
+			invoke("get_console_texts").then(texts => {
 				this.consoleTexts = texts;
+			});
+
+			invoke("get_console_input_commands").then(commands => {
+				this.previousCommands = commands;
 			});
 		}
 	},

@@ -17,7 +17,6 @@ use crate::{
 };
 use configparser::ini::Ini;
 use glob::glob;
-use rayon::iter::{IntoParallelRefIterator, ParallelExtend, ParallelIterator};
 use std::{
     collections::{HashMap, HashSet},
     fs::{create_dir_all, read_to_string},
@@ -353,15 +352,15 @@ pub async fn get_recommendations(window: Window) -> Option<AllRecommendations<Bo
         let name_path_pairs = {
             let mut bots = Vec::new();
 
-            bots.par_extend(
+            bots.extend(
                 bfs.folders
-                    .par_iter()
+                    .iter()
                     .filter_map(|(path, props)| {
                         if props.visible {
                             let pattern = Path::new(path).join("**/*.cfg");
                             let paths = glob(&pattern.to_string_lossy().clone()).unwrap().flatten().collect::<Vec<_>>();
 
-                            Some(paths.par_iter().filter_map(|path| BotConfigBundle::name_from_path(path.as_path()).ok()).collect::<Vec<_>>())
+                            Some(paths.iter().filter_map(|path| BotConfigBundle::name_from_path(path.as_path()).ok()).collect::<Vec<_>>())
                         } else {
                             None
                         }
@@ -369,9 +368,9 @@ pub async fn get_recommendations(window: Window) -> Option<AllRecommendations<Bo
                     .flatten(),
             );
 
-            bots.par_extend(
+            bots.extend(
                 bfs.files
-                    .par_iter()
+                    .iter()
                     .filter_map(|(path, props)| if props.visible { BotConfigBundle::name_from_path(Path::new(path)).ok() } else { None }),
             );
 
@@ -385,7 +384,7 @@ pub async fn get_recommendations(window: Window) -> Option<AllRecommendations<Bo
             for (name, path) in &name_path_pairs {
                 if name == bot_name {
                     if let Ok(mut bundle) = BotConfigBundle::minimal_from_path(Path::new(path)) {
-                        bundle.logo = bundle.get_logo();
+                        bundle.logo = bundle.load_logo();
 
                         if has_rlbot {
                             let missing_packages = bundle.get_missing_packages(&window);
@@ -497,7 +496,17 @@ pub async fn get_cities_json(story_settings: StoryConfig) -> JsonMap {
 }
 
 pub fn get_all_bot_configs(story_settings: &StoryConfig) -> JsonMap {
-    let mut bots = bots_base::json();
+    let mut bots = {
+        let mut bots_base_lock = BOTS_BASE.lock().expect("BOTS_BASE lock poisoned");
+        match bots_base_lock.as_ref() {
+            Some(bots) => bots.clone(),
+            None => {
+                let bots = bots_base::json();
+                *bots_base_lock = Some(bots.clone());
+                bots
+            }
+        }
+    };
 
     if let Some(more_bots) = get_map_from_story_key(story_settings, "bots") {
         bots.extend(more_bots);

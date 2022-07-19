@@ -290,24 +290,6 @@ impl Runnable for BotConfigBundle {
         self.supports_standalone.unwrap_or_default() && self.use_virtual_environment.unwrap_or_default()
     }
 
-    fn get_environment_path(&self) -> String {
-        if self.use_virtual_environment() {
-            if let Some(conf_dir) = self.config_directory.as_ref() {
-                return if cfg!(windows) {
-                    Path::new(conf_dir).join("venv").join("scripts").join("python.exe").to_string_lossy().to_string()
-                } else {
-                    Path::new(conf_dir).join("venv").join("bin").join("python").to_string_lossy().to_string()
-                };
-            }
-        }
-
-        if let Ok(path) = PYTHON_PATH.lock() {
-            path.to_owned()
-        } else {
-            "".to_owned()
-        }
-    }
-
     fn get_missing_packages(&self, window: &Window) -> Vec<String> {
         if self.use_virtual_environment() {
             return Vec::new();
@@ -357,12 +339,28 @@ impl Runnable for BotConfigBundle {
         Vec::new()
     }
 
-    fn get_logo(&self) -> Option<String> {
+    fn logo(&self) -> &Option<String> {
+        &self.logo
+    }
+
+    fn load_logo(&self) -> Option<String> {
         if let Some(logo_path) = &self.logo_path {
             to_base64(logo_path)
         } else {
             None
         }
+    }
+
+    fn is_rlbot_controlled(&self) -> bool {
+        self.runnable_type == "rlbot"
+    }
+
+    fn warn(&self) -> &Option<String> {
+        &self.warn
+    }
+
+    fn missing_python_packages(&self) -> &Option<Vec<String>> {
+        &self.missing_python_packages
     }
 }
 
@@ -467,25 +465,6 @@ impl Runnable for ScriptConfigBundle {
         self.use_virtual_environment
     }
 
-    fn get_environment_path(&self) -> String {
-        if self.use_virtual_environment() {
-            if cfg!(windows) {
-                Path::new(&self.config_directory)
-                    .join("venv")
-                    .join("scripts")
-                    .join("python.exe")
-                    .to_string_lossy()
-                    .to_string()
-            } else {
-                Path::new(&self.config_directory).join("venv").join("bin").join("python").to_string_lossy().to_string()
-            }
-        } else if let Ok(path) = PYTHON_PATH.lock() {
-            path.to_owned()
-        } else {
-            "".to_owned()
-        }
-    }
-
     fn get_missing_packages(&self, window: &Window) -> Vec<String> {
         if self.use_virtual_environment() {
             return Vec::new();
@@ -533,11 +512,27 @@ impl Runnable for ScriptConfigBundle {
         Vec::new()
     }
 
-    fn get_logo(&self) -> Option<String> {
+    fn logo(&self) -> &Option<String> {
+        &self.logo
+    }
+
+    fn load_logo(&self) -> Option<String> {
         if let Some(logo_path) = &self.logo_path {
             to_base64(logo_path)
         } else {
             None
         }
+    }
+
+    fn is_rlbot_controlled(&self) -> bool {
+        true
+    }
+
+    fn warn(&self) -> &Option<String> {
+        &self.warn
+    }
+
+    fn missing_python_packages(&self) -> &Option<Vec<String>> {
+        &self.missing_python_packages
     }
 }

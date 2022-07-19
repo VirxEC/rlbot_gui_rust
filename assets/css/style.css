@@ -352,3 +352,13 @@ button.icon-button {
   font-weight: bold;
   color: rgb(27, 27, 27);
 }
+
+.console-text-pool {
+  white-space: pre-wrap;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column-reverse;
+  line-height: normal;
+  font-family: 'Fira Code', 'Courier New', Courier, monospace;
+}
