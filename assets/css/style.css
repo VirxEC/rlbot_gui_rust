@@ -359,4 +359,6 @@ button.icon-button {
   overflow-y: auto;
   display: flex;
   flex-direction: column-reverse;
+  line-height: normal;
+  font-family: 'Fira Code', 'Courier New', Courier, monospace;
 }

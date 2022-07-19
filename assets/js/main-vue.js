@@ -407,7 +407,7 @@ export default {
 			<launcher-preference-modal modal-id="launcher-modal" />
 		</b-modal>
 
-		<b-modal size="xl" id="mini-console" v-bind:title="miniConsoleTitle" hide-footer centered no-close-on-backdrop no-close-on-esc hide-header-close>
+		<b-modal size="xl" id="mini-console" v-bind:title="miniConsoleTitle" hide-footer centered :no-close-on-backdrop="!allowMiniConsoleClose" :no-close-on-esc="!allowMiniConsoleClose" :hide-header-close="!allowMiniConsoleClose">
 			<mini-console/>
 		</b-modal>
 	</div>
@@ -488,12 +488,14 @@ export default {
 			rec_python: null,
 			init: false,
 			miniConsoleTitle: "",
+			allowMiniConsoleClose: false,
 			errorStartingMatchContent: "",
 			updateDownloadProgressPercent: listen("update-download-progress", event => {
 				this.downloadProgressPercent = event.payload.percent;
 				this.downloadStatus = event.payload.status;
 			}),
 			matchStarted: listen("match-started", _ => {
+				this.$bvModal.hide("mini-console");
 				this.matchStarting = false;
 				this.gameAlreadyLaunched = true;
 			}),
@@ -597,6 +599,9 @@ export default {
 		},
 		startMatch: async function (event) {
 			this.matchStarting = true;
+			this.miniConsoleTitle = "Starting Match";
+			this.allowMiniConsoleClose = true;
+			this.$bvModal.show("mini-console");
 
 			if (this.matchSettings.randomize_map) await this.setRandomMap();
 
@@ -616,6 +621,7 @@ export default {
 		},
 		killBots: function(event) {
 			invoke("kill_bots");
+			this.$bvModal.hide("mini-console");
 			this.matchStarting = false;
 		},
 		pickBotFolder: function (event) {
@@ -722,26 +728,26 @@ export default {
 			}
 			
 			this.$bvModal.hide('new-bot-modal');
+			this.allowMiniConsoleClose = false;
+			this.showProgressSpinner = true;
 			if (language === 'python') {
-				this.showProgressSpinner = true;
 				this.miniConsoleTitle = "Creating Python Bot";
 				this.$bvModal.show("mini-console");
 				invoke("begin_python_bot", { botName: bot_name }).then(this.botLoadHandler).catch(this.newBotErrorHandler);
 			} else if (language === 'scratch') {
-				this.showProgressSpinner = true;
 				this.miniConsoleTitle = "Creating Scratch Bot";
 				this.$bvModal.show("mini-console");
 				invoke("begin_scratch_bot", { botName: bot_name }).then(this.botLoadHandler).catch(this.newBotErrorHandler);
 			} else if (language === 'python_hive') {
-				this.showProgressSpinner = true;
 				this.miniConsoleTitle = "Creating Python Hivemind Bot";
 				this.$bvModal.show("mini-console");
 				invoke("begin_python_hivemind", { hiveName: bot_name }).then(this.botLoadHandler).catch(this.newBotErrorHandler);
 			} else if (language === 'rust') {
-				this.showProgressSpinner = true;
 				this.miniConsoleTitle = "Creating Rust Bot";
 				this.$bvModal.show("mini-console");
 				invoke("begin_rust_bot", { botName: bot_name }).then(this.botLoadHandler).catch(this.newBotErrorHandler);
+			} else {
+				this.showProgressSpinner = false;
 			}
 		},
 		prepareFolderSettingsDialog: function() {
@@ -960,6 +966,7 @@ export default {
 		installPackage: function () {
 			this.showProgressSpinner = true;
 			this.miniConsoleTitle = "Installing the package " + this.packageString;
+			this.allowMiniConsoleClose = false;
 			this.$bvModal.show("mini-console");
 			invoke("install_package", { packageString: this.packageString }).then(this.onInstallationComplete);
 		},
@@ -967,6 +974,7 @@ export default {
 			this.showProgressSpinner = true;
 			this.$bvModal.hide('language-warning-modal');
 			this.miniConsoleTitle = "Installing all requirements for bot...";
+			this.allowMiniConsoleClose = false;
 			this.$bvModal.show("mini-console");
 			invoke("install_requirements", { configPath: configPath }).then(this.onInstallationComplete);
 		},
@@ -996,6 +1004,7 @@ export default {
 						if (!isDebugBuild && !this.$route.query.check_for_updates) {
 							this.showProgressSpinner = true;
 							this.miniConsoleTitle = "Checking for updated packages...";
+							this.allowMiniConsoleClose = false;
 							this.$bvModal.show("mini-console");
 							invoke("install_basic_packages").then((result) => {
 								let message = result.exit_code === 0 ? 'Successfully checked for updates to ' : 'Failed to check for updates to ';
