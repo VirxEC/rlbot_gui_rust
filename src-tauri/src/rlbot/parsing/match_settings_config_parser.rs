@@ -363,7 +363,12 @@ pub struct MatchOptions {
 impl Default for MatchOptions {
     fn default() -> Self {
         Self {
-            map_types: enum_to_vec(),
+            map_types: {
+                let mut map_types = enum_to_vec();
+                // We need to pop because Custom(String) introduces an extra map type with an empty name
+                map_types.pop();
+                map_types
+            },
             game_modes: enum_to_vec(),
             match_behaviours: enum_to_vec(),
             mutators: Mutators::default(),
