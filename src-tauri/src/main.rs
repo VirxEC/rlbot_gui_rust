@@ -75,7 +75,7 @@ fn auto_detect_python() -> Option<(String, bool)> {
         }
     }
 
-    if get_command_status("python", &["--version"]) {
+    if get_command_status("python", ["--version"]) {
         Some(("python".to_owned(), false))
     } else {
         None
@@ -100,7 +100,7 @@ fn get_python_from_pip(pip: &str) -> Result<String, Box<dyn Error>> {
 #[cfg(target_os = "macos")]
 fn auto_detect_python() -> Option<(String, bool)> {
     for python in ["python3.7", "python3.8", "python3.9", "python3.6", "python3"] {
-        if get_command_status(python, &["--version"]) {
+        if get_command_status(python, ["--version"]) {
             return Some((python.to_owned(), false));
         }
     }
@@ -116,7 +116,7 @@ fn auto_detect_python() -> Option<(String, bool)> {
     }
 
     for python in ["python3.7", "python3.8", "python3.9", "python3.6", "python3"] {
-        if get_command_status(python, &["--version"]) {
+        if get_command_status(python, ["--version"]) {
             return Some((python.to_owned(), false));
         }
     }
@@ -193,7 +193,7 @@ fn has_chrome() -> bool {
 #[cfg(target_os = "linux")]
 fn has_chrome() -> bool {
     // google chrome works, but many Linux users especally may prefer to use Chromium instead
-    get_command_status("google-chrome", &["--product-version"]) || get_command_status("chromium", &["--product-version"])
+    get_command_status("google-chrome", ["--product-version"]) || get_command_status("chromium", ["--product-version"])
 }
 
 /// Spawns a process, waits for it to finish, and returns whether or not it completed sucessfully
@@ -202,7 +202,7 @@ fn has_chrome() -> bool {
 ///
 /// * `program` - The executable to run
 /// * `args` - The arguments to pass to the executable
-fn get_command_status<S: AsRef<OsStr>>(program: S, args: &[&str]) -> bool {
+fn get_command_status<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(program: S, args: I) -> bool {
     let mut command = Command::new(program);
 
     #[cfg(windows)]
@@ -232,7 +232,7 @@ fn get_command_status<S: AsRef<OsStr>>(program: S, args: &[&str]) -> bool {
 ///
 /// * `program` - The executable to run
 /// * `args` - The arguments to pass to the executable
-pub fn get_capture_command<S: AsRef<OsStr>>(program: S, args: &[&str]) -> Result<Command, Box<dyn Error>> {
+pub fn get_capture_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(program: S, args: I) -> Result<Command, Box<dyn Error>> {
     let mut command = Command::new(program);
 
     #[cfg(windows)]
@@ -264,7 +264,7 @@ pub fn get_capture_command<S: AsRef<OsStr>>(program: S, args: &[&str]) -> Result
 ///
 /// * `program` - The executable to run
 /// * `args` - The arguments to pass to the executable
-pub fn spawn_capture_process<S: AsRef<OsStr>>(program: S, args: &[&str]) -> Result<Child, Box<dyn Error>> {
+pub fn spawn_capture_process<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(program: S, args: I) -> Result<Child, Box<dyn Error>> {
     Ok(get_capture_command(program, args)?.spawn()?)
 }
 
@@ -277,7 +277,7 @@ pub fn spawn_capture_process<S: AsRef<OsStr>>(program: S, args: &[&str]) -> Resu
 ///
 /// * `program` - The executable to run
 /// * `args` - The arguments to pass to the executable
-pub fn spawn_capture_process_and_get_exit_code<S: AsRef<OsStr>>(program: S, args: &[&str]) -> i32 {
+pub fn spawn_capture_process_and_get_exit_code<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(program: S, args: I) -> i32 {
     if let Ok(mut child) = spawn_capture_process(program, args) {
         if let Ok(exit_status) = child.wait() {
             return exit_status.code().unwrap_or(1);
@@ -293,7 +293,7 @@ pub fn spawn_capture_process_and_get_exit_code<S: AsRef<OsStr>>(program: S, args
 ///
 /// This function will return an error if `PYTHON_PATH`'s lock has been poisoned.
 pub fn check_has_rlbot() -> Result<bool, String> {
-    Ok(get_command_status(&*PYTHON_PATH.lock().map_err(|err| err.to_string())?, &["-c", "import rlbot"]))
+    Ok(get_command_status(&*PYTHON_PATH.lock().map_err(|err| err.to_string())?, ["-c", "import rlbot"]))
 }
 
 #[cfg(windows)]

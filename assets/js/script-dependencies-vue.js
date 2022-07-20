@@ -4,7 +4,7 @@ import ScriptCard from './script-card-vue.js'
 function prefixFilter(arr, prefix) {
 	// cut prefix from strings and remove those which don't have the prefix
 	return arr.filter(str => str.startsWith(prefix)).map(str => str.substring(prefix.length));
-} 
+}
 
 export default {
 	name: 'script-dependencies',
@@ -64,7 +64,7 @@ export default {
 					prefixFilter(runnable.info.tags, "supports-").includes(tag) ||
 					prefixFilter(runnable.info.tags, "requires-").includes(tag)
 				);
-				
+
 				let supportedBots = this.bots.filter(enableTagFilter);
 				let supportedScripts = this.scripts.filter(enableTagFilter);
 				let visible = [script, ...supportedBots, ...supportedScripts].some(this.passesFilter);

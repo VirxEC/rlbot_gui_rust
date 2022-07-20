@@ -27,7 +27,7 @@ export default {
 	props: { upgradeSaveState: Object },
 	template: /*html*/`
 	<b-list-group>
-		<b-list-group-item 
+		<b-list-group-item
 			v-for="upgrade in upgrades_ui"
 			class="d-flex justify-content-between align-items-center"
 			v-bind:variant="upgrade.purchased ? 'success' : upgrade.available ? 'default' : 'dark'">
@@ -56,7 +56,7 @@ export default {
 
 			// Screw it, hard coding it is
 			if (!result[0].purchased) {
-				// If boost-33 is not purchased, 
+				// If boost-33 is not purchased,
 				// boost-100, boost-recharge is disabled
 				result[1].available = false;
 				result[2].available = false;

@@ -274,12 +274,12 @@ pub async fn save_team_settings(window: Window, blue_team: Vec<BotConfigBundle>,
 pub async fn get_language_support() -> Result<HashMap<String, bool>, String> {
     let mut lang_support = HashMap::new();
 
-    lang_support.insert("java".to_owned(), get_command_status("java", &["-version"]));
-    lang_support.insert("node".to_owned(), get_command_status("node", &["--version"]));
+    lang_support.insert("java".to_owned(), get_command_status("java", ["-version"]));
+    lang_support.insert("node".to_owned(), get_command_status("node", ["--version"]));
     lang_support.insert("chrome".to_owned(), has_chrome());
     lang_support.insert(
         "fullpython".to_owned(),
-        get_command_status(&*PYTHON_PATH.lock().map_err(|err| err.to_string())?, &["-c", "import tkinter"]),
+        get_command_status(&*PYTHON_PATH.lock().map_err(|err| err.to_string())?, ["-c", "import tkinter"]),
     );
 
     Ok(dbg!(lang_support))

@@ -104,7 +104,7 @@ export default {
 			this.downloadStatus = "Starting installation...";
 			this.downloadProgressPercent = 0;
 			this.$bvModal.show("download-modal");
-			
+
 			invoke("install_python").then(_ => {
 				this.$bvModal.hide("download-modal");
 				this.snackbarContent = "Successfully installed Python to your system, installing required packages";
@@ -169,12 +169,12 @@ export default {
 				this.hasRLBot = support.rlbotpython;
 
 				this.$bvModal.hide("install-console");
-				
+
 				if (!this.noPython && this.hasRLBot) {
 					this.$router.replace(`/?check_for_updates=${redirect_check_for_updates}`);
 					return
 				}
-				
+
 				this.startup_inner();
 			});
 		},

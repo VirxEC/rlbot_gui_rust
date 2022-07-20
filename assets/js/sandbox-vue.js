@@ -87,17 +87,17 @@ export default {
 								Rewind 5 Seconds
 							</b-button>
 						</div>
-						
+
 						<b-form-group label-cols="3" label-align="right" label="Game Speed" class="form-group-inline">
 							<b-form-input v-model="gamespeed" type="number"></b-form-input>
 							<b-button @click="setGamespeed()" class="ml-2">Set</b-button>
 						</b-form-group>
-						
+
 						<b-form-group label-cols="3" label-align="right" label="Console Command" class="form-group-inline">
 							<b-form-input v-model="command"></b-form-input>
 							<b-button @click="executeCommand()" class="ml-2">Execute</b-button>
 						</b-form-group>
-						
+
 						<p>
 							You can drag and drop to move objects around in the game!
 						</p>

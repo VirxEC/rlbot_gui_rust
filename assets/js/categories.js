@@ -19,11 +19,11 @@ export default {
 			{
 				name: "Bots with teamplay",
 				bots: "teamplay",
-			},	
+			},
 			{
 				name: "Goalie bots",
 				bots: "goalie",
-			},	
+			},
 		],
 	},
 	extra: {
