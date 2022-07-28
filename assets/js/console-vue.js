@@ -42,7 +42,7 @@ export default {
 				if (update.replace_last) {
 					this.consoleTexts.pop();
 				}
-				
+
 				this.consoleTexts.unshift(update.content);
 
 				if (this.consoleTexts.length > 1200) {
@@ -82,10 +82,10 @@ export default {
 				this.previousCommands.unshift(this.inputCommand)
 			}
 
-			invoke("run_command",  { input: this.inputCommand }).then(exitCode => console.log(exitCode));
+			invoke("run_command",  { input: this.inputCommand }).catch(error => console.error(error));
 
-			this.inputCommand = "";		
-			this.savedInputCommand = "";	
+			this.inputCommand = "";
+			this.savedInputCommand = "";
 			this.commandsIndex = -1;
 		},
 		startup: function() {

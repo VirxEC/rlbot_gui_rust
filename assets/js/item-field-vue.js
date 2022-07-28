@@ -6,7 +6,7 @@ export default {
 		<b-col class="pr-1">
 			<b-form-group :label="itemType.name" label-cols="4">
 				<b-input-group>
-						
+
 					<b-input-group-prepend>
 						<b-button variant="secondary" size="sm" v-b-tooltip.hover title="Set random" @click="selectRandomItem">
 							<b-icon icon="shuffle"/>

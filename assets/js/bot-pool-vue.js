@@ -31,18 +31,18 @@ export default {
 				/>
 				<b-form-input id="filter-text-input" v-model="botNameFilter" placeholder="Search..." size="sm" type="search"/>
 			</b-form>
-	
+
 			<div class="overflow-auto">
 				<bot-card v-for="bot in bots" :bot="bot" v-show="passesFilter(bot)" @click="$emit('bot-clicked', bot)"/>
-	
+
 				<span v-if="displayedBotsCount + displayedScriptsCount === 0">
 					No bots available for this category.
 				</span>
-	
+
 				<div v-if="displayedScriptsCount > 0" class="scripts-header">Scripts</div>
-	
+
 				<script-card v-for="script in scripts" :script="script" v-show="passesFilter(script)"/>
-				
+
 				<script-dependencies :bots="bots" :scripts="scripts"
 					v-if="secondaryCategorySelected.displayScriptDependencies"
 					@bot-clicked="$emit('bot-clicked', $event)"

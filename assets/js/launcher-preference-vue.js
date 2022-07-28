@@ -11,8 +11,8 @@ export default {
 				<b-form-radio v-model="launcherSettings.preferred_launcher" name="launcher-radios" value="steam">Steam</b-form-radio>
 				<b-form-radio v-model="launcherSettings.preferred_launcher" name="launcher-radios" value="epic_only">Epic Games</b-form-radio>
 			</b-form-group>
-			<b-form-group 
-				label="Optional: Path to RocketLeague.exe for Epic Launcher" 
+			<b-form-group
+				label="Optional: Path to RocketLeague.exe for Epic Launcher"
 				description="Only needed if it's not working automatically, only used by Epic launcher.">
 				<b-form-input
 					v-model="launcherSettings.rocket_league_exe_path"
@@ -78,6 +78,6 @@ export default {
 		},
 	},
 	created: function () {
-		invoke("get_launcher_settings").then(this.launcherSettingsReceived); 
+		invoke("get_launcher_settings").then(this.launcherSettingsReceived);
 	},
 }

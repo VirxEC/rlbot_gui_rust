@@ -18,7 +18,7 @@ export default {
 	<b-card-text>
 	<b-form @submit.prev="$emit('started', form)">
 		<b-form-group label="Teamname" label-for="teamname_entry" label-cols="3">
-			<b-form-input 
+			<b-form-input
 				type="text"
 				required
 				placeholder="Enter team name"
@@ -47,7 +47,7 @@ export default {
 				<span>{{this.form.custom_story.story_path}}</span>
 			</b-form-group>
 		</b-form-group>
-		
+
 		<b-form-group label="Launcher" label-cols="3">
 			<b-button v-b-modal.launcher-modal-story>
 				Choose Steam or Epic

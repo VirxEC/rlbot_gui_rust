@@ -97,9 +97,9 @@ body, html {
   margin: 2px;
   box-shadow: 1px 1px 7px #0000002e;
   display: inline-flex;
-  text-overflow:ellipsis; 
-  white-space:nowrap; 
-  overflow:hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .bot-card .card-body {

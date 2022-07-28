@@ -17,7 +17,7 @@ export default {
 				if (update.replace_last) {
 					this.consoleTexts.pop();
 				}
-				
+
 				this.consoleTexts.unshift(update.content);
 
 				if (this.consoleTexts.length > 1200) {

@@ -24,7 +24,7 @@ const CITY_ICON_MAP = [
 const CITY_MAP_INFO = {
 	'INTRO': {
 		displayName: "Beginner's Park",
-		overlayLocation: [229, 92], 
+		overlayLocation: [229, 92],
 		clickArea: "45,181,53,319,79,347,97,329,141,335,144,277,121,183,70,169",
 	},
 	'TRYHARD': {
@@ -74,7 +74,7 @@ export default {
 			:botInfo="bots_config"
 			@teamPicked="launchChallenge($event.id, $event.pickedTeammates)">
 		</story-pick-team>
-		
+
 		<!-- Popup after completing a game -->
 		<b-button v-if="${DEBUG}" @click="$bvModal.show('game_completed_popup')">Open Modal</b-button>
 		<b-modal id="game_completed_popup" ok-only
@@ -95,11 +95,11 @@ export default {
 			<div v-if="game_completed.completed && !all_challenges_done">
 				<b-img src="imgs/story/coin.png" />
 				<p>
-				Congrats on finishing the challenge! 
+				Congrats on finishing the challenge!
 				You have earned 2 currency!
 				</p>
 				<p>
-				You can use it to recruit previous opponents, 
+				You can use it to recruit previous opponents,
 				customize teammates or purchase upgrades.
 				</p>
 			</div>
@@ -118,7 +118,7 @@ export default {
 		<b-overlay :show="game_in_progress.name" rounded="sm" variant="dark">
 
 			<!-- Intro message-->
-			<b-card v-if="showIntroPopup()" class="mx-auto story-card-text" 
+			<b-card v-if="showIntroPopup()" class="mx-auto story-card-text"
 				style="width: 600px;"
 				title="Are you ready?">
 				<b-card-text>
@@ -140,13 +140,13 @@ export default {
 				<b-row>
 				<b-col cols="auto">
 					<!-- Map and overlays -->
-				   <img 
+				   <img
 						src="imgs/story/story-mode-map.png"
 						usemap="#story-image-map">
 					<img v-for="(city, cityId) in cityDisplayInfo"
 						class="story-map-icon"
 						v-bind:src="getOverlayForCity(cityId)"
-						v-bind:style="{top: city.overlayLocation[0] - 20 + 'px', left: city.overlayLocation[1] + 'px', postion: 'absolute'}" 
+						v-bind:style="{top: city.overlayLocation[0] - 20 + 'px', left: city.overlayLocation[1] + 'px', postion: 'absolute'}"
 						v-if="getCityState(cityId) !== ${CITY_STATE.OPEN}" />
 
 					<map name="story-image-map">
@@ -165,7 +165,7 @@ export default {
 						triggers="hover">
 						{{getCityStateTooltip(cityId)}}
 					</b-tooltip>
-					<b-card 
+					<b-card
 						class="mt-2 ml-0 mr-0 mb-0 settings-card"
 						:title="'City: ' + cityDisplayInfo[selectedCityId].displayName"
 						bg-variant="dark"
@@ -181,12 +181,12 @@ export default {
 							</p>
 						</div>
 					</b-card>
- 
+
 				</b-col>
 				<b-col class="mh-100" cols-xl="auto" style="min-width:200px; max-width:800px;">
 					<b-row style="overflow-y: auto; height: 380px">
 					<!-- Selecting the challenge -->
-						<b-card 
+						<b-card
 							:title="cityDisplayInfo[selectedCityId].displayName"
 							bg-variant="light" text-variant="dark" class="w-100">
 						<b-list-group flush v-if="selectedCityId" class="story-card-text">
@@ -214,13 +214,13 @@ export default {
 					<b-card no-body class="w-100">
 						<b-tabs content-class="mt-3" fill class="story-card-text">
 							<b-tab title="Upgrades">
-								<story-upgrades 
+								<story-upgrades
 									v-bind:upgradeSaveState="saveState.upgrades"
 									@purchase_upgrade="$emit('purchase_upgrade', $event)">
 								</story-upgrades>
 							</b-tab>
 							<b-tab active title="Teammates">
-								<story-recruit-list 
+								<story-recruit-list
 									v-bind:recruitables="recruit_list"
 									v-bind:currency="saveState.upgrades.currency"
 									@recruit="$emit('recruit', {id: $event})"

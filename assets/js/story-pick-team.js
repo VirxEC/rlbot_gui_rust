@@ -13,7 +13,7 @@ export default {
 			<b-button v-if="${DEBUG}" @click="$bvModal.show('pick_team_popup')">
 				Open Pick Team Modal
 			</b-button>
-			<b-modal id="pick_team_popup" 
+			<b-modal id="pick_team_popup"
 				:title="'Pick ' + (challenge.humanTeamSize - 1).toString() + ' teammate(s)'"
 				:ok-disabled="blockOkay"
 				:ok-variant="!blockOkay ? 'success' : 'dark'"

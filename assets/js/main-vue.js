@@ -46,7 +46,7 @@ export default {
 				State setting is turned off, sandbox won't work!
 			</b-tooltip>
 
-			<b-button 
+			<b-button
 				@click="$router.replace('/story')" variant="dark" class="ml-2"
 				>
 				Story Mode
@@ -77,7 +77,7 @@ export default {
 	</b-navbar>
 	<b-container fluid class="rlbot-main-config noscroll-flex flex-grow-1">
 
-	
+
 
 	<b-modal title="Install Package" id="package-installer" centered>
 
@@ -402,7 +402,7 @@ export default {
 				v-bind:path="appearancePath"
 				v-bind:map="matchSettings.map"
 				id="appearance-editor-dialog" />
-				
+
 		<b-modal title="Preferred Rocket League Launcher" id="launcher-modal" size="md" hide-footer centered>
 			<launcher-preference-modal modal-id="launcher-modal" />
 		</b-modal>
@@ -520,7 +520,7 @@ export default {
 			invoke("check_rlbot_python").then(support => {
 				let noPython = !support.python;
 				let hasRLBot = support.rlbotpython;
-	
+
 				if (noPython || !hasRLBot) {
 					this.init = false;
 					this.$router.replace('/python-config')
@@ -586,7 +586,7 @@ export default {
 					this.snackbarContent = message;
 					this.showSnackbar = true;
 					this.showProgressSpinner = false;
-					
+
 					this.quickReloadWarnings();
 				});
 			});
@@ -687,7 +687,7 @@ export default {
 		},
 		downloadBotPack: function() {
 			this.showBotpackUpdateSnackbar = false;
-			this.downloadModalTitle = "Downloading Bot Pack" 
+			this.downloadModalTitle = "Downloading Bot Pack"
 			this.$bvModal.show('download-modal');
 			this.downloadStatus = "Starting";
 			this.downloadProgressPercent = 0;
@@ -695,7 +695,7 @@ export default {
 		},
 		updateBotPack: function() {
 			this.showBotpackUpdateSnackbar = false;
-			this.downloadModalTitle = "Updating Bot Pack" 
+			this.downloadModalTitle = "Updating Bot Pack"
 			this.$bvModal.show('download-modal');
 			this.downloadStatus = "Starting";
 			this.downloadProgressPercent = 0;
@@ -703,7 +703,7 @@ export default {
 		},
 		updateMapPack: function() {
 			this.showBotpackUpdateSnackbar = false;
-			this.downloadModalTitle = "Downloading Custom Maps" 
+			this.downloadModalTitle = "Downloading Custom Maps"
 			this.$bvModal.show('download-modal');
 			this.downloadStatus = "Starting";
 			this.downloadProgressPercent = 0;
@@ -726,7 +726,7 @@ export default {
 				this.showSnackbar = true;
 				return;
 			}
-			
+
 			this.$bvModal.hide('new-bot-modal');
 			this.allowMiniConsoleClose = false;
 			this.showProgressSpinner = true;
@@ -914,7 +914,7 @@ export default {
 					this.orangeTeam[botLogo.index].logo = botLogo.logo;
 				});
 			});
-			
+
 			this.distinguishDuplicateBots(this.blueTeam.concat(this.orangeTeam));
 			this.applyLanguageWarnings(this.blueTeam.concat(this.orangeTeam));
 		},
@@ -955,7 +955,7 @@ export default {
 			this.snackbarContent = message;
 			this.showSnackbar = true;
 			this.showProgressSpinner = false;
-			
+
 			if (result.exit_code === 0) {
 				this.quickReloadWarnings();
 			}
@@ -988,7 +988,7 @@ export default {
 			invoke("check_rlbot_python").then(support => {
 				let noPython = !support.python;
 				let hasRLBot = support.rlbotpython;
-	
+
 				if (noPython || !hasRLBot) {
 					this.init = false;
 					this.$router.replace('/python-config')
@@ -998,7 +998,7 @@ export default {
 				if (this.$route.path != "/") {
 					return
 				}
-	
+
 				if (!this.init) {
 					invoke("is_debug_build").then(isDebugBuild => {
 						if (!isDebugBuild && !this.$route.query.check_for_updates) {

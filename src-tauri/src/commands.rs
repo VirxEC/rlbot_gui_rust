@@ -37,11 +37,11 @@ pub async fn check_rlbot_python() -> Result<HashMap<String, bool>, String> {
 
     let python_path = PYTHON_PATH.lock().map_err(|err| err.to_string())?.to_owned();
 
-    if get_command_status(&python_path, &["--version"]) {
+    if get_command_status(&python_path, ["--version"]) {
         python_support.insert("python".to_owned(), true);
         python_support.insert(
             "rlbotpython".to_owned(),
-            get_command_status(python_path, &["-c", "import rlbot; import numpy; import numba; import scipy; import selenium"]),
+            get_command_status(python_path, ["-c", "import rlbot; import numpy; import numba; import scipy; import selenium"]),
         );
     } else {
         python_support.insert("python".to_owned(), false);
@@ -65,41 +65,37 @@ fn ensure_bot_directory(window: &Window) -> PathBuf {
 
 #[tauri::command]
 pub async fn begin_python_bot(window: Window, bot_name: String) -> Result<BotConfigBundle, String> {
-    match bootstrap_python_bot(&window, bot_name, ensure_bot_directory(&window)).await {
-        Ok(config_file) => BotConfigBundle::minimal_from_path(Path::new(&config_file)),
-        Err(e) => Err(e),
-    }
+    bootstrap_python_bot(&window, bot_name, ensure_bot_directory(&window))
+        .await
+        .and_then(|config_file| BotConfigBundle::minimal_from_path(Path::new(&config_file)))
 }
 
 #[tauri::command]
 pub async fn begin_python_hivemind(window: Window, hive_name: String) -> Result<BotConfigBundle, String> {
-    match bootstrap_python_hivemind(&window, hive_name, ensure_bot_directory(&window)).await {
-        Ok(config_file) => BotConfigBundle::minimal_from_path(Path::new(&config_file)),
-        Err(e) => Err(e),
-    }
+    bootstrap_python_hivemind(&window, hive_name, ensure_bot_directory(&window))
+        .await
+        .and_then(|config_file| BotConfigBundle::minimal_from_path(Path::new(&config_file)))
 }
 
 #[tauri::command]
 pub async fn begin_rust_bot(window: Window, bot_name: String) -> Result<BotConfigBundle, String> {
-    match bootstrap_rust_bot(&window, bot_name, ensure_bot_directory(&window)).await {
-        Ok(config_file) => BotConfigBundle::minimal_from_path(Path::new(&config_file)),
-        Err(e) => Err(e),
-    }
+    bootstrap_rust_bot(&window, bot_name, ensure_bot_directory(&window))
+        .await
+        .and_then(|config_file| BotConfigBundle::minimal_from_path(Path::new(&config_file)))
 }
 
 #[tauri::command]
 pub async fn begin_scratch_bot(window: Window, bot_name: String) -> Result<BotConfigBundle, String> {
-    match bootstrap_scratch_bot(&window, bot_name, ensure_bot_directory(&window)).await {
-        Ok(config_file) => BotConfigBundle::minimal_from_path(Path::new(&config_file)),
-        Err(e) => Err(e),
-    }
+    bootstrap_scratch_bot(&window, bot_name, ensure_bot_directory(&window))
+        .await
+        .and_then(|config_file| BotConfigBundle::minimal_from_path(Path::new(&config_file)))
 }
 
 #[tauri::command]
 pub async fn install_package(package_string: String) -> Result<PackageResult, String> {
     let exit_code = spawn_capture_process_and_get_exit_code(
-        PYTHON_PATH.lock().map_err(|err| err.to_string())?.to_owned(),
-        &["-m", "pip", "install", "-U", "--no-warn-script-location", &package_string],
+        &*PYTHON_PATH.lock().map_err(|err| err.to_string())?,
+        ["-m", "pip", "install", "-U", "--no-warn-script-location", &package_string],
     );
 
     Ok(PackageResult::new(exit_code, vec![package_string]))
@@ -111,8 +107,8 @@ pub async fn install_requirements(window: Window, config_path: String) -> Result
 
     Ok(if let Some(file) = bundle.get_requirements_file() {
         let packages = bundle.get_missing_packages(&window);
-        let python = PYTHON_PATH.lock().map_err(|err| err.to_string())?.to_owned();
-        let exit_code = spawn_capture_process_and_get_exit_code(&python, &["-m", "pip", "install", "-U", "--no-warn-script-location", "-r", file]);
+        let python = PYTHON_PATH.lock().map_err(|err| err.to_string())?;
+        let exit_code = spawn_capture_process_and_get_exit_code(&*python, ["-m", "pip", "install", "-U", "--no-warn-script-location", "-r", file]);
 
         PackageResult::new(exit_code, packages)
     } else {
@@ -145,16 +141,16 @@ pub async fn install_basic_packages(window: Window) -> Result<PackageResult, Str
 
     let python = PYTHON_PATH.lock().map_err(|err| err.to_string())?.to_owned();
 
-    spawn_capture_process_and_get_exit_code(&python, &["-m", "ensurepip"]);
+    spawn_capture_process_and_get_exit_code(&python, ["-m", "ensurepip"]);
 
     let mut exit_code = 0;
 
     for package in &packages {
+        exit_code = spawn_capture_process_and_get_exit_code(&python, ["-m", "pip", "install", "-U", "--no-warn-script-location", package]);
+
         if exit_code != 0 {
             break;
         }
-
-        exit_code = spawn_capture_process_and_get_exit_code(&python, &["-m", "pip", "install", "-U", "--no-warn-script-location", package]);
     }
 
     Ok(PackageResult::new(exit_code, packages))
@@ -171,19 +167,20 @@ pub async fn get_console_input_commands() -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-pub async fn run_command(input: String) -> Result<i32, String> {
-    let args = input.split_whitespace().collect::<Vec<_>>();
-
-    if args.is_empty() {
-        return Ok(1);
-    }
+pub async fn run_command(window: Window, input: String) -> Result<(), String> {
+    let program = input.split_whitespace().next().ok_or_else(|| "No command given".to_string())?;
 
     CONSOLE_INPUT_COMMANDS.lock().map_err(|err| err.to_string())?.push(input.clone());
 
-    let (program, args) = args.split_at(1);
+    let args = input.strip_prefix(program).and_then(shlex::split).unwrap_or_default();
+    dbg!(&args);
 
-    // spawn capture process
-    Ok(spawn_capture_process_and_get_exit_code(program[0], args))
+    spawn_capture_process(program, args).map_err(|err| {
+        ccprintlne(&window, format!("{}", err));
+        err.to_string()
+    })?;
+
+    Ok(())
 }
 
 fn get_missing_packages_generic<T: Runnable + Send + Sync>(window: &Window, runnables: Vec<T>) -> Vec<MissingPackagesUpdate> {
@@ -470,9 +467,7 @@ pub async fn save_launcher_settings(window: Window, settings: LauncherConfig) {
 ///
 /// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
 fn create_match_handler(window: &Window) -> Option<ChildStdin> {
-    let program = PYTHON_PATH.lock().ok()?.clone();
-
-    match get_capture_command(program, &["-c", "from rlbot_smh.match_handler import listen; listen()"])
+    match get_capture_command(&*PYTHON_PATH.lock().ok()?, ["-c", "from rlbot_smh.match_handler import listen; listen()"])
         .ok()?
         .stdin(Stdio::piped())
         .spawn()

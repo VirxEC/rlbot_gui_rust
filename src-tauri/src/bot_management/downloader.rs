@@ -179,7 +179,7 @@ pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, c
 
     if status.is_ok() && update_tag_settings {
         let latest_release_tag_name = match get_json_from_url(&client, &format!("https://api.github.com/repos/{}/releases/latest", repo_full_name)).await {
-            Ok(release) => release["tag_name"].as_str().unwrap().to_owned(),
+            Ok(release) => release["tag_name"].as_str().unwrap_or_default().to_owned(),
             Err(e) => {
                 ccprintlne(window, e.to_string());
                 return BotpackStatus::Success("Downloaded the bot pack, but failed to get the latest release tag.".to_owned());
@@ -226,6 +226,20 @@ fn get_url_from_tag(repo_full_name: &str, tag: u32) -> String {
     format!("https://github.com/{}/releases/download/incr-{}/incremental.zip", repo_full_name, tag)
 }
 
+/// Finds what the tag is on the latest release in a repo
+async fn get_latest_release_tag(repo_full_name: &str) -> Result<u32, String> {
+    get_json_from_url(&Client::new(), &format!("https://api.github.com/repos/{}/releases/latest", repo_full_name))
+        .await
+        .map_err(|e| e.to_string())
+        .and_then(|release| {
+            release
+                .get("tag_name")
+                .ok_or_else(|| "No key 'tag_name' found in json".to_string())
+                .and_then(|json_tag| json_tag.as_str().ok_or_else(|| "Couldn't convert tag_name to string".to_string()))
+                .and_then(|tag_name| tag_name.replace("incr-", "").parse::<u32>().map_err(|e| e.to_string()))
+        })
+}
+
 /// Check if the botpack is up to date
 ///
 /// # Arguments
@@ -238,15 +252,13 @@ pub async fn is_botpack_up_to_date(window: &Window, repo_full_name: &str) -> boo
         None => return true,
     };
 
-    let latest_release_tag = match get_json_from_url(&Client::new(), &format!("https://api.github.com/repos/{}/releases/latest", repo_full_name)).await {
-        Ok(release) => release["tag_name"].as_str().unwrap().replace("incr-", "").parse::<u32>().unwrap(),
+    match get_latest_release_tag(repo_full_name).await {
+        Ok(latest_release_tag) => latest_release_tag == current_tag_name,
         Err(e) => {
-            ccprintlne(window, format!("{}", e));
-            return true;
+            ccprintlne(window, e);
+            true
         }
-    };
-
-    latest_release_tag == current_tag_name
+    }
 }
 
 /// Handles updating the botpack
@@ -265,10 +277,10 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
         None => return BotpackStatus::RequiresFullDownload,
     };
 
-    let latest_release_tag = match get_json_from_url(&Client::new(), &format!("https://api.github.com/repos/{}/releases/latest", repo_full_name)).await {
-        Ok(release) => release["tag_name"].as_str().unwrap().replace("incr-", "").parse::<u32>().unwrap(),
+    let latest_release_tag = match get_latest_release_tag(&repo_full_name).await {
+        Ok(value) => value,
         Err(e) => {
-            ccprintlne(window, format!("{}", e));
+            ccprintlne(window, e);
             return BotpackStatus::Skipped("Failed to get the latest release tag.".to_owned());
         }
     };
