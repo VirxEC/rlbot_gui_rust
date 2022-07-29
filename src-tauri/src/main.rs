@@ -389,21 +389,21 @@ fn gui_setup_load_config(window: &Window) -> Result<(), Box<dyn Error>> {
 fn gui_setup(app: &mut App) -> Result<(), Box<dyn Error>> {
     const MAIN_WINDOW_NAME: &str = "main";
     let window = app.get_window(MAIN_WINDOW_NAME).ok_or(format!("Cannot find window '{MAIN_WINDOW_NAME}'"))?;
-    
+
     clear_log_file()?;
 
     gui_setup_load_config(&window)?;
-    
+
     let (mut pipe_reader, pipe_writer) = pipe()?;
     *CAPTURE_PIPE_WRITER.lock()? = Some(pipe_writer);
-    
+
     thread::spawn(move || {
         let mut next_replace_last = false;
         loop {
             let mut text = String::new();
             let mut will_replace_last = next_replace_last;
             next_replace_last = false;
-            
+
             loop {
                 let mut buf = [0];
                 match pipe_reader.read(&mut buf[..]) {
@@ -415,7 +415,7 @@ fn gui_setup(app: &mut App) -> Result<(), Box<dyn Error>> {
                                 will_replace_last = false;
                                 continue;
                             }
-                            
+
                             break;
                         } else if &string == "\r" {
                             next_replace_last = true;
@@ -425,7 +425,7 @@ fn gui_setup(app: &mut App) -> Result<(), Box<dyn Error>> {
                     }
                 };
             }
-            
+
             emit_text(&window, text, will_replace_last);
         }
     });
