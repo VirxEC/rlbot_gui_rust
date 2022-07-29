@@ -885,8 +885,8 @@ fn find_challenge_in_city(challenge_id: &str, city: &serde_json::Value) -> Optio
 ///
 /// * `story_settings` - Information on the story configuration, used to load the inforamation about the cities and challenges
 /// * `challenge_id` - The ID of the challenge to find
-fn get_challenge_by_id(story_settings: &StoryConfig, challenge_id: &str) -> Option<(serde_json::Value, JsonMap)> {
-    let cities = get_cities(story_settings);
+async fn get_challenge_by_id(story_settings: &StoryConfig, challenge_id: &str) -> Option<(serde_json::Value, JsonMap)> {
+    let cities = get_cities(story_settings).await;
 
     for city in cities.values() {
         if let Some(challenge) = find_challenge_in_city(challenge_id, city) {
@@ -919,13 +919,13 @@ async fn run_challenge(window: &Window, save_state: &StoryState, challenge_id: S
 
     let story_settings = save_state.get_story_settings();
 
-    let (city, challenge) = match get_challenge_by_id(story_settings, &challenge_id) {
+    let (city, challenge) = match get_challenge_by_id(story_settings, &challenge_id).await {
         Some(challenge) => challenge,
         None => return Err(format!("Could not find challenge with id {}", challenge_id).into()),
     };
 
-    let all_bots = get_all_bot_configs(story_settings);
-    let all_scripts = get_all_script_configs(story_settings);
+    let all_bots = get_all_bot_configs(story_settings).await;
+    let all_scripts = get_all_script_configs(story_settings).await;
 
     let botpack_root = match BOT_FOLDER_SETTINGS
         .lock()
