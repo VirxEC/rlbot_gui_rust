@@ -469,35 +469,41 @@ fn get_story_json(story_settings: &StoryConfig) -> Option<JsonMap> {
     }
 }
 
-fn get_story_config(story_settings: &StoryConfig) -> Option<JsonMap> {
-    if let Some(json) = STORIES_CACHE.lock().ok()?.as_ref()?.get(story_settings) {
+async fn get_story_config(story_settings: &StoryConfig) -> Option<JsonMap> {
+    let mut stories_cache = STORIES_CACHE.lock().await;
+
+    if let Some(json) = stories_cache.get(story_settings) {
         return Some(json.clone());
     }
 
-    get_story_json(story_settings)
+    let story_config = get_story_json(story_settings)?;
+
+    stories_cache.insert(story_settings.clone(), story_config.clone());
+
+    Some(story_config)
 }
 
-fn get_map_from_story_key(story_settings: &StoryConfig, key: &str) -> Option<JsonMap> {
-    Some(get_story_config(story_settings)?.get(key)?.as_object()?.clone())
+async fn get_map_from_story_key(story_settings: &StoryConfig, key: &str) -> Option<JsonMap> {
+    Some(get_story_config(story_settings).await?.get(key)?.as_object()?.clone())
 }
 
 #[tauri::command]
 pub async fn get_story_settings(story_settings: StoryConfig) -> JsonMap {
-    get_map_from_story_key(&story_settings, "settings").unwrap_or_default()
+    get_map_from_story_key(&story_settings, "settings").await.unwrap_or_default()
 }
 
-pub fn get_cities(story_settings: &StoryConfig) -> JsonMap {
-    get_map_from_story_key(story_settings, "cities").unwrap_or_default()
+pub async fn get_cities(story_settings: &StoryConfig) -> JsonMap {
+    get_map_from_story_key(story_settings, "cities").await.unwrap_or_default()
 }
 
 #[tauri::command]
 pub async fn get_cities_json(story_settings: StoryConfig) -> JsonMap {
-    get_cities(&story_settings)
+    get_cities(&story_settings).await
 }
 
-pub fn get_all_bot_configs(story_settings: &StoryConfig) -> JsonMap {
+pub async fn get_all_bot_configs(story_settings: &StoryConfig) -> JsonMap {
     let mut bots = {
-        let mut bots_base_lock = BOTS_BASE.lock().expect("BOTS_BASE lock poisoned");
+        let mut bots_base_lock = BOTS_BASE.lock().await;
         match bots_base_lock.as_ref() {
             Some(bots) => bots.clone(),
             None => {
@@ -508,19 +514,19 @@ pub fn get_all_bot_configs(story_settings: &StoryConfig) -> JsonMap {
         }
     };
 
-    if let Some(more_bots) = get_map_from_story_key(story_settings, "bots") {
+    if let Some(more_bots) = get_map_from_story_key(story_settings, "bots").await {
         bots.extend(more_bots);
     }
 
     bots
 }
 
-pub fn get_all_script_configs(story_settings: &StoryConfig) -> JsonMap {
-    get_map_from_story_key(story_settings, "scripts").unwrap_or_default()
+pub async fn get_all_script_configs(story_settings: &StoryConfig) -> JsonMap {
+    get_map_from_story_key(story_settings, "scripts").await.unwrap_or_default()
 }
 
 // Get the base bots config and merge it with the bots in the story config
 #[tauri::command]
 pub async fn get_bots_configs(story_settings: StoryConfig) -> JsonMap {
-    get_all_bot_configs(&story_settings)
+    get_all_bot_configs(&story_settings).await
 }

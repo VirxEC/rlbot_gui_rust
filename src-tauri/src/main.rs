@@ -27,13 +27,15 @@ use std::{
     env,
     error::Error,
     ffi::OsStr,
-    io::Read,
+    fs::File,
+    io::{Read, Result as IoResult},
     path::PathBuf,
     process::{Child, ChildStdin, Command, Stdio},
     sync::Mutex,
     thread,
 };
 use tauri::{App, Error as TauriError, Manager, Window};
+use tokio::sync::Mutex as AsyncMutex;
 
 const BOTPACK_FOLDER: &str = "RLBotPackDeletable";
 const MAPPACK_FOLDER: &str = "RLBotMapPackDeletable";
@@ -48,8 +50,8 @@ lazy_static! {
     static ref BOT_FOLDER_SETTINGS: Mutex<Option<BotFolders>> = Mutex::new(None);
     static ref MATCH_HANDLER_STDIN: Mutex<Option<ChildStdin>> = Mutex::new(None);
     static ref CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
-    static ref STORIES_CACHE: Mutex<Option<HashMap<StoryConfig, JsonMap>>> = Mutex::new(None);
-    static ref BOTS_BASE: Mutex<Option<JsonMap>> = Mutex::new(None);
+    static ref BOTS_BASE: AsyncMutex<Option<JsonMap>> = AsyncMutex::new(None);
+    static ref STORIES_CACHE: AsyncMutex<HashMap<StoryConfig, JsonMap>> = AsyncMutex::new(HashMap::new());
 }
 
 #[cfg(windows)]
@@ -127,6 +129,16 @@ fn auto_detect_python() -> Option<(String, bool)> {
 /// Get the path to the GUI config file
 fn get_config_path() -> PathBuf {
     get_content_folder().join("config.ini")
+}
+
+/// Get the path to the GUI log file
+fn get_log_path() -> PathBuf {
+    get_content_folder().join("log.txt")
+}
+
+/// Clear the log file
+fn clear_log_file() -> IoResult<()> {
+    File::create(get_log_path()).map(drop)
 }
 
 /// Emits text to the console
@@ -375,20 +387,23 @@ fn gui_setup_load_config(window: &Window) -> Result<(), Box<dyn Error>> {
 }
 
 fn gui_setup(app: &mut App) -> Result<(), Box<dyn Error>> {
-    let window = app.get_window("main").unwrap();
+    const MAIN_WINDOW_NAME: &str = "main";
+    let window = app.get_window(MAIN_WINDOW_NAME).ok_or(format!("Cannot find window '{MAIN_WINDOW_NAME}'"))?;
+    
+    clear_log_file()?;
 
     gui_setup_load_config(&window)?;
-
+    
     let (mut pipe_reader, pipe_writer) = pipe()?;
     *CAPTURE_PIPE_WRITER.lock()? = Some(pipe_writer);
-
+    
     thread::spawn(move || {
         let mut next_replace_last = false;
         loop {
             let mut text = String::new();
             let mut will_replace_last = next_replace_last;
             next_replace_last = false;
-
+            
             loop {
                 let mut buf = [0];
                 match pipe_reader.read(&mut buf[..]) {
@@ -400,7 +415,7 @@ fn gui_setup(app: &mut App) -> Result<(), Box<dyn Error>> {
                                 will_replace_last = false;
                                 continue;
                             }
-
+                            
                             break;
                         } else if &string == "\r" {
                             next_replace_last = true;
@@ -410,7 +425,7 @@ fn gui_setup(app: &mut App) -> Result<(), Box<dyn Error>> {
                     }
                 };
             }
-
+            
             emit_text(&window, text, will_replace_last);
         }
     });
@@ -429,8 +444,6 @@ fn main() {
     initialize(&CONSOLE_TEXT);
     initialize(&CONSOLE_INPUT_COMMANDS);
     initialize(&MATCH_HANDLER_STDIN);
-
-    *STORIES_CACHE.lock().expect("STORIES_CACHE lock was poisoned") = Some(HashMap::new());
 
     tauri::Builder::default()
         .setup(|app| gui_setup(app))
