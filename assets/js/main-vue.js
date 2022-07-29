@@ -985,6 +985,10 @@ export default {
 			this.$bvModal.hide('recommendations-modal');
 		},
 		startup: function() {
+			if (this.$route.path == "/console") {
+				return;
+			}
+
 			invoke("check_rlbot_python").then(support => {
 				let noPython = !support.python;
 				let hasRLBot = support.rlbotpython;
