@@ -1,5 +1,5 @@
 use super::cfg_helper::load_cfg;
-use crate::{bot_management::zip_extract_fixed, ccprintln, ccprintlne, ccprintlnr, get_config_path, load_gui_config};
+use crate::{bot_management::zip_extract_fixed, ccprintln, ccprintlne, ccprintlnr, commands::UPDATE_DOWNLOAD_PROGRESS_SIGNAL, get_config_path, load_gui_config};
 use fs_extra::dir;
 use futures_util::StreamExt;
 use rand::Rng;
@@ -130,7 +130,7 @@ async fn download_and_extract_repo_zip<T: IntoUrl, J: AsRef<Path>>(
 
         if last_update.elapsed().as_secs_f32() >= 0.1 {
             let progress = bytes.len() as f32 / total_size as f32 * 100.0;
-            if let Err(e) = window.emit("update-download-progress", ProgressBarUpdate::new(progress, "Downloading zip...".to_owned())) {
+            if let Err(e) = window.emit(UPDATE_DOWNLOAD_PROGRESS_SIGNAL, ProgressBarUpdate::new(progress, "Downloading zip...".to_owned())) {
                 ccprintlne(window, format!("Error when updating progress bar: {}", e));
             }
             last_update = Instant::now();
@@ -143,7 +143,7 @@ async fn download_and_extract_repo_zip<T: IntoUrl, J: AsRef<Path>>(
         }
     }
 
-    if let Err(e) = window.emit("update-download-progress", ProgressBarUpdate::new(100., "Extracting zip...".to_owned())) {
+    if let Err(e) = window.emit(UPDATE_DOWNLOAD_PROGRESS_SIGNAL, ProgressBarUpdate::new(100., "Extracting zip...".to_owned())) {
         ccprintlne(window, format!("Error when updating progress bar: {}", e));
     }
 
@@ -322,7 +322,10 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
         ccprintln(window, format!("Patching in update incr-{}", tag));
 
         let progress = (tag - current_tag_name) as f32 / total_patches as f32 * 100.;
-        if let Err(e) = window.emit("update-download-progress", ProgressBarUpdate::new(progress, format!("Downloading patch incr-{}...", tag))) {
+        if let Err(e) = window.emit(
+            UPDATE_DOWNLOAD_PROGRESS_SIGNAL,
+            ProgressBarUpdate::new(progress, format!("Downloading patch incr-{}...", tag)),
+        ) {
             ccprintlne(window, format!("Error when updating progress bar: {}", e));
         }
 
@@ -335,7 +338,7 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
         };
 
         let progress = progress + 1. / (total_patches as f32 * 2.) * 100.;
-        if let Err(e) = window.emit("update-download-progress", ProgressBarUpdate::new(progress, format!("Applying patch incr-{}...", tag))) {
+        if let Err(e) = window.emit(UPDATE_DOWNLOAD_PROGRESS_SIGNAL, ProgressBarUpdate::new(progress, format!("Applying patch incr-{}...", tag))) {
             ccprintlne(window, format!("Error when updating progress bar: {}", e));
         }
 

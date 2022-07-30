@@ -2,7 +2,7 @@ use crate::{
     bot_management::{
         bot_creation::{bootstrap_python_bot, bootstrap_python_hivemind, bootstrap_rust_bot, bootstrap_scratch_bot, BoostrapError, CREATED_BOTS_FOLDER},
         downloader::{self, get_current_tag_name, ProgressBarUpdate},
-        zip_extract_fixed,
+        zip_extract_fixed::{self, ExtractError},
     },
     rlbot::{
         agents::runnable::Runnable,
@@ -31,6 +31,7 @@ use tauri::Window;
 use thiserror::Error;
 
 const DEBUG_MODE_SHORT_GAMES: bool = false;
+pub const UPDATE_DOWNLOAD_PROGRESS_SIGNAL: &str = "update-download-progress";
 
 #[tauri::command]
 pub async fn check_rlbot_python() -> Result<HashMap<String, bool>, String> {
@@ -74,42 +75,58 @@ pub enum BeginBotError {
 
 #[tauri::command]
 pub async fn begin_python_bot(window: Window, bot_name: String) -> Result<BotConfigBundle, String> {
-    async fn inner(window: Window, bot_name: String) -> Result<BotConfigBundle, BeginBotError> {
-        let config_file = bootstrap_python_bot(&window, bot_name, ensure_bot_directory(&window)).await?;
+    async fn inner(window: &Window, bot_name: String) -> Result<BotConfigBundle, BeginBotError> {
+        let config_file = bootstrap_python_bot(window, bot_name, ensure_bot_directory(window)).await?;
         Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file))?)
     }
 
-    inner(window, bot_name).await.map_err(|e| e.to_string())
+    inner(&window, bot_name).await.map_err(|e| {
+        let err = e.to_string();
+        ccprintlne(&window, err.clone());
+        err
+    })
 }
 
 #[tauri::command]
 pub async fn begin_python_hivemind(window: Window, hive_name: String) -> Result<BotConfigBundle, String> {
-    async fn inner(window: Window, hive_name: String) -> Result<BotConfigBundle, BeginBotError> {
-        let config_file = bootstrap_python_hivemind(&window, hive_name, ensure_bot_directory(&window)).await?;
+    async fn inner(window: &Window, hive_name: String) -> Result<BotConfigBundle, BeginBotError> {
+        let config_file = bootstrap_python_hivemind(window, hive_name, ensure_bot_directory(window)).await?;
         Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file))?)
     }
 
-    inner(window, hive_name).await.map_err(|e| e.to_string())
+    inner(&window, hive_name).await.map_err(|e| {
+        let err = e.to_string();
+        ccprintlne(&window, err.clone());
+        err
+    })
 }
 
 #[tauri::command]
 pub async fn begin_rust_bot(window: Window, bot_name: String) -> Result<BotConfigBundle, String> {
-    async fn inner(window: Window, bot_name: String) -> Result<BotConfigBundle, BeginBotError> {
-        let config_file = bootstrap_rust_bot(&window, bot_name, ensure_bot_directory(&window)).await?;
+    async fn inner(window: &Window, bot_name: String) -> Result<BotConfigBundle, BeginBotError> {
+        let config_file = bootstrap_rust_bot(window, bot_name, ensure_bot_directory(window)).await?;
         Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file))?)
     }
 
-    inner(window, bot_name).await.map_err(|e| e.to_string())
+    inner(&window, bot_name).await.map_err(|e| {
+        let err = e.to_string();
+        ccprintlne(&window, err.clone());
+        err
+    })
 }
 
 #[tauri::command]
 pub async fn begin_scratch_bot(window: Window, bot_name: String) -> Result<BotConfigBundle, String> {
-    async fn inner(window: Window, bot_name: String) -> Result<BotConfigBundle, BeginBotError> {
-        let config_file = bootstrap_scratch_bot(&window, bot_name, ensure_bot_directory(&window)).await?;
+    async fn inner(window: &Window, bot_name: String) -> Result<BotConfigBundle, BeginBotError> {
+        let config_file = bootstrap_scratch_bot(window, bot_name, ensure_bot_directory(window)).await?;
         Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file))?)
     }
 
-    inner(window, bot_name).await.map_err(|e| e.to_string())
+    inner(&window, bot_name).await.map_err(|e| {
+        let err = e.to_string();
+        ccprintlne(&window, err.clone());
+        err
+    })
 }
 
 const PACKAGES: [&str; 9] = ["pip", "setuptools", "wheel", "numpy<1.23", "scipy", "numba<0.56", "selenium", "rlbot", "rlbot-smh>=1.0.0"];
@@ -145,11 +162,11 @@ pub enum InstallRequirementseError {
 
 #[tauri::command]
 pub async fn install_requirements(window: Window, config_path: String) -> Result<PackageResult, String> {
-    async fn inner(window: Window, config_path: String) -> Result<PackageResult, InstallRequirementseError> {
+    async fn inner(window: &Window, config_path: String) -> Result<PackageResult, InstallRequirementseError> {
         let bundle = BotConfigBundle::minimal_from_path(Path::new(&config_path))?;
 
         Ok(if let Some(file) = bundle.get_requirements_file() {
-            let packages = bundle.get_missing_packages(&window);
+            let packages = bundle.get_missing_packages(window);
             let python = PYTHON_PATH.lock().map_err(|_| InstallRequirementseError::MutexPoisoned("PYTHON_PATH".to_owned()))?;
             let exit_code = spawn_capture_process_and_get_exit_code(&*python, ["-m", "pip", "install", "--no-warn-script-location", "-r", file]);
 
@@ -159,7 +176,11 @@ pub async fn install_requirements(window: Window, config_path: String) -> Result
         })
     }
 
-    inner(window, config_path).await.map_err(|e| e.to_string())
+    inner(&window, config_path).await.map_err(|e| {
+        let err = e.to_string();
+        ccprintlne(&window, err.clone());
+        err
+    })
 }
 
 #[tauri::command]
@@ -313,6 +334,22 @@ pub fn is_windows() -> bool {
     cfg!(windows)
 }
 
+#[derive(Debug, Error)]
+pub enum BootstrapCustomPythonError {
+    #[error("This function is only supported on Windows")]
+    NotWindows,
+    #[error("Couldn't download the custom python zip")]
+    Download(#[from] reqwest::Error),
+    #[error("Couldn't emit signal {UPDATE_DOWNLOAD_PROGRESS_SIGNAL}")]
+    EmitSignal(#[from] tauri::Error),
+    #[error("File handle error")]
+    Io(#[from] std::io::Error),
+    #[error("Coudn't extract the zip")]
+    ExtractZip(#[from] ExtractError),
+    #[error("Mutex {0} was poisoned")]
+    MutexPoisoned(String),
+}
+
 /// Downloads RLBot's isloated Python 3.7.9 environment and unzips it.
 /// Updates the user with continuous progress updates.
 ///
@@ -321,9 +358,9 @@ pub fn is_windows() -> bool {
 /// # Arguments
 ///
 /// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
-pub async fn bootstrap_custom_python(window: &Window) -> Result<(), Box<dyn Error>> {
+pub async fn bootstrap_custom_python(window: &Window) -> Result<(), BootstrapCustomPythonError> {
     if cfg!(not(windows)) {
-        return Err("This function is only supported on Windows.".into());
+        return Err(BootstrapCustomPythonError::NotWindows);
     }
 
     let content_folder = get_content_folder();
@@ -344,25 +381,26 @@ pub async fn bootstrap_custom_python(window: &Window) -> Result<(), Box<dyn Erro
 
             if last_update.elapsed().as_secs_f32() >= 0.1 {
                 let progress = bytes.len() as f32 / total_size as f32 * 100.0;
-                window.emit("update-download-progress", ProgressBarUpdate::new(progress, "Downloading zip...".to_owned()))?;
+                window.emit(UPDATE_DOWNLOAD_PROGRESS_SIGNAL, ProgressBarUpdate::new(progress, "Downloading zip...".to_owned()))?;
                 last_update = Instant::now();
             }
         }
 
-        window.emit("update-download-progress", ProgressBarUpdate::new(100., "Writing zip to disk...".to_owned()))?;
+        window.emit(UPDATE_DOWNLOAD_PROGRESS_SIGNAL, ProgressBarUpdate::new(100., "Writing zip to disk...".to_owned()))?;
 
         let mut file = File::create(&file_path)?;
         let mut content = Cursor::new(bytes);
         copy(&mut content, &mut file)?;
     }
 
-    window.emit("update-download-progress", ProgressBarUpdate::new(100., "Extracting zip...".to_owned()))?;
+    window.emit(UPDATE_DOWNLOAD_PROGRESS_SIGNAL, ProgressBarUpdate::new(100., "Extracting zip...".to_owned()))?;
 
     // Extract the zip file
     zip_extract_fixed::extract(window, File::open(&file_path)?, folder_destination.as_path(), false, false)?;
 
     // Update the Python path
-    *PYTHON_PATH.lock().map_err(|err| err.to_string())? = folder_destination.join("python.exe").to_string_lossy().to_string();
+    *PYTHON_PATH.lock().map_err(|_| BootstrapCustomPythonError::MutexPoisoned("PYTHON_PATH".to_owned()))? =
+        folder_destination.join("python.exe").to_string_lossy().to_string();
 
     Ok(())
 }
