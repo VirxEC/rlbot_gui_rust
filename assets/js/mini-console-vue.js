@@ -20,8 +20,8 @@ export default {
 
 				this.consoleTexts.unshift(update.content);
 
-				if (this.consoleTexts.length > 1200) {
-					this.consoleTexts = this.consoleTexts.slice(this.consoleTexts.length - 1200);
+				if (this.consoleTexts.length > 240) {
+					this.consoleTexts.splice(240, this.consoleTexts.length - 240);
 				}
 			})
 		}

@@ -23,7 +23,7 @@ export default {
 			</b-form>
 			<hr>
 			<span :style="'color:' + (text.color ? text.color : 'black') + ';'" v-for="text in consoleTexts">
-				<span>{{ text.text }}</span><br>
+				<span>{{ text.text }}<span>
 			</span>
 		</b-card>
 	</b-container>
@@ -45,8 +45,8 @@ export default {
 
 				this.consoleTexts.unshift(update.content);
 
-				if (this.consoleTexts.length > 1200) {
-					this.consoleTexts = this.consoleTexts.slice(this.consoleTexts.length - 1200);
+				if (this.consoleTexts.length > 800) {
+					this.consoleTexts.splice(800, this.consoleTexts.length - 800);
 				}
 			})
 		}
