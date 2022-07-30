@@ -22,9 +22,25 @@ export default {
 				<b-form-input v-on:keyup.down="onDown" v-on:keyup.up="onUp" v-model="inputCommand" id="console-input" placeholder="Enter command..."></b-form-input>
 			</b-form>
 			<hr>
-			<span :style="'color:' + (text.color ? text.color : 'black') + ';'" v-for="text in consoleTexts">
-				<span>{{ text.text }}<span>
-			</span>
+
+			<DynamicScroller
+				ref="scroller"
+				:items="consoleTexts"
+				:min-item-size="24"
+				class="scroller"
+			>
+				<DynamicScrollerItem
+					slot-scope="{ item, index, active }"
+					:item="item"
+					:active="active"
+					:data-index="index"
+				>
+					<span :style="'color:' + (item.content.color ? item.content.color : 'black') + ';'">
+						<span>{{ item.content.text }}<span>
+					</span>
+				</DynamicScrollerItem>
+			</DynamicScroller>
+
 		</b-card>
 	</b-container>
 	</div>
@@ -37,16 +53,19 @@ export default {
 			previousCommands: [],
 			commandsIndex: -1,
 			consoleTexts: [],
+			texts: 0,
 			newTextListener: listen('new-console-text', event => {
 				let update = event.payload;
 				if (update.replace_last) {
 					this.consoleTexts.pop();
 				}
 
-				this.consoleTexts.unshift(update.content);
+				this.consoleTexts.push({ 'id': this.texts, 'content': update.content });
+				this.texts++;
+				this.$refs.scroller.scrollToBottom()
 
 				if (this.consoleTexts.length > 800) {
-					this.consoleTexts.splice(800, this.consoleTexts.length - 800);
+					this.consoleTexts.shift();
 				}
 			})
 		}
@@ -90,7 +109,12 @@ export default {
 		},
 		startup: function() {
 			invoke("get_console_texts").then(texts => {
-				this.consoleTexts = texts;
+				texts.forEach(content => {
+					this.consoleTexts.push({ 'id': this.texts, 'content': content });
+					this.texts++;
+				});
+
+				this.$refs.scroller.scrollToBottom()
 			});
 
 			invoke("get_console_input_commands").then(commands => {

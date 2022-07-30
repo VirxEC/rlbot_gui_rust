@@ -391,7 +391,7 @@ fn gui_setup_load_config(window: &Window) -> Result<(), Box<dyn StdError>> {
 fn gui_setup(app: &mut App) -> Result<(), Box<dyn StdError>> {
     const MAIN_WINDOW_NAME: &str = "main";
     let window = app.get_window(MAIN_WINDOW_NAME).ok_or(format!("Cannot find window '{MAIN_WINDOW_NAME}'"))?;
-    // let window2 = window.clone();
+    let window2 = window.clone();
 
     clear_log_file()?;
 
@@ -433,15 +433,15 @@ fn gui_setup(app: &mut App) -> Result<(), Box<dyn StdError>> {
         }
     });
 
-    // thread::spawn(move || {
-    //     let mut i = 0;
+    thread::spawn(move || {
+        let mut i = 0;
 
-    //     loop {
-    //         emit_text(&window2, format!("Hello #{i}"), false);
-    //         i += 1;
-    //         thread::sleep(Duration::from_secs_f32(1. / 120.));
-    //     }
-    // });
+        loop {
+            emit_text(&window2, format!("Hello #{i}"), false);
+            i += 1;
+            thread::sleep(Duration::from_secs_f32(1. / 120.));
+        }
+    });
 
     Ok(())
 }
