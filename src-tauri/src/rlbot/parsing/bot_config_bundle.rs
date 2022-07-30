@@ -1,5 +1,5 @@
 use crate::{
-    bot_management::cfg_helper::load_cfg,
+    bot_management::cfg_helper::{load_cfg, CfgHelperError},
     ccprintln, get_command_status,
     rlbot::agents::{base_script::SCRIPT_FILE_KEY, runnable::Runnable},
     PYTHON_PATH,
@@ -16,6 +16,7 @@ use std::{
     str::from_utf8,
 };
 use tauri::Window;
+use thiserror::Error;
 
 pub const PYTHON_FILE_KEY: &str = "python_file";
 pub const REQUIREMENTS_FILE_KEY: &str = "requirements_file";
@@ -126,6 +127,20 @@ pub trait Clean {
     fn cleaned(&self) -> Self;
 }
 
+#[derive(Debug, Error)]
+pub enum RLBotCfgParseError {
+    #[error("Failed to load config file from disk")]
+    CfgLoad(#[from] CfgHelperError),
+    #[error("No name found in config file {0}")]
+    NoName(String),
+    #[error("No looks config found in config file {0}")]
+    NoLooksConfig(String),
+    #[error("No python file found in config file {0}")]
+    NoPythonFile(String),
+    #[error("No script file found in config file {0}")]
+    NoScriptFile(String),
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
 pub struct BotConfigBundle {
     pub name: Option<String>,
@@ -148,7 +163,8 @@ pub struct BotConfigBundle {
 }
 
 impl BotConfigBundle {
-    pub fn minimal_from_path(config_path: &Path) -> Result<Self, String> {
+    pub fn minimal_from_path(config_path: &Path) -> Result<Self, RLBotCfgParseError> {
+        let config_path_str = config_path.display().to_string();
         let conf = load_cfg(config_path)?;
 
         let path = config_path.to_string_lossy().to_string();
@@ -166,7 +182,7 @@ impl BotConfigBundle {
         let requires_tkinter = conf.getbool(BOT_CONFIG_MODULE_HEADER, REQUIRES_TKINTER).unwrap_or(Some(false));
 
         if name.is_none() {
-            return Err("Bot name not found".to_owned());
+            return Err(RLBotCfgParseError::NoName(config_path_str));
         }
 
         let valid_looks = match &looks_path {
@@ -175,7 +191,7 @@ impl BotConfigBundle {
         };
 
         if !valid_looks {
-            return Err("Looks config not found".to_owned());
+            return Err(RLBotCfgParseError::NoLooksConfig(config_path_str));
         }
 
         let valid_path = match &python_path {
@@ -184,7 +200,7 @@ impl BotConfigBundle {
         };
 
         if !valid_path {
-            return Err("Python file not found".to_owned());
+            return Err(RLBotCfgParseError::NoPythonFile(config_path_str));
         }
 
         let relative_logo_path = conf.get(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY).unwrap_or_else(|| String::from("logo.png"));
@@ -224,13 +240,14 @@ impl BotConfigBundle {
         })
     }
 
-    pub fn name_from_path(config_path: &Path) -> Result<(String, String), String> {
+    pub fn name_from_path(config_path: &Path) -> Result<(String, String), RLBotCfgParseError> {
+        let config_path_str = config_path.display().to_string();
         let conf = load_cfg(config_path)?;
 
         let name = if let Some(the_name) = conf.get(BOT_CONFIG_MODULE_HEADER, NAME_KEY) {
             the_name
         } else {
-            return Err("Bot name not found".to_owned());
+            return Err(RLBotCfgParseError::NoName(config_path_str));
         };
 
         let path = config_path.to_string_lossy().to_string();
@@ -247,7 +264,7 @@ impl BotConfigBundle {
         };
 
         if !valid_looks {
-            return Err("Looks config not found".to_owned());
+            return Err(RLBotCfgParseError::NoLooksConfig(config_path_str));
         }
 
         let python_path = conf
@@ -260,7 +277,7 @@ impl BotConfigBundle {
         };
 
         if !valid_path {
-            return Err("Python file not found".to_owned());
+            return Err(RLBotCfgParseError::NoPythonFile(config_path_str));
         }
 
         Ok((name, path))
@@ -384,7 +401,8 @@ pub struct ScriptConfigBundle {
 }
 
 impl ScriptConfigBundle {
-    pub fn minimal_from_path(config_path: &Path) -> Result<Self, String> {
+    pub fn minimal_from_path(config_path: &Path) -> Result<Self, RLBotCfgParseError> {
+        let config_path_str = config_path.display().to_string();
         let conf = load_cfg(config_path)?;
 
         let name = conf.get(BOT_CONFIG_MODULE_HEADER, NAME_KEY);
@@ -406,11 +424,11 @@ impl ScriptConfigBundle {
             .unwrap_or_default();
 
         if name.is_none() {
-            return Err("Bot name not found".to_owned());
+            return Err(RLBotCfgParseError::NoName(config_path_str));
         }
 
         if !Path::new(&script_file).exists() {
-            return Err("Script file not found".to_owned());
+            return Err(RLBotCfgParseError::NoScriptFile(config_path_str));
         }
 
         let relative_logo_path = conf.get(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY).unwrap_or_else(|| String::from("logo.png"));

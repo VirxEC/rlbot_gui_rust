@@ -1,4 +1,7 @@
-use crate::{bot_management::cfg_helper::load_cfg, ccprintlne};
+use crate::{
+    bot_management::cfg_helper::{load_cfg, CfgHelperError},
+    ccprintlne,
+};
 use configparser::ini::Ini;
 use serde::{Deserialize, Serialize};
 use tauri::Window;
@@ -36,7 +39,7 @@ pub struct BotTeamLooksConfig {
 }
 
 impl BotTeamLooksConfig {
-    pub fn from_path(loadout_header: &str, paint_header: &str, path: &str) -> Result<Self, String> {
+    pub fn from_path(loadout_header: &str, paint_header: &str, path: &str) -> Result<Self, CfgHelperError> {
         let conf = load_cfg(path)?;
 
         let team_color_id = conf.get(loadout_header, "team_color_id").unwrap_or_default();
@@ -125,7 +128,7 @@ pub struct BotLooksConfig {
 }
 
 impl BotLooksConfig {
-    pub fn from_path(path: &str) -> Result<Self, String> {
+    pub fn from_path(path: &str) -> Result<Self, CfgHelperError> {
         Ok(Self {
             blue: BotTeamLooksConfig::from_path(BOT_CONFIG_LOADOUT_HEADER, BOT_CONFIG_LOADOUT_PAINT_BLUE_HEADER, path)?,
             orange: BotTeamLooksConfig::from_path(BOT_CONFIG_LOADOUT_ORANGE_HEADER, BOT_CONFIG_LOADOUT_PAINT_ORANGE_HEADER, path)?,

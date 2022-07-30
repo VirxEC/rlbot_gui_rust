@@ -1,6 +1,6 @@
 use crate::{
     bot_management::{
-        bot_creation::{bootstrap_python_bot, bootstrap_python_hivemind, bootstrap_rust_bot, bootstrap_scratch_bot, CREATED_BOTS_FOLDER},
+        bot_creation::{bootstrap_python_bot, bootstrap_python_hivemind, bootstrap_rust_bot, bootstrap_scratch_bot, BoostrapError, CREATED_BOTS_FOLDER},
         downloader::{self, get_current_tag_name, ProgressBarUpdate},
         zip_extract_fixed,
     },
@@ -9,7 +9,7 @@ use crate::{
         gateway_util,
         parsing::{
             agent_config_parser::BotLooksConfig,
-            bot_config_bundle::{BotConfigBundle, ScriptConfigBundle},
+            bot_config_bundle::{BotConfigBundle, RLBotCfgParseError, ScriptConfigBundle},
             match_settings_config_parser::{BoostAmount, GameMode, MaxScore, Rumble},
         },
         setup_manager,
@@ -28,6 +28,7 @@ use std::{
     time::Instant,
 };
 use tauri::Window;
+use thiserror::Error;
 
 const DEBUG_MODE_SHORT_GAMES: bool = false;
 
@@ -63,72 +64,107 @@ fn ensure_bot_directory(window: &Window) -> PathBuf {
     bot_directory_path
 }
 
+#[derive(Debug, Error)]
+pub enum BeginBotError {
+    #[error("Failed to create bot template")]
+    Boostraping(#[from] BoostrapError),
+    #[error("Failed to load rlbot cfg file")]
+    LoadCfg(#[from] RLBotCfgParseError),
+}
+
 #[tauri::command]
 pub async fn begin_python_bot(window: Window, bot_name: String) -> Result<BotConfigBundle, String> {
-    bootstrap_python_bot(&window, bot_name, ensure_bot_directory(&window))
-        .await
-        .and_then(|config_file| BotConfigBundle::minimal_from_path(Path::new(&config_file)))
+    async fn inner(window: Window, bot_name: String) -> Result<BotConfigBundle, BeginBotError> {
+        let config_file = bootstrap_python_bot(&window, bot_name, ensure_bot_directory(&window)).await?;
+        Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file))?)
+    }
+
+    inner(window, bot_name).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn begin_python_hivemind(window: Window, hive_name: String) -> Result<BotConfigBundle, String> {
-    bootstrap_python_hivemind(&window, hive_name, ensure_bot_directory(&window))
-        .await
-        .and_then(|config_file| BotConfigBundle::minimal_from_path(Path::new(&config_file)))
+    async fn inner(window: Window, hive_name: String) -> Result<BotConfigBundle, BeginBotError> {
+        let config_file = bootstrap_python_hivemind(&window, hive_name, ensure_bot_directory(&window)).await?;
+        Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file))?)
+    }
+
+    inner(window, hive_name).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn begin_rust_bot(window: Window, bot_name: String) -> Result<BotConfigBundle, String> {
-    bootstrap_rust_bot(&window, bot_name, ensure_bot_directory(&window))
-        .await
-        .and_then(|config_file| BotConfigBundle::minimal_from_path(Path::new(&config_file)))
+    async fn inner(window: Window, bot_name: String) -> Result<BotConfigBundle, BeginBotError> {
+        let config_file = bootstrap_rust_bot(&window, bot_name, ensure_bot_directory(&window)).await?;
+        Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file))?)
+    }
+
+    inner(window, bot_name).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn begin_scratch_bot(window: Window, bot_name: String) -> Result<BotConfigBundle, String> {
-    bootstrap_scratch_bot(&window, bot_name, ensure_bot_directory(&window))
-        .await
-        .and_then(|config_file| BotConfigBundle::minimal_from_path(Path::new(&config_file)))
+    async fn inner(window: Window, bot_name: String) -> Result<BotConfigBundle, BeginBotError> {
+        let config_file = bootstrap_scratch_bot(&window, bot_name, ensure_bot_directory(&window)).await?;
+        Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file))?)
+    }
+
+    inner(window, bot_name).await.map_err(|e| e.to_string())
+}
+
+const PACKAGES: [&str; 9] = ["pip", "setuptools", "wheel", "numpy<1.23", "scipy", "numba<0.56", "selenium", "rlbot", "rlbot-smh>=1.0.0"];
+
+/// Apply version constraints to the given package name.
+fn get_package_name(package_name: &str) -> &str {
+    for package in PACKAGES {
+        if package.contains(package_name) {
+            return package;
+        }
+    }
+
+    package_name
 }
 
 #[tauri::command]
 pub async fn install_package(package_string: String) -> Result<PackageResult, String> {
     let exit_code = spawn_capture_process_and_get_exit_code(
         &*PYTHON_PATH.lock().map_err(|err| err.to_string())?,
-        ["-m", "pip", "install", "-U", "--no-warn-script-location", &package_string],
+        ["-m", "pip", "install", "-U", "--no-warn-script-location", get_package_name(&package_string)],
     );
 
     Ok(PackageResult::new(exit_code, vec![package_string]))
 }
 
+#[derive(Debug, Error)]
+pub enum InstallRequirementseError {
+    #[error("Mutex {0} was poisoned")]
+    MutexPoisoned(String),
+    #[error("Failed to load rlbot cfg file")]
+    LoadCfg(#[from] RLBotCfgParseError),
+}
+
 #[tauri::command]
 pub async fn install_requirements(window: Window, config_path: String) -> Result<PackageResult, String> {
-    let bundle = BotConfigBundle::minimal_from_path(Path::new(&config_path))?;
+    async fn inner(window: Window, config_path: String) -> Result<PackageResult, InstallRequirementseError> {
+        let bundle = BotConfigBundle::minimal_from_path(Path::new(&config_path))?;
 
-    Ok(if let Some(file) = bundle.get_requirements_file() {
-        let packages = bundle.get_missing_packages(&window);
-        let python = PYTHON_PATH.lock().map_err(|err| err.to_string())?;
-        let exit_code = spawn_capture_process_and_get_exit_code(&*python, ["-m", "pip", "install", "-U", "--no-warn-script-location", "-r", file]);
+        Ok(if let Some(file) = bundle.get_requirements_file() {
+            let packages = bundle.get_missing_packages(&window);
+            let python = PYTHON_PATH.lock().map_err(|_| InstallRequirementseError::MutexPoisoned("PYTHON_PATH".to_owned()))?;
+            let exit_code = spawn_capture_process_and_get_exit_code(&*python, ["-m", "pip", "install", "--no-warn-script-location", "-r", file]);
 
-        PackageResult::new(exit_code, packages)
-    } else {
-        PackageResult::new(1, vec!["unknown file".to_owned()])
-    })
+            PackageResult::new(exit_code, packages)
+        } else {
+            PackageResult::new(1, vec!["unknown file".to_owned()])
+        })
+    }
+
+    inner(window, config_path).await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn install_basic_packages(window: Window) -> Result<PackageResult, String> {
-    let packages = vec![
-        String::from("pip"),
-        String::from("setuptools"),
-        String::from("wheel"),
-        String::from("numpy<1.23"),
-        String::from("scipy"),
-        String::from("numba<0.56"),
-        String::from("selenium"),
-        String::from("rlbot"),
-        String::from("rlbot-smh>=1.0.0"),
-    ];
+    let packages = PACKAGES.iter().map(|s| s.to_string()).collect::<Vec<String>>();
 
     if !is_online::check().await {
         ccprintlne(
@@ -145,7 +181,7 @@ pub async fn install_basic_packages(window: Window) -> Result<PackageResult, Str
 
     let mut exit_code = 0;
 
-    for package in &packages {
+    for package in PACKAGES {
         exit_code = spawn_capture_process_and_get_exit_code(&python, ["-m", "pip", "install", "-U", "--no-warn-script-location", package]);
 
         if exit_code != 0 {

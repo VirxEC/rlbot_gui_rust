@@ -26,7 +26,7 @@ use std::path::Path;
 use std::{
     collections::HashMap,
     env,
-    error::Error,
+    error::Error as StdError,
     ffi::OsStr,
     fs::File,
     io::{Read, Result as IoResult},
@@ -245,7 +245,7 @@ fn get_command_status<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A
 ///
 /// * `program` - The executable to run
 /// * `args` - The arguments to pass to the executable
-pub fn get_capture_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(program: S, args: I) -> Result<Command, Box<dyn Error>> {
+pub fn get_capture_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(program: S, args: I) -> Result<Command, Box<dyn StdError>> {
     let mut command = Command::new(program);
 
     #[cfg(windows)]
@@ -277,7 +277,7 @@ pub fn get_capture_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Ite
 ///
 /// * `program` - The executable to run
 /// * `args` - The arguments to pass to the executable
-pub fn spawn_capture_process<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(program: S, args: I) -> Result<Child, Box<dyn Error>> {
+pub fn spawn_capture_process<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(program: S, args: I) -> Result<Child, Box<dyn StdError>> {
     Ok(get_capture_command(program, args)?.spawn()?)
 }
 
@@ -380,14 +380,14 @@ fn emit_text(window: &Window, text: String, replace_last: bool) {
     }
 }
 
-fn gui_setup_load_config(window: &Window) -> Result<(), Box<dyn Error>> {
+fn gui_setup_load_config(window: &Window) -> Result<(), Box<dyn StdError>> {
     let gui_config = load_gui_config(window);
     *PYTHON_PATH.lock()? = gui_config.get("python_config", "path").unwrap_or_else(|| auto_detect_python().unwrap_or_default().0);
     *BOT_FOLDER_SETTINGS.lock()? = Some(BotFolders::load_from_conf(&gui_config));
     Ok(())
 }
 
-fn gui_setup(app: &mut App) -> Result<(), Box<dyn Error>> {
+fn gui_setup(app: &mut App) -> Result<(), Box<dyn StdError>> {
     const MAIN_WINDOW_NAME: &str = "main";
     let window = app.get_window(MAIN_WINDOW_NAME).ok_or(format!("Cannot find window '{MAIN_WINDOW_NAME}'"))?;
 

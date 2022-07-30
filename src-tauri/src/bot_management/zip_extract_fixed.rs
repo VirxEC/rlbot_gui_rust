@@ -1,11 +1,11 @@
 use crate::{ccprintln, ccprintlne, ccprintlnr};
 use std::{
-    error::Error,
-    fmt, fs,
+    fs,
     io::{copy, Read, Seek},
     path::{Path, PathBuf, StripPrefixError},
 };
 use tauri::Window;
+use thiserror::Error;
 use zip::{result::ZipError, ZipArchive};
 
 // Code taken from https://github.com/MCOfficer/zip-extract
@@ -13,26 +13,20 @@ use zip::{result::ZipError, ZipArchive};
 // Code taken due to lack up updates, a few prominent bugs & a lack of eyes from the community (potential security flaw)
 // As a result, the code has been patched and debugging as been better integrated into the GUI
 
-/// Custom error that can be merged with other errors in a Result
-///
-/// This is a `std::path::StripPrefixError` with extra debug information
-#[derive(Clone, Debug)]
-pub struct StripToplevel {
-    pub toplevel: PathBuf,
-    pub path: PathBuf,
-    pub error: StripPrefixError,
-}
-
-impl fmt::Display for StripToplevel {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Failed to strip the top level ({}) from {}", self.toplevel.display(), self.path.display())
-    }
-}
-
-impl Error for StripToplevel {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        Some(&self.error)
-    }
+/// The error type for the `extract` function.
+#[derive(Debug, Error)]
+pub enum ExtractError {
+    #[error("Invalid ZIP archive")]
+    Zip(#[from] ZipError),
+    #[error("Block from file operation")]
+    Io(#[from] std::io::Error),
+    #[error("Couldn't strip the top level ({top_level}) from {path}")]
+    StripToplevel {
+        top_level: PathBuf,
+        path: PathBuf,
+        #[source]
+        error: StripPrefixError,
+    },
 }
 
 /// Extract a zip file to a directory with GUI console prints
@@ -44,7 +38,7 @@ impl Error for StripToplevel {
 /// * `target_dir`: The target directory to extract the zip file to
 /// * `toplevel`: If the top level directory to strip from the zip file (does nothing if there are multiple top level directories)
 /// * `replace`: Whether or not files should be overwritten if they already exist in the target directory
-pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, strip_toplevel: bool, replace: bool) -> Result<(), Box<dyn Error>> {
+pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, strip_toplevel: bool, replace: bool) -> Result<(), ExtractError> {
     if !target_dir.exists() {
         fs::create_dir_all(&target_dir)?;
     }
@@ -67,8 +61,8 @@ pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, st
                 p.push(c);
                 p
             });
-            relative_path = relative_path.strip_prefix(&base).map_err(|error| StripToplevel {
-                toplevel: base,
+            relative_path = relative_path.strip_prefix(&base).map_err(|error| ExtractError::StripToplevel {
+                top_level: base,
                 path: relative_path.to_path_buf(),
                 error,
             })?;
