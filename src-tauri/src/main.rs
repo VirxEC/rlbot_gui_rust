@@ -44,6 +44,7 @@ const MAPPACK_FOLDER: &str = "RLBotMapPackDeletable";
 const MAPPACK_REPO: (&str, &str) = ("azeemba", "RLBotMapPack");
 const BOTPACK_REPO_OWNER: &str = "RLBot";
 const BOTPACK_REPO_NAME: &str = "RLBotPack";
+const MAX_CONSOLE_LINES: usize = 840;
 
 lazy_static! {
     static ref CONSOLE_TEXT: Mutex<Vec<ConsoleText>> = Mutex::new(Vec::new());
@@ -330,10 +331,10 @@ fn update_internal_console(update: &ConsoleTextUpdate) -> Result<(), String> {
     if update.replace_last {
         console_text.pop();
     }
-    console_text.insert(0, update.content.clone());
+    console_text.push(update.content.clone());
 
-    if console_text.len() > 1200 {
-        console_text.drain(1200..);
+    if console_text.len() > MAX_CONSOLE_LINES {
+        console_text.remove(0);
     }
 
     Ok(())
@@ -439,7 +440,7 @@ fn gui_setup(app: &mut App) -> Result<(), Box<dyn StdError>> {
         loop {
             emit_text(&window2, format!("Hello #{i}"), false);
             i += 1;
-            thread::sleep(Duration::from_secs_f32(1. / 120.));
+            thread::sleep(Duration::from_secs_f32(1. / 500.));
         }
     });
 

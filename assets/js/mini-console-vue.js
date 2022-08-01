@@ -4,9 +4,17 @@ export default {
 	name: 'mini-console',
 	template: /*html*/`
 	<b-card no-body class="console-text-pool p-1" style="max-height: 80vh">
-		<span :style="'color:' + (text.color ? text.color : 'black') + ';'" v-for="text in consoleTexts">
-			<span>{{ text.text }}</span><br>
-		</span>
+		<RecycleScroller
+		ref="scroller"
+		class="scroller"
+		:items="consoleTexts"
+		:item-size="26"
+		v-slot="{ item }"
+		>
+			<span class="console-text-item" :style="'color:' + (item.content.color ? item.content.color : 'black') + ';'">
+				<span>{{ item.content.text }}</span>
+			</span>
+		</RecycleScroller>
 	</b-card>
 	`,
 	data () {
@@ -18,10 +26,12 @@ export default {
 					this.consoleTexts.pop();
 				}
 
-				this.consoleTexts.unshift(update.content);
+				this.consoleTexts.push({ 'id': this.texts, 'content': update.content });
+				this.$refs.scroller.scrollToItem(this.texts)
+				this.texts++;
 
-				if (this.consoleTexts.length > 240) {
-					this.consoleTexts.splice(240, this.consoleTexts.length - 240);
+				if (this.consoleTexts.length > 800) {
+					this.consoleTexts.shift();
 				}
 			})
 		}
