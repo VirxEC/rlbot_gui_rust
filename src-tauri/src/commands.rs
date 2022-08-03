@@ -58,7 +58,7 @@ fn ensure_bot_directory(window: &Window) -> PathBuf {
 
     if !bot_directory_path.exists() {
         if let Err(e) = create_dir_all(&bot_directory_path) {
-            ccprintlne(window, format!("Error creating bot directory: {}", e));
+            ccprintlne(window, format!("Error creating bot directory: {e}"));
         }
     }
 
@@ -67,9 +67,9 @@ fn ensure_bot_directory(window: &Window) -> PathBuf {
 
 #[derive(Debug, Error)]
 pub enum BeginBotError {
-    #[error("Failed to create bot template")]
+    #[error("Failed to create bot template: {0}")]
     Boostraping(#[from] BoostrapError),
-    #[error("Failed to load rlbot cfg file")]
+    #[error("Failed to load rlbot cfg file: {0}")]
     LoadCfg(#[from] RLBotCfgParseError),
 }
 
@@ -156,7 +156,7 @@ pub async fn install_package(package_string: String) -> Result<PackageResult, St
 pub enum InstallRequirementseError {
     #[error("Mutex {0} was poisoned")]
     MutexPoisoned(String),
-    #[error("Failed to load rlbot cfg file")]
+    #[error("Failed to load rlbot cfg file: {0}")]
     LoadCfg(#[from] RLBotCfgParseError),
 }
 
@@ -233,8 +233,9 @@ pub async fn run_command(window: Window, input: String) -> Result<(), String> {
     dbg!(&args);
 
     spawn_capture_process(program, args).map_err(|err| {
-        ccprintlne(&window, format!("{}", err));
-        err.to_string()
+        let e = err.to_string();
+        ccprintlne(&window, e.clone());
+        e
     })?;
 
     Ok(())
@@ -338,13 +339,13 @@ pub fn is_windows() -> bool {
 pub enum BootstrapCustomPythonError {
     #[error("This function is only supported on Windows")]
     NotWindows,
-    #[error("Couldn't download the custom python zip")]
+    #[error("Couldn't download the custom python zip: {0}")]
     Download(#[from] reqwest::Error),
     #[error("Couldn't emit signal {UPDATE_DOWNLOAD_PROGRESS_SIGNAL}")]
     EmitSignal(#[from] tauri::Error),
-    #[error("File handle error")]
+    #[error("File handle error: {0}")]
     Io(#[from] std::io::Error),
-    #[error("Coudn't extract the zip")]
+    #[error("Coudn't extract the zip: {0}")]
     ExtractZip(#[from] ExtractError),
     #[error("Mutex {0} was poisoned")]
     MutexPoisoned(String),
@@ -548,7 +549,7 @@ fn create_match_handler(window: &Window) -> Option<ChildStdin> {
     {
         Ok(mut child) => child.stdin.take(),
         Err(err) => {
-            ccprintlne(window, format!("Failed to start match handler: {}", err));
+            ccprintlne(window, format!("Failed to start match handler: {err}"));
             None
         }
     }
@@ -659,7 +660,7 @@ async fn start_match_helper(window: &Window, bot_list: Vec<TeamBotBundle>, match
 pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_settings: MiniMatchConfig) -> Result<(), String> {
     start_match_helper(&window, bot_list, match_settings).await.map_err(|error| {
         if let Err(e) = window.emit("match-start-failed", ()) {
-            ccprintlne(&window, format!("Failed to emit match-start-failed: {}", e));
+            ccprintlne(&window, format!("Failed to emit match-start-failed: {e}"));
         }
 
         ccprintlne(&window, error.clone());
@@ -995,7 +996,7 @@ async fn run_challenge(window: &Window, save_state: &StoryState, challenge_id: S
 
     let (city, challenge) = match get_challenge_by_id(story_settings, &challenge_id).await {
         Some(challenge) => challenge,
-        None => return Err(format!("Could not find challenge with id {}", challenge_id).into()),
+        None => return Err(format!("Could not find challenge with id {challenge_id}").into()),
     };
 
     let all_bots = get_all_bot_configs(story_settings).await;
@@ -1045,7 +1046,7 @@ async fn run_challenge(window: &Window, save_state: &StoryState, challenge_id: S
 pub async fn launch_challenge(window: Window, save_state: StoryState, challenge_id: String, picked_teammates: Vec<String>) -> Result<(), String> {
     run_challenge(&window, &save_state, challenge_id, &picked_teammates).await.map_err(|err| {
         if let Err(e) = window.emit("match-start-failed", ()) {
-            ccprintlne(&window, format!("Failed to emit match-start-failed: {}", e));
+            ccprintlne(&window, format!("Failed to emit match-start-failed: {e}"));
         }
 
         let e = err.to_string();

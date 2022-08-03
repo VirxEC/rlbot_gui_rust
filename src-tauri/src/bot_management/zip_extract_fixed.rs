@@ -16,9 +16,9 @@ use zip::{result::ZipError, ZipArchive};
 /// The error type for the `extract` function.
 #[derive(Debug, Error)]
 pub enum ExtractError {
-    #[error("Invalid ZIP archive")]
+    #[error("Invalid ZIP archive: {0}")]
     Zip(#[from] ZipError),
-    #[error("Block from file operation")]
+    #[error("Block from file operation: {0}")]
     Io(#[from] std::io::Error),
     #[error("Couldn't strip the top level ({top_level}) from {path}")]
     StripToplevel {
@@ -96,7 +96,7 @@ pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, st
         } else if let Some(p) = outpath.parent() {
             if !p.exists() {
                 if let Err(e) = fs::create_dir_all(p) {
-                    ccprintlne(window, format!("Failed to create directory {}: {}", p.display(), e));
+                    ccprintlne(window, format!("Failed to create directory {}: {e}", p.display()));
                 }
             }
         }

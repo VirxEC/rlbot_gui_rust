@@ -6,7 +6,7 @@ use thiserror::Error;
 pub enum CfgHelperError {
     #[error("Could not load config file: {0}")]
     Load(String),
-    #[error("Could not save config file")]
+    #[error("Could not save config file: {0}")]
     Save(#[from] std::io::Error),
 }
 

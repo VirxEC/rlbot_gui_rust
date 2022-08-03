@@ -29,9 +29,9 @@ pub const CREATED_BOTS_FOLDER: &str = "MyBots";
 
 #[derive(Debug, Error)]
 pub enum DownloadExtractError {
-    #[error("Failed to download")]
+    #[error("Failed to download: {0}")]
     Download(#[from] reqwest::Error),
-    #[error("Failed to extract zip")]
+    #[error("Failed to extract zip: {0}")]
     Extract(#[from] zip_extract_fixed::ExtractError),
 }
 
@@ -59,13 +59,13 @@ pub enum BoostrapError {
     MutexNone(String),
     #[error("Mutex {0} was poisoned")]
     MutexPoisoned(String),
-    #[error("Failed to setup bot template")]
+    #[error("Failed to setup bot template: {0}")]
     SetupTemplate(#[from] DownloadExtractError),
-    #[error("Failed change key in cfg")]
+    #[error("Failed change key in cfg: {0}")]
     ChangeKey(#[from] cfg_helper::CfgHelperError),
-    #[error("File operation not completed")]
+    #[error("File operation not completed: {0}")]
     Io(#[from] std::io::Error),
-    #[error("Couldn't to rename folder")]
+    #[error("Couldn't to rename folder: {0}")]
     FolderRename(#[from] fs_extra::error::Error),
 }
 
@@ -150,7 +150,7 @@ pub async fn bootstrap_python_hivemind(window: &Window, hive_name: String, direc
 
     change_key_in_cfg(&config_file, BOT_CONFIG_MODULE_HEADER, NAME_KEY, hive_name.clone())?;
 
-    replace_all_regex_in_file(&drone_file, &Regex::new(r"hive_name = .*$").unwrap(), format!("hive_name = \"{} Hivemind\"", &hive_name))?;
+    replace_all_regex_in_file(&drone_file, &Regex::new(r"hive_name = .*$").unwrap(), format!("hive_name = \"{hive_name} Hivemind\""))?;
 
     let mut hasher = DefaultHasher::new();
     hive_name.hash(&mut hasher);
@@ -158,12 +158,12 @@ pub async fn bootstrap_python_hivemind(window: &Window, hive_name: String, direc
     // add random number between 100000 and 999999 to hive_id
     hive_key += rand::random::<u64>() % 1_000_000;
 
-    replace_all_regex_in_file(&drone_file, &Regex::new(r"hive_key = .*$").unwrap(), format!("hive_key = \"{}\"", hive_key))?;
+    replace_all_regex_in_file(&drone_file, &Regex::new(r"hive_key = .*$").unwrap(), format!("hive_key = \"{hive_key}\""))?;
 
     replace_all_regex_in_file(
         &hive_file,
         &Regex::new(r"class .*\(PythonHivemind\)").unwrap(),
-        format!("class {}Hivemind(PythonHivemind)", &hive_name),
+        format!("class {hive_name}Hivemind(PythonHivemind)"),
     )?;
 
     let config_file = config_file.to_string_lossy();
@@ -207,7 +207,7 @@ pub async fn bootstrap_rust_bot(window: &Window, bot_name: String, directory: Pa
     let mut conf = load_cfg(&config_file)?;
 
     conf.set(BOT_CONFIG_MODULE_HEADER, NAME_KEY, Some(bot_name.clone()));
-    conf.set(BOT_CONFIG_PARAMS_HEADER, EXECUTABLE_PATH_KEY, Some(format!("../target/debug/{}.exe", bot_name)));
+    conf.set(BOT_CONFIG_PARAMS_HEADER, EXECUTABLE_PATH_KEY, Some(format!("../target/debug/{bot_name}.exe")));
 
     save_cfg(&conf, &config_file)?;
 
@@ -215,7 +215,7 @@ pub async fn bootstrap_rust_bot(window: &Window, bot_name: String, directory: Pa
 
     let mut conf = load_cfg(&cargo_toml_file)?;
 
-    conf.set("package", "name", Some(format!("\"{}\"", sanitized_name)));
+    conf.set("package", "name", Some(format!("\"{sanitized_name}\"")));
     conf.set("package", "authors", Some("[\"\"]".to_owned()));
 
     save_cfg(&conf, cargo_toml_file)?;
@@ -249,9 +249,9 @@ pub async fn bootstrap_scratch_bot(window: &Window, bot_name: String, directory:
 
     // Choose appropriate file names based on the bot name
     let code_dir = top_dir.join(&sanitized_name);
-    let sb3_filename = format!("{}.sb3", &sanitized_name);
+    let sb3_filename = format!("{sanitized_name}.sb3");
     let sb3_file = code_dir.join(&sb3_filename);
-    let config_filename = format!("{}.cfg", &sanitized_name);
+    let config_filename = format!("{sanitized_name}.cfg");
     let config_file = code_dir.join(&config_filename);
 
     replace_all_regex_in_file(

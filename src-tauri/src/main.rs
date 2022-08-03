@@ -28,8 +28,8 @@ use std::{
     env,
     error::Error as StdError,
     ffi::OsStr,
-    fs::File,
-    io::{Read, Result as IoResult},
+    fs::{File, OpenOptions},
+    io::{Read, Result as IoResult, Write},
     path::PathBuf,
     process::{Child, ChildStdin, Command, Stdio},
     sync::Mutex,
@@ -37,6 +37,7 @@ use std::{
     time::Duration,
 };
 use tauri::{App, Error as TauriError, Manager, Window};
+use thiserror::Error;
 use tokio::sync::Mutex as AsyncMutex;
 
 const BOTPACK_FOLDER: &str = "RLBotPackDeletable";
@@ -48,6 +49,7 @@ const MAX_CONSOLE_LINES: usize = 840;
 
 lazy_static! {
     static ref CONSOLE_TEXT: Mutex<Vec<ConsoleText>> = Mutex::new(Vec::new());
+    static ref CONSOLE_TEXT_OUT_QUEUE: Mutex<Vec<String>> = Mutex::new(Vec::new());
     static ref CONSOLE_INPUT_COMMANDS: Mutex<Vec<String>> = Mutex::new(Vec::new());
     static ref PYTHON_PATH: Mutex<String> = Mutex::new(String::new());
     static ref BOT_FOLDER_SETTINGS: Mutex<Option<BotFolders>> = Mutex::new(None);
@@ -88,7 +90,7 @@ fn auto_detect_python() -> Option<(String, bool)> {
 }
 
 #[cfg(windows)]
-fn get_python_from_pip(pip: &str) -> Result<String, Box<dyn Error>> {
+fn get_python_from_pip(pip: &str) -> Result<String, Box<dyn StdError>> {
     let output = Command::new("where").arg(pip).output()?;
     let stdout = String::from_utf8(output.stdout)?;
 
@@ -326,12 +328,39 @@ fn get_content_folder() -> PathBuf {
     PathBuf::from(format!("{}/.RLBotGUI", env::var("HOME").unwrap()))
 }
 
-fn update_internal_console(update: &ConsoleTextUpdate) -> Result<(), String> {
-    let mut console_text = CONSOLE_TEXT.lock().map_err(|e| e.to_string())?;
+#[derive(Debug, Error)]
+enum InternalConsoleError {
+    #[error("Mutex {0} was poisoned")]
+    Poisoned(String),
+    #[error("File on i/o operation: {0}")]
+    Io(#[from] std::io::Error),
+}
+
+fn write_console_text_out_queue_to_file() -> Result<(), InternalConsoleError> {
+    let mut file = OpenOptions::new().write(true).append(true).open(get_log_path())?;
+
+    for line in CONSOLE_TEXT_OUT_QUEUE
+        .lock()
+        .map_err(|_| InternalConsoleError::Poisoned("CONSOLE_TEXT_OUT_QUEUE".to_owned()))?
+        .drain(..)
+    {
+        writeln!(file, "{line}")?;
+    }
+
+    Ok(())
+}
+
+fn update_internal_console(update: &ConsoleTextUpdate) -> Result<(), InternalConsoleError> {
+    let mut console_text = CONSOLE_TEXT.lock().map_err(|_| InternalConsoleError::Poisoned("CONSOLE_TEXT".to_owned()))?;
     if update.replace_last {
         console_text.pop();
     }
     console_text.push(update.content.clone());
+
+    CONSOLE_TEXT_OUT_QUEUE
+        .lock()
+        .map_err(|_| InternalConsoleError::Poisoned("CONSOLE_TEXT_OUT_QUEUE".to_owned()))?
+        .push(update.content.text.clone());
 
     if console_text.len() > MAX_CONSOLE_LINES {
         console_text.remove(0);
@@ -347,7 +376,7 @@ fn try_emit_signal<S: Serialize + Clone>(window: &Window, signal: &str, payload:
 fn issue_console_update(window: &Window, text: String, replace_last: bool) -> (String, Option<TauriError>) {
     let update = ConsoleTextUpdate::from(text, replace_last);
     if let Err(e) = update_internal_console(&update) {
-        ccprintlne(window, e);
+        ccprintlne(window, e.to_string());
     }
     try_emit_signal(window, "new-console-text", update)
 }
@@ -366,7 +395,6 @@ fn try_emit_text(window: &Window, text: String, replace_last: bool) -> (String, 
     } else if text.starts_with("-|-*|STORY_RESULT ") && text.ends_with("|*-|-") {
         println!("GOT STORY RESULT");
         let text = text.replace("-|-*|STORY_RESULT ", "").replace("|*-|-", "");
-        println!("{}", &text);
         let save_state: StoryState = serde_json::from_str(&text).unwrap();
         save_state.save(window);
         try_emit_signal(window, "load_updated_save_state", save_state)
@@ -378,7 +406,7 @@ fn try_emit_text(window: &Window, text: String, replace_last: bool) -> (String, 
 fn emit_text(window: &Window, text: String, replace_last: bool) {
     let (signal, error) = try_emit_text(window, text, replace_last);
     if let Some(e) = error {
-        ccprintlne(window, format!("Error emitting {}: {}", signal, e));
+        ccprintlne(window, format!("Error emitting {signal}: {e}"));
     }
 }
 
@@ -434,13 +462,10 @@ fn gui_setup(app: &mut App) -> Result<(), Box<dyn StdError>> {
         }
     });
 
-    thread::spawn(move || {
-        let mut i = 0;
-
-        loop {
-            emit_text(&window2, format!("Hello #{i}"), false);
-            i += 1;
-            thread::sleep(Duration::from_secs_f32(1. / 500.));
+    thread::spawn(move || loop {
+        thread::sleep(Duration::from_secs_f32(1. / 5.));
+        if let Err(e) = write_console_text_out_queue_to_file() {
+            ccprintlne(&window2, e.to_string());
         }
     });
 
