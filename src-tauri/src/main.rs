@@ -32,6 +32,7 @@ use std::{
     io::{Read, Result as IoResult, Write},
     path::PathBuf,
     process::{Child, ChildStdin, Command, Stdio},
+    string::FromUtf8Error,
     sync::Mutex,
     thread,
     time::Duration,
@@ -89,19 +90,36 @@ fn auto_detect_python() -> Option<(String, bool)> {
     }
 }
 
+#[derive(Debug, Error)]
+pub enum WindowsPipLocateError {
+    #[error("Couldn't convert stdout to string: {0}")]
+    InvalidUTF8(#[from] FromUtf8Error),
+    #[error("{0} has no parent")]
+    NoParentError(String),
+    #[error("I/O error: {0}")]
+    IO(#[from] std::io::Error),
+    #[error("Could not find python.exe")]
+    NoPython,
+}
+
 #[cfg(windows)]
-fn get_python_from_pip(pip: &str) -> Result<String, Box<dyn StdError>> {
+fn get_python_from_pip(pip: &str) -> Result<String, WindowsPipLocateError> {
     let output = Command::new("where").arg(pip).output()?;
     let stdout = String::from_utf8(output.stdout)?;
 
     if let Some(first_line) = stdout.lines().next() {
-        let python_path = Path::new(first_line).parent().unwrap().parent().unwrap().join("python.exe");
+        let python_path = Path::new(first_line)
+            .parent()
+            .ok_or_else(|| WindowsPipLocateError::NoParentError(first_line.to_owned()))?
+            .parent()
+            .ok_or_else(|| WindowsPipLocateError::NoParentError(first_line.to_owned()))?
+            .join("python.exe");
         if python_path.exists() {
             return Ok(python_path.to_string_lossy().to_string());
         }
     }
 
-    Err("Could not find python.exe".into())
+    Err(WindowsPipLocateError::NoPython)
 }
 
 #[cfg(target_os = "macos")]
@@ -235,6 +253,16 @@ fn get_command_status<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A
     }
 }
 
+#[derive(Debug, Error)]
+pub enum CommandError {
+    #[error("Mutex {0} was poisoned")]
+    Poisoned(String),
+    #[error("I/O error: {0}")]
+    IO(#[from] std::io::Error),
+    #[error("Pipe is closed")]
+    ClosedPipe,
+}
+
 /// Returns a Command that, went ran, will have all it's output redirected to the GUI console
 /// Be sure to `drop(command)` after spawning the child process! Otherwise a deadlock could happen.
 /// This is due to how the `os_pipe` crate works.
@@ -249,7 +277,7 @@ fn get_command_status<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A
 ///
 /// * `program` - The executable to run
 /// * `args` - The arguments to pass to the executable
-pub fn get_capture_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(program: S, args: I) -> Result<Command, Box<dyn StdError>> {
+pub fn get_capture_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(program: S, args: I) -> Result<Command, CommandError> {
     let mut command = Command::new(program);
 
     #[cfg(windows)]
@@ -259,9 +287,9 @@ pub fn get_capture_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Ite
         command.creation_flags(0x08000000);
     };
 
-    let pipe = CAPTURE_PIPE_WRITER.lock()?;
-    let out_pipe = pipe.as_ref().ok_or("Pipe is closed")?.try_clone()?;
-    let err_pipe = pipe.as_ref().ok_or("Pipe is closed")?.try_clone()?;
+    let pipe = CAPTURE_PIPE_WRITER.lock().map_err(|_| CommandError::Poisoned("CAPTURE_PIPE_WRITER".to_owned()))?;
+    let out_pipe = pipe.as_ref().ok_or(CommandError::ClosedPipe)?.try_clone()?;
+    let err_pipe = pipe.as_ref().ok_or(CommandError::ClosedPipe)?.try_clone()?;
 
     command.args(args).current_dir(get_content_folder()).stdout(out_pipe).stderr(err_pipe);
 
@@ -281,7 +309,7 @@ pub fn get_capture_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Ite
 ///
 /// * `program` - The executable to run
 /// * `args` - The arguments to pass to the executable
-pub fn spawn_capture_process<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(program: S, args: I) -> Result<Child, Box<dyn StdError>> {
+pub fn spawn_capture_process<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(program: S, args: I) -> Result<Child, CommandError> {
     Ok(get_capture_command(program, args)?.spawn()?)
 }
 

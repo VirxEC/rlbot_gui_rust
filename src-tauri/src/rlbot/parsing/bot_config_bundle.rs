@@ -176,9 +176,7 @@ impl BotConfigBundle {
         let python_path = conf.get(BOT_CONFIG_MODULE_HEADER, PYTHON_FILE_KEY).map(|path| format!("{config_directory}/{path}"));
         let supports_standalone = conf.get(BOT_CONFIG_MODULE_HEADER, SUPPORTS_STANDALONE).map(|s| s.parse::<bool>().unwrap_or_default());
         let use_virtual_environment = conf.getbool(BOT_CONFIG_MODULE_HEADER, USE_VIRTUAL_ENVIRONMENT_KEY).unwrap_or(None);
-        let requirements_file = conf
-            .get(BOT_CONFIG_MODULE_HEADER, REQUIREMENTS_FILE_KEY)
-            .map(|path| format!("{config_directory}/{path}"));
+        let requirements_file = conf.get(BOT_CONFIG_MODULE_HEADER, REQUIREMENTS_FILE_KEY).map(|path| format!("{config_directory}/{path}"));
         let requires_tkinter = conf.getbool(BOT_CONFIG_MODULE_HEADER, REQUIRES_TKINTER).unwrap_or(Some(false));
 
         if name.is_none() {
