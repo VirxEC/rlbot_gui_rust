@@ -72,6 +72,9 @@ export default {
 				<b-dropdown-item @click="pickAndEditAppearanceFile()">
 					Edit appearance config file
 				</b-dropdown-item>
+				<b-dropdown-item @click="uploadLog()">
+					Upload GUI log for help
+				</b-dropdown-item>
 			</b-dropdown>
 		</b-navbar-nav>
 	</b-navbar>
@@ -410,6 +413,13 @@ export default {
 		<b-modal size="xl" id="mini-console" v-bind:title="miniConsoleTitle" hide-footer centered :no-close-on-backdrop="!allowMiniConsoleClose" :no-close-on-esc="!allowMiniConsoleClose" :hide-header-close="!allowMiniConsoleClose">
 			<mini-console/>
 		</b-modal>
+
+		<b-modal id="log-upload-successful" title="Uploaded log to hastebin!" centered ok-only>
+			<p>Your log has been uploaded to hastebin!</p>
+			<p>You can view it at <a :href="logUploadUrl" target="_blank">{{ logUploadUrl }}</a>.</p>
+			<p>Please copy the link and share it in the #rlbot-help channel in the RLBot Discord server:</p>
+			<p><a href="https://discord.gg/zbaAKPt" target="_blank">https://discord.gg/zbaAKPt</a></p>
+		</b-modal>
 	</div>
 
 	</b-container>
@@ -490,6 +500,7 @@ export default {
 			miniConsoleTitle: "",
 			allowMiniConsoleClose: false,
 			errorStartingMatchContent: "",
+			logUploadUrl: "",
 			updateDownloadProgressPercent: listen("update-download-progress", event => {
 				this.downloadProgressPercent = event.payload.percent;
 				this.downloadStatus = event.payload.status;
@@ -512,6 +523,23 @@ export default {
 	},
 
 	methods: {
+		uploadLog: function(event) {
+			this.miniConsoleTitle = "Uploading full log to hastebin";
+			this.allowMiniConsoleClose = false;
+			this.$bvModal.show("mini-console");
+
+			setTimeout(() => {
+				invoke("upload_log").then(logUploadUrl => {
+					this.allowMiniConsoleClose = true;
+					this.logUploadUrl = logUploadUrl;
+					this.$bvModal.hide("mini-console");
+					this.$bvModal.show("log-upload-successful");
+				}).catch(error => {
+					console.error(error);
+					this.allowMiniConsoleClose = true;
+				});
+			}, 500);
+		},
 		pythonSetup: function(event)  {
 			invoke("get_detected_python_path").then(info => this.rec_python = info[0]);
 			this.$bvModal.show("python-setup");

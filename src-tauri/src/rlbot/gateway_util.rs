@@ -27,7 +27,7 @@ pub fn find_existing_process(window: &Window) -> Option<u16> {
         }
     }
 
-    ccprintln(window, "No existing RLBot process found...".to_owned());
+    ccprintln(window, "No existing RLBot process found...");
     None
 }
 
@@ -37,12 +37,12 @@ pub fn kill_existing_processes(window: &Window) {
     let mut found = false;
     // there might be multiple processes, so just be able to kill them all encase
     for process_info in system.processes_by_name(EXECUTABLE_NAME) {
-        ccprintln(window, "Killing existing RLBot process".to_owned());
+        ccprintln(window, "Killing existing RLBot process");
         process_info.kill();
         found = true;
     }
 
     if !found {
-        ccprintln(window, "No existing RLBot process found".to_owned());
+        ccprintln(window, "No existing RLBot process found");
     }
 }

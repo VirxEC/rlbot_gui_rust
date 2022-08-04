@@ -171,8 +171,9 @@ fn clear_log_file() -> IoResult<()> {
 ///
 /// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
 /// * `text` - The text to emit
-pub fn ccprintln(window: &Window, text: String) {
-    println!("{}", &text);
+pub fn ccprintln<T: AsRef<str>>(window: &Window, text: T) {
+    let text = text.as_ref();
+    println!("{}", text);
     emit_text(window, text, false);
 }
 
@@ -360,18 +361,22 @@ fn get_content_folder() -> PathBuf {
 enum InternalConsoleError {
     #[error("Mutex {0} was poisoned")]
     Poisoned(String),
-    #[error("File on i/o operation: {0}")]
+    #[error("Could not complete I/O operation: {0}")]
     Io(#[from] std::io::Error),
 }
 
 fn write_console_text_out_queue_to_file() -> Result<(), InternalConsoleError> {
+    let mut queue = CONSOLE_TEXT_OUT_QUEUE
+        .lock()
+        .map_err(|_| InternalConsoleError::Poisoned("CONSOLE_TEXT_OUT_QUEUE".to_owned()))?;
+
+    if queue.is_empty() {
+        return Ok(());
+    }
+
     let mut file = OpenOptions::new().write(true).append(true).open(get_log_path())?;
 
-    for line in CONSOLE_TEXT_OUT_QUEUE
-        .lock()
-        .map_err(|_| InternalConsoleError::Poisoned("CONSOLE_TEXT_OUT_QUEUE".to_owned()))?
-        .drain(..)
-    {
+    for line in queue.drain(..) {
         writeln!(file, "{line}")?;
     }
 
@@ -409,7 +414,8 @@ fn issue_console_update(window: &Window, text: String, replace_last: bool) -> (S
     try_emit_signal(window, "new-console-text", update)
 }
 
-fn try_emit_text(window: &Window, text: String, replace_last: bool) -> (String, Option<TauriError>) {
+fn try_emit_text<T: AsRef<str>>(window: &Window, text: T, replace_last: bool) -> (String, Option<TauriError>) {
+    let text = text.as_ref();
     if text == "-|-*|MATCH START FAILED|*-|-" {
         eprintln!("START MATCH FAILED");
         try_emit_signal(window, "match-start-failed", ())
@@ -427,11 +433,11 @@ fn try_emit_text(window: &Window, text: String, replace_last: bool) -> (String, 
         save_state.save(window);
         try_emit_signal(window, "load_updated_save_state", save_state)
     } else {
-        issue_console_update(window, text, replace_last)
+        issue_console_update(window, text.to_owned(), replace_last)
     }
 }
 
-fn emit_text(window: &Window, text: String, replace_last: bool) {
+fn emit_text<T: AsRef<str>>(window: &Window, text: T, replace_last: bool) {
     let (signal, error) = try_emit_text(window, text, replace_last);
     if let Some(e) = error {
         ccprintlne(window, format!("Error emitting {signal}: {e}"));
@@ -577,6 +583,7 @@ fn main() {
             recruit,
             is_debug_build,
             run_command,
+            upload_log,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

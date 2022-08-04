@@ -20,6 +20,7 @@ export default {
 	data () {
 		return {
 			consoleTexts: [],
+			texts: 0,
 			newTextListener: listen('new-console-text', event => {
 				let update = event.payload;
 				if (update.replace_last) {
@@ -27,12 +28,14 @@ export default {
 				}
 
 				this.consoleTexts.push({ 'id': this.texts, 'content': update.content });
-				this.$refs.scroller.scrollToItem(this.texts)
+				console.log(this.consoleTexts);
 				this.texts++;
-
-				if (this.consoleTexts.length > 800) {
+				
+				if (this.consoleTexts.length > 420) {
 					this.consoleTexts.shift();
 				}
+
+				this.$refs.scroller.scrollToItem(this.texts - 1)
 			})
 		}
 	},

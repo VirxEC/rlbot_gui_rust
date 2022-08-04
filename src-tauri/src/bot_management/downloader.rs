@@ -286,7 +286,7 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
     };
 
     if latest_release_tag == current_tag_name {
-        ccprintln(window, "The botpack is already up-to-date!".to_owned());
+        ccprintln(window, "The botpack is already up-to-date!");
         return BotpackStatus::Skipped("The botpack is already up-to-date!".to_owned());
     }
 
@@ -516,7 +516,7 @@ impl MapPackUpdater {
         if latest_revision > revision {
             BotpackStatus::RequiresFullDownload
         } else {
-            ccprintln(window, "Map pack is already up-to-date!".to_owned());
+            ccprintln(window, "Map pack is already up-to-date!");
             BotpackStatus::Skipped("Map pack is already up-to-date!".to_owned())
         }
     }

@@ -48,7 +48,7 @@ pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, st
     let do_strip_toplevel = strip_toplevel && has_toplevel(window, &mut archive)?;
 
     ccprintln(window, format!("Extracting to {}", target_dir.to_string_lossy()));
-    ccprintln(window, "".to_owned());
+    ccprintln(window, "");
     for i in 0..archive.len() {
         let mut item = archive.by_index(i)?;
         let mut relative_path = match item.enclosed_name() {
@@ -126,7 +126,7 @@ fn has_toplevel<S: Read + Seek>(window: &Window, archive: &mut ZipArchive<S>) ->
         let file = archive.by_index(i)?.mangled_name();
         if let Some(toplevel_dir) = &toplevel_dir {
             if !file.starts_with(toplevel_dir) {
-                ccprintln(window, "Found different toplevel directory".to_owned());
+                ccprintln(window, "Found different toplevel directory");
                 return Ok(false);
             }
         } else {
@@ -136,6 +136,6 @@ fn has_toplevel<S: Read + Seek>(window: &Window, archive: &mut ZipArchive<S>) ->
             toplevel_dir = Some(comp);
         }
     }
-    ccprintln(window, "Found no other toplevel directory".to_owned());
+    ccprintln(window, "Found no other toplevel directory");
     Ok(true)
 }

@@ -79,7 +79,7 @@ export default {
 		}
 	},
 	methods: {
-		toggleScrollLock () {
+		toggleScrollLock: function() {
 			this.userChoseLock = true;
 			this.scrollLock = !this.scrollLock;
 		},
@@ -120,18 +120,20 @@ export default {
 			this.commandsIndex = -1;
 		},
 		startup: function() {
-			invoke("get_console_texts").then(texts => {
-				texts.forEach(content => {
-					this.consoleTexts.push({ 'id': this.texts, 'content': content });
-					this.texts++;
+			if (this.$route.path == "/console") {
+				invoke("get_console_texts").then(texts => {
+					texts.forEach(content => {
+						this.consoleTexts.push({ 'id': this.texts, 'content': content });
+						this.texts++;
+					});
+
+					this.$refs.scroller.scrollToItem(this.texts - 1)
 				});
 
-				this.$refs.scroller.scrollToItem(this.texts - 1)
-			});
-
-			invoke("get_console_input_commands").then(commands => {
-				this.previousCommands = commands;
-			});
+				invoke("get_console_input_commands").then(commands => {
+					this.previousCommands = commands;
+				});
+			}
 		}
 	},
 	computed: {},

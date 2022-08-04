@@ -29,6 +29,10 @@ use std::{
 };
 use tauri::Window;
 use thiserror::Error;
+use tokio::{
+    fs::File as AsyncFile,
+    io::{AsyncReadExt, BufReader},
+};
 
 const DEBUG_MODE_SHORT_GAMES: bool = false;
 pub const UPDATE_DOWNLOAD_PROGRESS_SIGNAL: &str = "update-download-progress";
@@ -567,11 +571,11 @@ pub fn issue_match_handler_command(window: &Window, command_parts: &[String], mu
 
     if match_handler_stdin.is_none() {
         if create_handler {
-            ccprintln(window, "Starting match handler!".to_owned());
+            ccprintln(window, "Starting match handler!");
             *match_handler_stdin = create_match_handler(window);
             create_handler = false;
         } else {
-            ccprintln(window, "Not issuing command to handler as it's down and I was told to not start it".to_owned());
+            ccprintln(window, "Not issuing command to handler as it's down and I was told to not start it");
             return Ok(());
         }
     }
@@ -582,7 +586,7 @@ pub fn issue_match_handler_command(window: &Window, command_parts: &[String], mu
     if stdin.write_all(command.as_bytes()).is_err() {
         drop(match_handler_stdin.take());
         if create_handler {
-            ccprintln(window, "Failed to write to match handler, trying to restart...".to_owned());
+            ccprintln(window, "Failed to write to match handler, trying to restart...");
             issue_match_handler_command(window, command_parts, true)
         } else {
             Err("Failed to write to match handler".to_owned())
@@ -1077,4 +1081,64 @@ pub async fn recruit(window: Window, mut save_state: StoryState, id: String) -> 
     save_state.save(&window);
 
     Some(save_state)
+}
+
+#[derive(Debug, Error)]
+pub enum LogUploadError {
+    #[error("Failed to read log file: {0}")]
+    IO(#[from] std::io::Error),
+    #[error("The log file is empty; not uploading")]
+    EmptyLog,
+    #[error("Failed to upload log file: {0}")]
+    Upload(#[from] reqwest::Error),
+    #[error("No key '{0}' in JSON repsonse")]
+    NoKey(String),
+    #[error("Key '{0}' in JSON response was not a string")]
+    InvalidKeyType(String),
+}
+
+#[tauri::command]
+pub async fn upload_log(window: Window) -> Result<String, String> {
+    /// there are a few references to hastebin in the GUI
+    /// you should also change those references to avoid user confusion
+    /// (if changing paste provider)
+    async fn inner(window: &Window) -> Result<String, LogUploadError> {
+        ccprintln(window, "Reading log file...");
+        let file = AsyncFile::open(get_log_path()).await?;
+
+        let mut reader = BufReader::new(file);
+        let mut contents = String::new();
+        reader.read_to_string(&mut contents).await?;
+
+        if contents.is_empty() {
+            return Err(LogUploadError::EmptyLog);
+        }
+
+        ccprintln(window, "Log file read succesfully! Now uploading to hastebin...");
+
+        // send contents to https://hastebin.com/documents via POST
+        let res = reqwest::Client::new().post("https://hastebin.com/documents").body(contents).send().await?;
+
+        // the returned JSON looks a little bit like `{"key":"royidegeni"}`
+        // Take this and return the key attached to the hastebin URL
+        let json: serde_json::Value = res.json().await?;
+
+        const KEY: &str = "key";
+        let url_postfix = json
+            .get(KEY)
+            .ok_or_else(|| LogUploadError::NoKey(KEY.to_owned()))?
+            .as_str()
+            .ok_or_else(|| LogUploadError::InvalidKeyType(KEY.to_owned()))?
+            .to_owned();
+
+        let url = format!("https://hastebin.com/{url_postfix}");
+        ccprintln(window, format!("Log file uploaded to: {url}"));
+        Ok(url)
+    }
+
+    inner(&window).await.map_err(|e| {
+        let err = e.to_string();
+        ccprintlne(&window, err.clone());
+        err
+    })
 }
