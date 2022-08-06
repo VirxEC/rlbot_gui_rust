@@ -357,6 +357,16 @@ fn get_content_folder() -> PathBuf {
     PathBuf::from(format!("{}/.RLBotGUI", env::var("HOME").unwrap()))
 }
 
+#[cfg(windows)]
+fn get_home_folder() -> (PathBuf, &'static str) {
+    (PathBuf::from(env::var("USERPROFILE").unwrap()), "%USERPROFILE%")
+}
+
+#[cfg(not(windows))]
+fn get_home_folder() -> (PathBuf, &'static str) {
+    (PathBuf::from(env::var("HOME").unwrap()), "~")
+}
+
 #[derive(Debug, Error)]
 enum InternalConsoleError {
     #[error("Mutex {0} was poisoned")]

@@ -1114,6 +1114,9 @@ pub async fn upload_log(window: Window) -> Result<String, String> {
             return Err(LogUploadError::EmptyLog);
         }
 
+        let (home_folder, replacement_key) = get_home_folder();
+        let contents = contents.replace(&home_folder.to_string_lossy().to_string(), replacement_key);
+
         ccprintln(window, "Log file read succesfully! Now uploading to hastebin...");
 
         // send contents to https://hastebin.com/documents via POST
