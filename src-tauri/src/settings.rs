@@ -1,6 +1,7 @@
 use crate::{
     ccprintlne,
     config_handles::load_gui_config,
+    configparser::Ini,
     custom_maps::convert_to_path,
     get_config_path,
     rlbot::parsing::{
@@ -8,7 +9,6 @@ use crate::{
         match_settings_config_parser::*,
     },
 };
-use configparser::ini::Ini;
 use core::fmt;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug, str::FromStr};
@@ -58,7 +58,7 @@ impl BotFolders {
         conf.set("bot_folder_settings", "folders", serde_json::to_string(&self.folders).ok());
 
         if let Err(e) = conf.write(&get_config_path()) {
-            ccprintlne(window, format!("Failed to write config file: {}", e));
+            ccprintlne(window, format!("Failed to write config file: {e}"));
         }
     }
 
@@ -220,7 +220,7 @@ impl MiniMatchConfig {
 
         if let MapType::Custom(path) = &mut new.map {
             *path = convert_to_path(path, bf).ok_or_else(|| {
-                let err = format!("Failed to find custom map {}", path);
+                let err = format!("Failed to find custom map {path}");
                 ccprintlne(window, err.clone());
                 err
             })?;
@@ -279,7 +279,7 @@ impl MatchConfig {
     }
 
     fn set_value_in_conf<T: Default + serde::Serialize>(conf: &mut Ini, key: &str, item: &T) {
-        set_value_in_conf(conf, "mutator_settings", key, item);
+        set_value_in_conf(conf, "match_settings", key, item);
     }
 
     pub fn save_to_config(&mut self, conf: &mut Ini) {
@@ -302,7 +302,7 @@ impl MatchConfig {
         self.save_to_config(&mut conf);
 
         if let Err(e) = conf.write(get_config_path()) {
-            ccprintlne(window, format!("Error writing config file: {}", e));
+            ccprintlne(window, format!("Error writing config file: {e}"));
         }
     }
 
@@ -438,7 +438,7 @@ impl LauncherConfig {
         config.set("launcher_settings", "rocket_league_exe_path", self.rocket_league_exe_path);
 
         if let Err(e) = config.write(get_config_path()) {
-            ccprintlne(window, format!("Error writing config file: {}", e));
+            ccprintlne(window, format!("Error writing config file: {e}"));
         }
     }
 }
@@ -589,18 +589,18 @@ impl StoryState {
         conf.set("story_mode", "save_state", serde_json::to_string(self).ok());
 
         if let Err(e) = conf.write(get_config_path()) {
-            ccprintlne(window, format!("Failed to write config: {}", e));
+            ccprintlne(window, format!("Failed to write config: {e}"));
         }
     }
 
     pub fn add_purchase(&mut self, id: String, cost: usize) -> Result<(), String> {
         let current_currency = *self.upgrades.get(Self::CURRENCY_KEY).ok_or("The key 'currency' was not found")?;
         if current_currency < cost {
-            return Err(format!("Not enough currency to purchase {}", id));
+            return Err(format!("Not enough currency to purchase {id}"));
         }
 
         if self.upgrades.contains_key(&id) {
-            return Err(format!("Purchase already made: {}", id));
+            return Err(format!("Purchase already made: {id}"));
         }
 
         self.upgrades.insert(id, 1);
@@ -612,7 +612,7 @@ impl StoryState {
     pub fn add_recruit(&mut self, id: String) -> Result<(), String> {
         let current_currency = *self.upgrades.get(Self::CURRENCY_KEY).ok_or("The key 'currency' was not found")?;
         if current_currency < 1 {
-            return Err(format!("Not enough currency to recruit {}", id));
+            return Err(format!("Not enough currency to recruit {id}"));
         }
 
         self.teammates.push(id);

@@ -6,7 +6,7 @@ const REQUIRED_ARGS: [&str; 2] = ["-rlbot", "RLBot_ControllerURL=127.0.0.1"];
 pub fn is_rocket_league_running(port: u16) -> Result<bool, String> {
     let system = System::new_with_specifics(RefreshKind::new().with_processes(ProcessRefreshKind::new()));
     let mut rl_procs = system.processes_by_name(ROCKET_LEAGUE_PROGRAM_NAME);
-    let port_arg = format!("{}:{}", REQUIRED_ARGS[1], port);
+    let port_arg = format!("{}:{port}", REQUIRED_ARGS[1]);
 
     match rl_procs.next() {
         Some(process_info) => {
@@ -25,8 +25,8 @@ pub fn is_rocket_league_running(port: u16) -> Result<bool, String> {
             }
 
             Err(format!(
-                "Please close Rocket League and let RLBot open it for you. Do not start Rocket League yourself. (Rocket League is not running with '{}' and/or on port {} (with '{}'))",
-                REQUIRED_ARGS[0], port, port_arg
+                "Please close Rocket League and let RLBot open it for you. Do not start Rocket League yourself. (Rocket League is not running with '{}' and/or on port {port} (with '{port_arg}'))",
+                REQUIRED_ARGS[0]
             ))
         }
         None => Ok(false),

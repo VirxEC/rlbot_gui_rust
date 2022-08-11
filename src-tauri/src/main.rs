@@ -5,6 +5,7 @@
 mod bot_management;
 mod commands;
 mod config_handles;
+mod configparser;
 mod custom_maps;
 mod is_online;
 mod rlbot;
@@ -26,16 +27,19 @@ use std::path::Path;
 use std::{
     collections::HashMap,
     env,
-    error::Error,
+    error::Error as StdError,
     ffi::OsStr,
-    fs::File,
-    io::{Read, Result as IoResult},
+    fs::{File, OpenOptions},
+    io::{Read, Result as IoResult, Write},
     path::PathBuf,
     process::{Child, ChildStdin, Command, Stdio},
+    string::FromUtf8Error,
     sync::Mutex,
     thread,
+    time::Duration,
 };
 use tauri::{App, Error as TauriError, Manager, Window};
+use thiserror::Error;
 use tokio::sync::Mutex as AsyncMutex;
 
 const BOTPACK_FOLDER: &str = "RLBotPackDeletable";
@@ -43,14 +47,19 @@ const MAPPACK_FOLDER: &str = "RLBotMapPackDeletable";
 const MAPPACK_REPO: (&str, &str) = ("azeemba", "RLBotMapPack");
 const BOTPACK_REPO_OWNER: &str = "RLBot";
 const BOTPACK_REPO_NAME: &str = "RLBotPack";
+const MAX_CONSOLE_LINES: usize = 840;
 
 lazy_static! {
     static ref CONSOLE_TEXT: Mutex<Vec<ConsoleText>> = Mutex::new(Vec::new());
+    static ref CONSOLE_TEXT_OUT_QUEUE: Mutex<Vec<String>> = Mutex::new(Vec::new());
     static ref CONSOLE_INPUT_COMMANDS: Mutex<Vec<String>> = Mutex::new(Vec::new());
     static ref PYTHON_PATH: Mutex<String> = Mutex::new(String::new());
     static ref BOT_FOLDER_SETTINGS: Mutex<Option<BotFolders>> = Mutex::new(None);
     static ref MATCH_HANDLER_STDIN: Mutex<Option<ChildStdin>> = Mutex::new(None);
     static ref CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
+}
+
+lazy_static! {
     static ref BOTS_BASE: AsyncMutex<Option<JsonMap>> = AsyncMutex::new(None);
     static ref STORIES_CACHE: AsyncMutex<HashMap<StoryConfig, JsonMap>> = AsyncMutex::new(HashMap::new());
 }
@@ -85,19 +94,36 @@ fn auto_detect_python() -> Option<(String, bool)> {
     }
 }
 
+#[derive(Debug, Error)]
+pub enum WindowsPipLocateError {
+    #[error("Couldn't convert stdout to string: {0}")]
+    InvalidUTF8(#[from] FromUtf8Error),
+    #[error("{0} has no parent")]
+    NoParentError(String),
+    #[error("I/O error: {0}")]
+    IO(#[from] std::io::Error),
+    #[error("Could not find python.exe")]
+    NoPython,
+}
+
 #[cfg(windows)]
-fn get_python_from_pip(pip: &str) -> Result<String, Box<dyn Error>> {
+fn get_python_from_pip(pip: &str) -> Result<String, WindowsPipLocateError> {
     let output = Command::new("where").arg(pip).output()?;
     let stdout = String::from_utf8(output.stdout)?;
 
     if let Some(first_line) = stdout.lines().next() {
-        let python_path = Path::new(first_line).parent().unwrap().parent().unwrap().join("python.exe");
+        let python_path = Path::new(first_line)
+            .parent()
+            .ok_or_else(|| WindowsPipLocateError::NoParentError(first_line.to_owned()))?
+            .parent()
+            .ok_or_else(|| WindowsPipLocateError::NoParentError(first_line.to_owned()))?
+            .join("python.exe");
         if python_path.exists() {
             return Ok(python_path.to_string_lossy().to_string());
         }
     }
 
-    Err("Could not find python.exe".into())
+    Err(WindowsPipLocateError::NoPython)
 }
 
 #[cfg(target_os = "macos")]
@@ -149,8 +175,9 @@ fn clear_log_file() -> IoResult<()> {
 ///
 /// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
 /// * `text` - The text to emit
-pub fn ccprintln(window: &Window, text: String) {
-    println!("{}", &text);
+pub fn ccprintln<T: AsRef<str>>(window: &Window, text: T) {
+    let text = text.as_ref();
+    println!("{}", text);
     emit_text(window, text, false);
 }
 
@@ -231,6 +258,16 @@ fn get_command_status<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A
     }
 }
 
+#[derive(Debug, Error)]
+pub enum CommandError {
+    #[error("Mutex {0} was poisoned")]
+    Poisoned(String),
+    #[error("I/O error: {0}")]
+    IO(#[from] std::io::Error),
+    #[error("Pipe is closed")]
+    ClosedPipe,
+}
+
 /// Returns a Command that, went ran, will have all it's output redirected to the GUI console
 /// Be sure to `drop(command)` after spawning the child process! Otherwise a deadlock could happen.
 /// This is due to how the `os_pipe` crate works.
@@ -245,7 +282,7 @@ fn get_command_status<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A
 ///
 /// * `program` - The executable to run
 /// * `args` - The arguments to pass to the executable
-pub fn get_capture_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(program: S, args: I) -> Result<Command, Box<dyn Error>> {
+pub fn get_capture_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(program: S, args: I) -> Result<Command, CommandError> {
     let mut command = Command::new(program);
 
     #[cfg(windows)]
@@ -255,9 +292,9 @@ pub fn get_capture_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Ite
         command.creation_flags(0x08000000);
     };
 
-    let pipe = CAPTURE_PIPE_WRITER.lock()?;
-    let out_pipe = pipe.as_ref().ok_or("Pipe is closed")?.try_clone()?;
-    let err_pipe = pipe.as_ref().ok_or("Pipe is closed")?.try_clone()?;
+    let pipe = CAPTURE_PIPE_WRITER.lock().map_err(|_| CommandError::Poisoned("CAPTURE_PIPE_WRITER".to_owned()))?;
+    let out_pipe = pipe.as_ref().ok_or(CommandError::ClosedPipe)?.try_clone()?;
+    let err_pipe = pipe.as_ref().ok_or(CommandError::ClosedPipe)?.try_clone()?;
 
     command.args(args).current_dir(get_content_folder()).stdout(out_pipe).stderr(err_pipe);
 
@@ -277,7 +314,7 @@ pub fn get_capture_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Ite
 ///
 /// * `program` - The executable to run
 /// * `args` - The arguments to pass to the executable
-pub fn spawn_capture_process<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(program: S, args: I) -> Result<Child, Box<dyn Error>> {
+pub fn spawn_capture_process<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(program: S, args: I) -> Result<Child, CommandError> {
     Ok(get_capture_command(program, args)?.spawn()?)
 }
 
@@ -324,15 +361,56 @@ fn get_content_folder() -> PathBuf {
     PathBuf::from(format!("{}/.RLBotGUI", env::var("HOME").unwrap()))
 }
 
-fn update_internal_console(update: &ConsoleTextUpdate) -> Result<(), String> {
-    let mut console_text = CONSOLE_TEXT.lock().map_err(|e| e.to_string())?;
+#[cfg(windows)]
+fn get_home_folder() -> (PathBuf, &'static str) {
+    (PathBuf::from(env::var("USERPROFILE").unwrap()), "%USERPROFILE%")
+}
+
+#[cfg(not(windows))]
+fn get_home_folder() -> (PathBuf, &'static str) {
+    (PathBuf::from(env::var("HOME").unwrap()), "~")
+}
+
+#[derive(Debug, Error)]
+enum InternalConsoleError {
+    #[error("Mutex {0} was poisoned")]
+    Poisoned(String),
+    #[error("Could not complete I/O operation: {0}")]
+    Io(#[from] std::io::Error),
+}
+
+fn write_console_text_out_queue_to_file() -> Result<(), InternalConsoleError> {
+    let mut queue = CONSOLE_TEXT_OUT_QUEUE
+        .lock()
+        .map_err(|_| InternalConsoleError::Poisoned("CONSOLE_TEXT_OUT_QUEUE".to_owned()))?;
+
+    if queue.is_empty() {
+        return Ok(());
+    }
+
+    let mut file = OpenOptions::new().write(true).append(true).open(get_log_path())?;
+
+    for line in queue.drain(..) {
+        writeln!(file, "{line}")?;
+    }
+
+    Ok(())
+}
+
+fn update_internal_console(update: &ConsoleTextUpdate) -> Result<(), InternalConsoleError> {
+    let mut console_text = CONSOLE_TEXT.lock().map_err(|_| InternalConsoleError::Poisoned("CONSOLE_TEXT".to_owned()))?;
     if update.replace_last {
         console_text.pop();
     }
-    console_text.insert(0, update.content.clone());
+    console_text.push(update.content.clone());
 
-    if console_text.len() > 1200 {
-        console_text.drain(1200..);
+    CONSOLE_TEXT_OUT_QUEUE
+        .lock()
+        .map_err(|_| InternalConsoleError::Poisoned("CONSOLE_TEXT_OUT_QUEUE".to_owned()))?
+        .push(update.content.text.clone());
+
+    if console_text.len() > MAX_CONSOLE_LINES {
+        console_text.remove(0);
     }
 
     Ok(())
@@ -345,12 +423,13 @@ fn try_emit_signal<S: Serialize + Clone>(window: &Window, signal: &str, payload:
 fn issue_console_update(window: &Window, text: String, replace_last: bool) -> (String, Option<TauriError>) {
     let update = ConsoleTextUpdate::from(text, replace_last);
     if let Err(e) = update_internal_console(&update) {
-        ccprintlne(window, e);
+        ccprintlne(window, e.to_string());
     }
     try_emit_signal(window, "new-console-text", update)
 }
 
-fn try_emit_text(window: &Window, text: String, replace_last: bool) -> (String, Option<TauriError>) {
+fn try_emit_text<T: AsRef<str>>(window: &Window, text: T, replace_last: bool) -> (String, Option<TauriError>) {
+    let text = text.as_ref();
     if text == "-|-*|MATCH START FAILED|*-|-" {
         eprintln!("START MATCH FAILED");
         try_emit_signal(window, "match-start-failed", ())
@@ -364,32 +443,32 @@ fn try_emit_text(window: &Window, text: String, replace_last: bool) -> (String, 
     } else if text.starts_with("-|-*|STORY_RESULT ") && text.ends_with("|*-|-") {
         println!("GOT STORY RESULT");
         let text = text.replace("-|-*|STORY_RESULT ", "").replace("|*-|-", "");
-        println!("{}", &text);
         let save_state: StoryState = serde_json::from_str(&text).unwrap();
         save_state.save(window);
         try_emit_signal(window, "load_updated_save_state", save_state)
     } else {
-        issue_console_update(window, text, replace_last)
+        issue_console_update(window, text.to_owned(), replace_last)
     }
 }
 
-fn emit_text(window: &Window, text: String, replace_last: bool) {
+fn emit_text<T: AsRef<str>>(window: &Window, text: T, replace_last: bool) {
     let (signal, error) = try_emit_text(window, text, replace_last);
     if let Some(e) = error {
-        ccprintlne(window, format!("Error emitting {}: {}", signal, e));
+        ccprintlne(window, format!("Error emitting {signal}: {e}"));
     }
 }
 
-fn gui_setup_load_config(window: &Window) -> Result<(), Box<dyn Error>> {
+fn gui_setup_load_config(window: &Window) -> Result<(), Box<dyn StdError>> {
     let gui_config = load_gui_config(window);
     *PYTHON_PATH.lock()? = gui_config.get("python_config", "path").unwrap_or_else(|| auto_detect_python().unwrap_or_default().0);
     *BOT_FOLDER_SETTINGS.lock()? = Some(BotFolders::load_from_conf(&gui_config));
     Ok(())
 }
 
-fn gui_setup(app: &mut App) -> Result<(), Box<dyn Error>> {
+fn gui_setup(app: &mut App) -> Result<(), Box<dyn StdError>> {
     const MAIN_WINDOW_NAME: &str = "main";
     let window = app.get_window(MAIN_WINDOW_NAME).ok_or(format!("Cannot find window '{MAIN_WINDOW_NAME}'"))?;
+    let window2 = window.clone();
 
     clear_log_file()?;
 
@@ -428,6 +507,13 @@ fn gui_setup(app: &mut App) -> Result<(), Box<dyn Error>> {
             }
 
             emit_text(&window, text, will_replace_last);
+        }
+    });
+
+    thread::spawn(move || loop {
+        thread::sleep(Duration::from_secs_f32(1. / 5.));
+        if let Err(e) = write_console_text_out_queue_to_file() {
+            ccprintlne(&window2, e.to_string());
         }
     });
 
@@ -511,6 +597,7 @@ fn main() {
             recruit,
             is_debug_build,
             run_command,
+            upload_log,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

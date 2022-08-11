@@ -1,5 +1,6 @@
 use crate::{
     bot_management::downloader::MapPackUpdater,
+    configparser::Ini,
     custom_maps,
     rlbot::{
         agents::runnable::Runnable,
@@ -15,7 +16,6 @@ use crate::{
     stories::bots_base,
     *,
 };
-use configparser::ini::Ini;
 use glob::glob;
 use std::{
     collections::{HashMap, HashSet},
@@ -37,7 +37,7 @@ pub fn load_gui_config(window: &Window) -> Ini {
 
     if !config_path.exists() {
         if let Err(e) = create_dir_all(config_path.parent().unwrap()) {
-            ccprintlne(window, format!("Failed to create config directory: {}", e));
+            ccprintlne(window, format!("Failed to create config directory: {e}"));
         }
 
         conf.set("bot_folder_settings", "files", Some("{}".to_owned()));
@@ -51,10 +51,10 @@ pub fn load_gui_config(window: &Window) -> Ini {
         conf.set("story_mode", "save_state", None);
 
         if let Err(e) = conf.write(&config_path) {
-            ccprintlne(window, format!("Failed to write config file: {}", e));
+            ccprintlne(window, format!("Failed to write config file: {e}"));
         }
     } else if let Err(e) = conf.load(config_path) {
-        ccprintlne(window, format!("Failed to load config: {}", e));
+        ccprintlne(window, format!("Failed to load config: {e}"));
     }
 
     conf
@@ -85,25 +85,29 @@ fn filter_hidden_bundles<T: Runnable + Clone>(bundles: &HashSet<T>) -> Vec<T> {
     bundles.iter().filter(|b| !b.get_config_file_name().starts_with('_')).cloned().collect()
 }
 
-fn get_bots_from_directory(path: &str) -> Vec<BotConfigBundle> {
-    filter_hidden_bundles(&scan_directory_for_bot_configs(path))
+async fn get_bots_from_directory(path: &str) -> Vec<BotConfigBundle> {
+    filter_hidden_bundles(&scan_directory_for_bot_configs(path).await)
 }
 
 #[tauri::command]
 pub async fn scan_for_bots() -> Result<Vec<BotConfigBundle>, String> {
-    let bfs_lock = BOT_FOLDER_SETTINGS.lock().map_err(|err| err.to_string())?;
-    let bfs = bfs_lock.as_ref().ok_or("BOT_FOLDER_SETTINGS is None")?;
+    let bfs = BOT_FOLDER_SETTINGS
+        .lock()
+        .map_err(|_| "Mutex BOT_FOLDER_SETTINGS was poisoned".to_owned())?
+        .as_ref()
+        .ok_or("BOT_FOLDER_SETTINGS is None")?
+        .clone();
     let mut bots = Vec::new();
 
     for (path, props) in &bfs.folders {
         if props.visible {
-            bots.extend(get_bots_from_directory(&*path));
+            bots.extend(get_bots_from_directory(&**path).await);
         }
     }
 
     for (path, props) in &bfs.files {
         if props.visible {
-            if let Ok(bundle) = BotConfigBundle::minimal_from_path(Path::new(path)) {
+            if let Ok(bundle) = BotConfigBundle::minimal_from_path_sync(Path::new(path)) {
                 bots.push(bundle);
             }
         }
@@ -124,7 +128,7 @@ pub async fn scan_for_scripts() -> Result<Vec<ScriptConfigBundle>, String> {
 
     for (path, props) in &bfs.folders {
         if props.visible {
-            scripts.extend(get_scripts_from_directory(&*path));
+            scripts.extend(get_scripts_from_directory(&**path));
         }
     }
 
@@ -151,7 +155,7 @@ pub async fn pick_bot_folder(window: Window) {
                         ccprintlne(&window, "BOT_FOLDER_SETTINGS is None".to_owned());
                     }
                 }
-                Err(err) => ccprintlne(&window, format!("Failed to lock BOT_FOLDER_SETTINGS: {}", err)),
+                Err(err) => ccprintlne(&window, format!("Failed to lock BOT_FOLDER_SETTINGS: {err}")),
             }
         }
     });
@@ -169,7 +173,7 @@ pub async fn pick_bot_config(window: Window) {
                         ccprintlne(&window, "BOT_FOLDER_SETTINGS is None".to_owned());
                     }
                 }
-                Err(err) => ccprintlne(&window, format!("Failed to lock BOT_FOLDER_SETTINGS: {}", err)),
+                Err(err) => ccprintlne(&window, format!("Failed to lock BOT_FOLDER_SETTINGS: {err}")),
             }
         }
     });
@@ -180,7 +184,7 @@ pub async fn pick_json_file(window: Window) {
     FileDialogBuilder::new().add_filter("JSON File", &["json"]).pick_file(move |path| {
         if let Some(path) = path {
             if let Err(e) = window.emit("json_file_selected", path.to_string_lossy().to_string()) {
-                ccprintlne(&window, format!("Failed to emit json_file_selected event: {}", e));
+                ccprintlne(&window, format!("Failed to emit json_file_selected event: {e}"));
             }
         }
     });
@@ -200,13 +204,13 @@ pub async fn show_path_in_explorer(window: Window, path: String) {
     let path = if ppath.is_file() { ppath.parent().unwrap().to_string_lossy().to_string() } else { path };
 
     if let Err(e) = Command::new(command).arg(&path).spawn() {
-        ccprintlne(&window, format!("Failed to open path: {}", e));
+        ccprintlne(&window, format!("Failed to open path: {e}"));
     }
 }
 
 #[tauri::command]
 pub async fn get_looks(path: String) -> Option<BotLooksConfig> {
-    match BotLooksConfig::from_path(&*path) {
+    match BotLooksConfig::from_path(&*path).await {
         Ok(looks) => Some(looks),
         Err(_) => None,
     }
@@ -266,7 +270,7 @@ pub async fn save_team_settings(window: Window, blue_team: Vec<BotConfigBundle>,
     config.set("team_settings", "orange_team", Some(serde_json::to_string(&clean(&orange_team)).unwrap()));
 
     if let Err(e) = config.write(get_config_path()) {
-        ccprintlne(&window, format!("Failed to save team settings: {}", e));
+        ccprintlne(&window, format!("Failed to save team settings: {e}"));
     }
 }
 
@@ -302,7 +306,7 @@ pub async fn set_python_path(window: Window, path: String) -> Result<(), String>
     config.set("python_config", "path", Some(path));
 
     if let Err(e) = config.write(get_config_path()) {
-        ccprintlne(&window, format!("Failed to save python path: {}", e));
+        ccprintlne(&window, format!("Failed to save python path: {e}"));
     }
 
     Ok(())
@@ -313,7 +317,7 @@ pub async fn pick_appearance_file(window: Window) {
     FileDialogBuilder::new().add_filter("Appearance Cfg File", &["cfg"]).pick_file(move |path| {
         if let Some(path) = path {
             if let Err(e) = window.emit("set_appearance_file", path.to_string_lossy().to_string()) {
-                ccprintlne(&window, format!("Failed to set appearance file: {}", e));
+                ccprintlne(&window, format!("Failed to set appearance file: {e}"));
             }
         }
     });
@@ -322,7 +326,7 @@ pub async fn pick_appearance_file(window: Window) {
 fn read_recommendations_json<P: AsRef<Path>>(path: P) -> Result<AllRecommendations<String>, String> {
     let raw_json = read_to_string(&path).map_err(|e| format!("Failed to read {}", e))?;
 
-    serde_json::from_str(&raw_json).map_err(|e| format!("Failed to parse file {}: {}", path.as_ref().to_string_lossy(), e))
+    serde_json::from_str(&raw_json).map_err(|e| format!("Failed to parse file {}: {e}", path.as_ref().to_string_lossy()))
 }
 
 fn get_recommendations_json(window: &Window, bfs: &BotFolders) -> Option<AllRecommendations<String>> {
@@ -383,7 +387,7 @@ pub async fn get_recommendations(window: Window) -> Option<AllRecommendations<Bo
         j.change_generic(&|bot_name| {
             for (name, path) in &name_path_pairs {
                 if name == bot_name {
-                    if let Ok(mut bundle) = BotConfigBundle::minimal_from_path(Path::new(path)) {
+                    if let Ok(mut bundle) = BotConfigBundle::minimal_from_path_sync(Path::new(path)) {
                         bundle.logo = bundle.load_logo();
 
                         if has_rlbot {
@@ -429,7 +433,7 @@ pub async fn story_delete_save(window: Window) {
     conf.set("story_mode", "save_state", None);
 
     if let Err(e) = conf.write(get_config_path()) {
-        ccprintlne(&window, format!("Failed to write config: {}", e));
+        ccprintlne(&window, format!("Failed to write config: {e}"));
     }
 }
 

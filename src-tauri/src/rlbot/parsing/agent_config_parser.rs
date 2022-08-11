@@ -1,5 +1,8 @@
-use crate::{bot_management::cfg_helper::load_cfg, ccprintlne};
-use configparser::ini::Ini;
+use crate::{
+    bot_management::cfg_helper::{load_cfg, CfgHelperError},
+    ccprintlne,
+    configparser::Ini,
+};
 use serde::{Deserialize, Serialize};
 use tauri::Window;
 
@@ -36,8 +39,8 @@ pub struct BotTeamLooksConfig {
 }
 
 impl BotTeamLooksConfig {
-    pub fn from_path(loadout_header: &str, paint_header: &str, path: &str) -> Result<Self, String> {
-        let conf = load_cfg(path)?;
+    pub async fn from_path(loadout_header: &str, paint_header: &str, path: &str) -> Result<Self, CfgHelperError> {
+        let conf = load_cfg(path).await?;
 
         let team_color_id = conf.get(loadout_header, "team_color_id").unwrap_or_default();
         let custom_color_id = conf.get(loadout_header, "custom_color_id").unwrap_or_default();
@@ -125,10 +128,10 @@ pub struct BotLooksConfig {
 }
 
 impl BotLooksConfig {
-    pub fn from_path(path: &str) -> Result<Self, String> {
+    pub async fn from_path(path: &str) -> Result<Self, CfgHelperError> {
         Ok(Self {
-            blue: BotTeamLooksConfig::from_path(BOT_CONFIG_LOADOUT_HEADER, BOT_CONFIG_LOADOUT_PAINT_BLUE_HEADER, path)?,
-            orange: BotTeamLooksConfig::from_path(BOT_CONFIG_LOADOUT_ORANGE_HEADER, BOT_CONFIG_LOADOUT_PAINT_ORANGE_HEADER, path)?,
+            blue: BotTeamLooksConfig::from_path(BOT_CONFIG_LOADOUT_HEADER, BOT_CONFIG_LOADOUT_PAINT_BLUE_HEADER, path).await?,
+            orange: BotTeamLooksConfig::from_path(BOT_CONFIG_LOADOUT_ORANGE_HEADER, BOT_CONFIG_LOADOUT_PAINT_ORANGE_HEADER, path).await?,
         })
     }
 
@@ -139,7 +142,7 @@ impl BotLooksConfig {
             .save_to_config(&mut config, BOT_CONFIG_LOADOUT_ORANGE_HEADER, BOT_CONFIG_LOADOUT_PAINT_ORANGE_HEADER);
 
         if let Err(e) = config.write(path) {
-            ccprintlne(window, format!("Failed to save bot config to {}: {}", path, e));
+            ccprintlne(window, format!("Failed to save bot config to {path}: {e}"));
         }
     }
 }

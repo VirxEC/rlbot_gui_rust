@@ -1,5 +1,5 @@
-use super::cfg_helper::load_cfg;
-use crate::{bot_management::zip_extract_fixed, ccprintln, ccprintlne, ccprintlnr, get_config_path, load_gui_config};
+use super::cfg_helper::load_cfg_sync;
+use crate::{bot_management::zip_extract_fixed, ccprintln, ccprintlne, ccprintlnr, commands::UPDATE_DOWNLOAD_PROGRESS_SIGNAL, get_config_path, load_gui_config};
 use fs_extra::dir;
 use futures_util::StreamExt;
 use rand::Rng;
@@ -75,7 +75,7 @@ async fn get_json_from_url(client: &Client, url: &str) -> Result<serde_json::Val
 /// * `client`: The client to use to make the request
 /// * `repo_full_name` The owner/name of the repo, e.x. "RLBot/RLBotPack"
 async fn get_repo_size(client: &Client, repo_full_name: &str) -> Result<u64, Box<dyn Error>> {
-    let data = get_json_from_url(client, &format!("https://api.github.com/repos/{}", repo_full_name)).await?;
+    let data = get_json_from_url(client, &format!("https://api.github.com/repos/{repo_full_name}")).await?;
     match data["size"].as_u64() {
         Some(size) => Ok(size * 1000),
         None => Err(Box::new(IoError::new(IoErrorKind::Other, "Failed to get repository size"))),
@@ -130,7 +130,7 @@ async fn download_and_extract_repo_zip<T: IntoUrl, J: AsRef<Path>>(
 
         if last_update.elapsed().as_secs_f32() >= 0.1 {
             let progress = bytes.len() as f32 / total_size as f32 * 100.0;
-            if let Err(e) = window.emit("update-download-progress", ProgressBarUpdate::new(progress, "Downloading zip...".to_owned())) {
+            if let Err(e) = window.emit(UPDATE_DOWNLOAD_PROGRESS_SIGNAL, ProgressBarUpdate::new(progress, "Downloading zip...".to_owned())) {
                 ccprintlne(window, format!("Error when updating progress bar: {}", e));
             }
             last_update = Instant::now();
@@ -139,16 +139,16 @@ async fn download_and_extract_repo_zip<T: IntoUrl, J: AsRef<Path>>(
 
     if clobber && local_folder_path.exists() {
         if let Err(e) = dir::remove(local_folder_path) {
-            ccprintlne(window, format!("Error when removing existing folder: {}", e));
+            ccprintlne(window, format!("Error when removing existing folder: {e}"));
         }
     }
 
-    if let Err(e) = window.emit("update-download-progress", ProgressBarUpdate::new(100., "Extracting zip...".to_owned())) {
-        ccprintlne(window, format!("Error when updating progress bar: {}", e));
+    if let Err(e) = window.emit(UPDATE_DOWNLOAD_PROGRESS_SIGNAL, ProgressBarUpdate::new(100., "Extracting zip...".to_owned())) {
+        ccprintlne(window, format!("Error when updating progress bar: {e}"));
     }
 
     if let Err(e) = zip_extract_fixed::extract(window, Cursor::new(bytes), local_folder_path, false, true) {
-        ccprintlne(window, format!("Error when extracting zip: {}", e));
+        ccprintlne(window, format!("Error when extracting zip: {e}"));
     }
 
     Ok(())
@@ -165,12 +165,12 @@ async fn download_and_extract_repo_zip<T: IntoUrl, J: AsRef<Path>>(
 /// * `update_tag_settings`: Whether to update the incr tag in the GUI config
 pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, checkout_folder: &str, update_tag_settings: bool) -> BotpackStatus {
     let client = Client::new();
-    let repo_full_name = format!("{}/{}", repo_owner, repo_name);
+    let repo_full_name = format!("{repo_owner}/{repo_name}");
 
     let status = download_and_extract_repo_zip(
         window,
         &client,
-        &format!("https://github.com/{}/archive/refs/heads/master.zip", repo_full_name),
+        &format!("https://github.com/{repo_full_name}/archive/refs/heads/master.zip"),
         checkout_folder,
         true,
         &repo_full_name,
@@ -178,7 +178,7 @@ pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, c
     .await;
 
     if status.is_ok() && update_tag_settings {
-        let latest_release_tag_name = match get_json_from_url(&client, &format!("https://api.github.com/repos/{}/releases/latest", repo_full_name)).await {
+        let latest_release_tag_name = match get_json_from_url(&client, &format!("https://api.github.com/repos/{repo_full_name}/releases/latest")).await {
             Ok(release) => release["tag_name"].as_str().unwrap_or_default().to_owned(),
             Err(e) => {
                 ccprintlne(window, e.to_string());
@@ -208,7 +208,7 @@ pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, c
 
 /// Load the GUI config and check the get the current version number of the botpack
 pub fn get_current_tag_name() -> Option<u32> {
-    load_cfg(get_config_path())
+    load_cfg_sync(get_config_path())
         .ok()?
         .get("bot_folder_settings", "incr")?
         .replace("incr-", "")
@@ -228,7 +228,7 @@ fn get_url_from_tag(repo_full_name: &str, tag: u32) -> String {
 
 /// Finds what the tag is on the latest release in a repo
 async fn get_latest_release_tag(repo_full_name: &str) -> Result<u32, String> {
-    get_json_from_url(&Client::new(), &format!("https://api.github.com/repos/{}/releases/latest", repo_full_name))
+    get_json_from_url(&Client::new(), &format!("https://api.github.com/repos/{repo_full_name}/releases/latest"))
         .await
         .map_err(|e| e.to_string())
         .and_then(|release| {
@@ -270,7 +270,7 @@ pub async fn is_botpack_up_to_date(window: &Window, repo_full_name: &str) -> boo
 /// * `repo_name`: The name of the repo, e.x. "RLBotPack"
 /// * `checkout_folder`: The folder to checkout the repo to
 pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str, checkout_folder: &str) -> BotpackStatus {
-    let repo_full_name = format!("{}/{}", repo_owner, repo_name);
+    let repo_full_name = format!("{repo_owner}/{repo_name}");
 
     let current_tag_name = match get_current_tag_name() {
         Some(tag) => tag,
@@ -286,7 +286,7 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
     };
 
     if latest_release_tag == current_tag_name {
-        ccprintln(window, "The botpack is already up-to-date!".to_owned());
+        ccprintln(window, "The botpack is already up-to-date!");
         return BotpackStatus::Skipped("The botpack is already up-to-date!".to_owned());
     }
 
@@ -296,7 +296,7 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
         return BotpackStatus::RequiresFullDownload;
     }
 
-    let master_folder = format!("{}-{}", repo_name, FOLDER_SUFFIX);
+    let master_folder = format!("{repo_name}-{FOLDER_SUFFIX}");
     let local_folder_path = Path::new(checkout_folder).join(master_folder);
 
     if !local_folder_path.exists() {
@@ -322,20 +322,23 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
         ccprintln(window, format!("Patching in update incr-{}", tag));
 
         let progress = (tag - current_tag_name) as f32 / total_patches as f32 * 100.;
-        if let Err(e) = window.emit("update-download-progress", ProgressBarUpdate::new(progress, format!("Downloading patch incr-{}...", tag))) {
-            ccprintlne(window, format!("Error when updating progress bar: {}", e));
+        if let Err(e) = window.emit(
+            UPDATE_DOWNLOAD_PROGRESS_SIGNAL,
+            ProgressBarUpdate::new(progress, format!("Downloading patch incr-{tag}...")),
+        ) {
+            ccprintlne(window, format!("Error when updating progress bar: {e}"));
         }
 
         let resp = match handle.await {
             Ok(resp) => resp,
             Err(e) => {
-                ccprintlne(window, format!("Failed to await handle: {}", e));
+                ccprintlne(window, format!("Failed to await handle: {e}"));
                 break;
             }
         };
 
         let progress = progress + 1. / (total_patches as f32 * 2.) * 100.;
-        if let Err(e) = window.emit("update-download-progress", ProgressBarUpdate::new(progress, format!("Applying patch incr-{}...", tag))) {
+        if let Err(e) = window.emit(UPDATE_DOWNLOAD_PROGRESS_SIGNAL, ProgressBarUpdate::new(progress, format!("Applying patch incr-{tag}..."))) {
             ccprintlne(window, format!("Error when updating progress bar: {}", e));
         }
 
@@ -343,7 +346,7 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
             break;
         }
 
-        config.set("bot_folder_settings", "incr", Some(format!("incr-{}", tag)));
+        config.set("bot_folder_settings", "incr", Some(format!("incr-{tag}")));
 
         if let Err(e) = config.write(&config_path) {
             ccprintlne(window, e.to_string());
@@ -353,13 +356,13 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
 
         if tag_deleted_files_path.exists() {
             if let Err(e) = remove_file(&tag_deleted_files_path) {
-                ccprintlne(window, format!("Failed to delete {}: {}", tag_deleted_files_path.display(), e));
+                ccprintlne(window, format!("Failed to delete {}: {e}", tag_deleted_files_path.display()));
             }
         }
     }
 
     if let Err(e) = remove_empty_folders(window, local_folder_path) {
-        ccprintlne(window, format!("Failed to remove empty folders: {}", e));
+        ccprintlne(window, format!("Failed to remove empty folders: {e}"));
     }
 
     if tag - 1 == latest_release_tag {
@@ -381,7 +384,7 @@ async fn apply_patch(resp: Result<reqwest::Response, reqwest::Error>, window: &W
     let download = match resp {
         Ok(download) => download,
         Err(e) => {
-            ccprintlne(window, format!("Failed to download upgrade zip: {}", e));
+            ccprintlne(window, format!("Failed to download upgrade zip: {e}"));
             return ControlFlow::Break(());
         }
     };
@@ -389,13 +392,13 @@ async fn apply_patch(resp: Result<reqwest::Response, reqwest::Error>, window: &W
     let bytes = match download.bytes().await {
         Ok(bytes) => bytes,
         Err(e) => {
-            ccprintlne(window, format!("Failed to download upgrade zip: {}", e));
+            ccprintlne(window, format!("Failed to download upgrade zip: {e}"));
             return ControlFlow::Break(());
         }
     };
 
     if let Err(e) = zip_extract_fixed::extract(window, Cursor::new(&bytes), local_folder_path, false, true) {
-        ccprintlne(window, format!("Failed to extract upgrade zip: {}", e));
+        ccprintlne(window, format!("Failed to extract upgrade zip: {e}"));
         return ControlFlow::Break(());
     }
 
@@ -408,7 +411,7 @@ async fn apply_patch(resp: Result<reqwest::Response, reqwest::Error>, window: &W
                 if !line.is_empty() {
                     let file_name = local_folder_path.join(line);
                     if let Err(e) = remove_file(&file_name) {
-                        ccprintlne(window, format!("Failed to delete {}: {}", file_name.display(), e));
+                        ccprintlne(window, format!("Failed to delete {}: {e}", file_name.display()));
                         last_ok = false;
                     } else {
                         let text = format!("Deleted {}", file_name.display());
@@ -423,7 +426,7 @@ async fn apply_patch(resp: Result<reqwest::Response, reqwest::Error>, window: &W
                 }
             }
 
-            let text = format!("Deleted {} files", count);
+            let text = format!("Deleted {count} files");
             if last_ok {
                 ccprintlnr(window, text);
             } else {
@@ -431,7 +434,7 @@ async fn apply_patch(resp: Result<reqwest::Response, reqwest::Error>, window: &W
             }
         }
         Err(e) => {
-            ccprintlne(window, format!("Failed to open .deleted file: {}", e));
+            ccprintlne(window, format!("Failed to open .deleted file: {e}"));
             return ControlFlow::Break(());
         }
     }
@@ -448,7 +451,7 @@ pub struct MapPackUpdater {
 impl MapPackUpdater {
     pub fn new<T: AsRef<Path>>(location: T, repo_owner: String, repo_name: String) -> Self {
         Self {
-            full_path: location.as_ref().join(format!("{}-{}", &repo_name, "main")),
+            full_path: location.as_ref().join(format!("{repo_name}-main")),
             repo_owner,
             repo_name,
             client: Client::new(),
@@ -463,7 +466,7 @@ impl MapPackUpdater {
             let mut file = match File::open(index_path) {
                 Ok(file) => file,
                 Err(e) => {
-                    ccprintlne(window, format!("Failed to open index.json: {}", e));
+                    ccprintlne(window, format!("Failed to open index.json: {e}"));
                     return None;
                 }
             };
@@ -471,14 +474,14 @@ impl MapPackUpdater {
             let mut contents = String::new();
 
             if let Err(e) = file.read_to_string(&mut contents) {
-                ccprintlne(window, format!("Failed to read index.json: {}", e));
+                ccprintlne(window, format!("Failed to read index.json: {e}"));
                 return None;
             }
 
             match serde_json::from_str(&contents) {
                 Ok(json) => Some(json),
                 Err(e) => {
-                    ccprintlne(window, format!("Failed to parse index.json: {}", e));
+                    ccprintlne(window, format!("Failed to parse index.json: {e}"));
                     None
                 }
             }
@@ -503,7 +506,7 @@ impl MapPackUpdater {
         let latest_release = match get_json_from_url(&self.client, &url).await {
             Ok(latest_release) => latest_release,
             Err(e) => {
-                ccprintlne(window, format!("Failed to get latest release: {}", e));
+                ccprintlne(window, format!("Failed to get latest release: {e}"));
                 return BotpackStatus::Skipped("Failed to get latest release".to_owned());
             }
         };
@@ -513,7 +516,7 @@ impl MapPackUpdater {
         if latest_revision > revision {
             BotpackStatus::RequiresFullDownload
         } else {
-            ccprintln(window, "Map pack is already up-to-date!".to_owned());
+            ccprintln(window, "Map pack is already up-to-date!");
             BotpackStatus::Skipped("Map pack is already up-to-date!".to_owned())
         }
     }
@@ -566,7 +569,7 @@ impl MapPackUpdater {
         let latest_release = match get_json_from_url(&self.client, &url).await {
             Ok(latest_release) => latest_release,
             Err(e) => {
-                ccprintlne(window, format!("Failed to get latest release: {}", e));
+                ccprintlne(window, format!("Failed to get latest release: {e}"));
                 return;
             }
         };
@@ -574,7 +577,7 @@ impl MapPackUpdater {
         for asset in latest_release["assets"].as_array().unwrap() {
             let asset_name = asset["name"].as_str().unwrap();
             if let Err(e) = self.download_asset(window, asset, asset_name, &filename_to_path, &self.full_path).await {
-                ccprintlne(window, format!("Failed to download asset {}: {}", asset_name, e));
+                ccprintlne(window, format!("Failed to download asset {asset_name}: {e}"));
             }
         }
     }
@@ -589,7 +592,7 @@ impl MapPackUpdater {
     ) -> Result<(), Box<dyn Error>> {
         if let Some(local_path) = filename_to_path.get(asset_name) {
             let target_path = full_path.as_ref().join(local_path);
-            ccprintln(window, format!("Will fetch updated map {}", asset_name));
+            ccprintln(window, format!("Will fetch updated map {asset_name}"));
 
             let url = asset["browser_download_url"].as_str().unwrap();
             let resp = self.client.get(url).send().await?.bytes().await?;

@@ -358,7 +358,11 @@ button.icon-button {
   max-height: calc(100vh - 80px);
   overflow-y: auto;
   display: flex;
-  flex-direction: column-reverse;
   line-height: normal;
   font-family: 'Fira Code', 'Courier New', Courier, monospace;
+  overflow-x: scroll;
+}
+
+.console-text-item {
+  flex: 1;
 }
