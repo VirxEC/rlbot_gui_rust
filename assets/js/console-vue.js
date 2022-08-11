@@ -23,17 +23,27 @@ export default {
 	</b-navbar>
 	<b-container fluid>
 		<b-card no-body class="bot-pool console-text-pool p-1">
-			<RecycleScroller
-			  ref="scroller"
-			  class="scroller"
-			  :items="consoleTexts"
-			  :item-size="26"
-			  v-slot="{ item }"
+			<DynamicScroller
+				ref="scroller"
+				:items="consoleTexts"
+				:min-item-size="26"
+				class="scroller"
 			>
-				<span class="console-text-item" :style="'color:' + (item.content.color ? item.content.color : 'black') + ';'">
-					<span>{{ item.content.text }}</span>
-				</span>
-			</RecycleScroller>
+				<template v-slot="{ item, index, active }">
+					<DynamicScrollerItem
+						:item="item"
+						:active="active"
+						:size-dependencies="[
+							item.content.text,
+						]"
+						:data-index="index"
+						:data-active="active"
+						class="console-text-item"
+					>
+						<span :style="'color:' + (item.content.color ? item.content.color : 'black') + ';'">{{ item.content.text }}</span>
+					</DynamicScrollerItem>
+				</template>
+			</DynamicScroller>
 
 			<hr>
 
@@ -73,7 +83,7 @@ export default {
 						this.scrollLock = false;
 					}
 
-					this.$refs.scroller.scrollToItem(this.texts - 1)
+					this.$refs.scroller.scrollToBottom();
 				}
 			})
 		}
@@ -83,7 +93,7 @@ export default {
 			this.userChoseLock = true;
 			this.scrollLock = !this.scrollLock;
 			if (this.scrollLock) {
-				this.$refs.scroller.scrollToItem(this.texts - 1)
+				this.$refs.scroller.scrollToBottom();
 			}
 		},
 		onUp: function(event) {
@@ -130,7 +140,7 @@ export default {
 						this.texts++;
 					});
 
-					this.$refs.scroller.scrollToItem(this.texts - 1)
+					this.$refs.scroller.scrollToBottom();
 				});
 
 				invoke("get_console_input_commands").then(commands => {

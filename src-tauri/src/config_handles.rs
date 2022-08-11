@@ -1,5 +1,6 @@
 use crate::{
     bot_management::downloader::MapPackUpdater,
+    configparser::Ini,
     custom_maps,
     rlbot::{
         agents::runnable::Runnable,
@@ -15,7 +16,6 @@ use crate::{
     stories::bots_base,
     *,
 };
-use configparser::ini::Ini;
 use glob::glob;
 use std::{
     collections::{HashMap, HashSet},
@@ -101,7 +101,7 @@ pub async fn scan_for_bots() -> Result<Vec<BotConfigBundle>, String> {
 
     for (path, props) in &bfs.folders {
         if props.visible {
-            bots.extend(get_bots_from_directory(&*path).await);
+            bots.extend(get_bots_from_directory(&**path).await);
         }
     }
 
@@ -128,7 +128,7 @@ pub async fn scan_for_scripts() -> Result<Vec<ScriptConfigBundle>, String> {
 
     for (path, props) in &bfs.folders {
         if props.visible {
-            scripts.extend(get_scripts_from_directory(&*path));
+            scripts.extend(get_scripts_from_directory(&**path));
         }
     }
 

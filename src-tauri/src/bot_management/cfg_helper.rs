@@ -1,4 +1,4 @@
-use configparser::ini::Ini;
+use crate::configparser::Ini;
 use std::path::Path;
 use thiserror::Error;
 
@@ -17,7 +17,6 @@ pub enum CfgHelperError {
 /// * `path`: The path to the CFG file that needs to be loaded
 pub fn load_cfg_sync<T: AsRef<Path>>(path: T) -> Result<Ini, CfgHelperError> {
     let mut conf = Ini::new();
-    conf.set_comment_symbols(&[';']);
     conf.load(path).map_err(CfgHelperError::Load)?;
 
     Ok(conf)
@@ -31,7 +30,7 @@ pub fn load_cfg_sync<T: AsRef<Path>>(path: T) -> Result<Ini, CfgHelperError> {
 pub async fn load_cfg<T: AsRef<Path>>(path: T) -> Result<Ini, CfgHelperError> {
     let mut conf = Ini::new();
     conf.set_comment_symbols(&[';']);
-    conf.load(path).map_err(CfgHelperError::Load)?;
+    conf.load_async(path).await.map_err(CfgHelperError::Load)?;
 
     Ok(conf)
 }
@@ -42,8 +41,8 @@ pub async fn load_cfg<T: AsRef<Path>>(path: T) -> Result<Ini, CfgHelperError> {
 ///
 /// * `conf`: The CFG file that needs to be saved
 /// * `path`: Where to save the CFG file to
-pub fn save_cfg<T: AsRef<Path>>(conf: &Ini, path: T) -> Result<(), CfgHelperError> {
-    conf.write(path)?;
+pub async fn save_cfg<T: AsRef<Path>>(conf: &Ini, path: T) -> Result<(), CfgHelperError> {
+    conf.write_async(path).await?;
     Ok(())
 }
 
@@ -58,5 +57,5 @@ pub fn save_cfg<T: AsRef<Path>>(conf: &Ini, path: T) -> Result<(), CfgHelperErro
 pub async fn change_key_in_cfg<T: AsRef<Path>>(path: T, section: &str, key: &str, value: String) -> Result<(), CfgHelperError> {
     let mut conf = load_cfg(&path).await?;
     conf.set(section, key, Some(value));
-    save_cfg(&conf, path)
+    save_cfg(&conf, path).await
 }

@@ -4,17 +4,27 @@ export default {
 	name: 'mini-console',
 	template: /*html*/`
 	<b-card no-body class="console-text-pool p-1" style="max-height: 80vh">
-		<RecycleScroller
-		ref="scroller"
-		class="scroller"
-		:items="consoleTexts"
-		:item-size="26"
-		v-slot="{ item }"
+		<DynamicScroller
+			ref="scroller"
+			:items="consoleTexts"
+			:min-item-size="26"
+			class="scroller"
 		>
-			<span class="console-text-item" :style="'color:' + (item.content.color ? item.content.color : 'black') + ';'">
-				<span>{{ item.content.text }}</span>
-			</span>
-		</RecycleScroller>
+			<template v-slot="{ item, index, active }">
+				<DynamicScrollerItem
+					:item="item"
+					:active="active"
+					:size-dependencies="[
+						item.content.text,
+					]"
+					:data-index="index"
+					:data-active="active"
+					class="console-text-item"
+				>
+					<span :style="'color:' + (item.content.color ? item.content.color : 'black') + ';'">{{ item.content.text }}</span>
+				</DynamicScrollerItem>
+			</template>
+		</DynamicScroller>
 	</b-card>
 	`,
 	data () {
@@ -28,14 +38,13 @@ export default {
 				}
 
 				this.consoleTexts.push({ 'id': this.texts, 'content': update.content });
-				console.log(this.consoleTexts);
 				this.texts++;
 				
 				if (this.consoleTexts.length > 420) {
 					this.consoleTexts.shift();
 				}
 
-				this.$refs.scroller.scrollToItem(this.texts - 1)
+				this.$refs.scroller.scrollToBottom();
 			})
 		}
 	},

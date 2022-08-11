@@ -7,7 +7,7 @@ license = "MIT"
 repository = "https://github.com/VirxEC/rlbot_gui_rust"
 default-run = "rl-bot-gui"
 edition = "2021"
-rust-version = "1.62"
+rust-version = "1.63"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -27,7 +27,6 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_repr = "0.1"
 lazy_static = "1.4"
-configparser = { version = "3", features = ["indexmap"] }
 glob = "0.3"
 base64 = "0.13"
 imghdr = "0.7"
@@ -44,6 +43,7 @@ strum = { version = "0.24", features = ["derive"] }
 serde-enum-str = "0.2.5"
 shlex = "1.1"
 thiserror = "1.0.31"
+indexmap = "1"
 
 [target.'cfg(windows)'.dependencies]
 registry = "1.2"

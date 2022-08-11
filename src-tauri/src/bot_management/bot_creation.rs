@@ -209,7 +209,7 @@ pub async fn bootstrap_rust_bot(window: &Window, bot_name: String, directory: Pa
     conf.set(BOT_CONFIG_MODULE_HEADER, NAME_KEY, Some(bot_name.clone()));
     conf.set(BOT_CONFIG_PARAMS_HEADER, EXECUTABLE_PATH_KEY, Some(format!("../target/debug/{bot_name}.exe")));
 
-    save_cfg(&conf, &config_file)?;
+    save_cfg(&conf, &config_file).await?;
 
     let cargo_toml_file = top_dir.join("Cargo.toml");
 
@@ -218,7 +218,7 @@ pub async fn bootstrap_rust_bot(window: &Window, bot_name: String, directory: Pa
     conf.set("package", "name", Some(format!("\"{sanitized_name}\"")));
     conf.set("package", "authors", Some("[\"\"]".to_owned()));
 
-    save_cfg(&conf, cargo_toml_file)?;
+    save_cfg(&conf, cargo_toml_file).await?;
 
     if open::that(top_dir.join("src").join("main.rs")).is_err() {
         ccprintln(
@@ -281,7 +281,7 @@ pub async fn bootstrap_scratch_bot(window: &Window, bot_name: String, directory:
     let random_port = rand::thread_rng().gen_range(20000..65000);
     conf.set(BOT_CONFIG_PARAMS_HEADER, "port", Some(random_port.to_string()));
 
-    save_cfg(&conf, &config_file)?;
+    save_cfg(&conf, &config_file).await?;
 
     // delete the old config file
     remove_file(old_config_file)?;

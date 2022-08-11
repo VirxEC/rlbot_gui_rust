@@ -314,15 +314,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "configparser"
-version = "3.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06821ea598337a8412cf47c5b71c3bc694a7f0aed188ac28b836fab164a2c202"
-dependencies = [
- "indexmap",
-]
-
-[[package]]
 name = "convert_case"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2426,11 +2417,11 @@ name = "rl-bot-gui"
 version = "1.0.16"
 dependencies = [
  "base64",
- "configparser",
  "fs_extra",
  "futures-util",
  "glob",
  "imghdr",
+ "indexmap",
  "lazy_static",
  "open",
  "os_pipe",

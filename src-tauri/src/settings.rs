@@ -1,6 +1,7 @@
 use crate::{
     ccprintlne,
     config_handles::load_gui_config,
+    configparser::Ini,
     custom_maps::convert_to_path,
     get_config_path,
     rlbot::parsing::{
@@ -8,7 +9,6 @@ use crate::{
         match_settings_config_parser::*,
     },
 };
-use configparser::ini::Ini;
 use core::fmt;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug, str::FromStr};
