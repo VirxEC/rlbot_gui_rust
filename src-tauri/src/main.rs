@@ -17,7 +17,7 @@ use crate::{
     config_handles::*,
     settings::{BotFolders, ConsoleText, ConsoleTextUpdate, GameTickPacket, StoryConfig, StoryState},
 };
-use lazy_static::lazy_static;
+use lazy_static::{initialize, lazy_static};
 use os_pipe::{pipe, PipeWriter};
 #[cfg(windows)]
 use registry::{Hive, Security};
@@ -49,13 +49,15 @@ const BOTPACK_REPO_OWNER: &str = "RLBot";
 const BOTPACK_REPO_NAME: &str = "RLBotPack";
 const MAX_CONSOLE_LINES: usize = 840;
 
-static CONSOLE_TEXT: Mutex<Vec<ConsoleText>> = Mutex::new(Vec::new());
-static CONSOLE_TEXT_OUT_QUEUE: Mutex<Vec<String>> = Mutex::new(Vec::new());
-static CONSOLE_INPUT_COMMANDS: Mutex<Vec<String>> = Mutex::new(Vec::new());
-static PYTHON_PATH: Mutex<String> = Mutex::new(String::new());
-static BOT_FOLDER_SETTINGS: Mutex<Option<BotFolders>> = Mutex::new(None);
-static MATCH_HANDLER_STDIN: Mutex<Option<ChildStdin>> = Mutex::new(None);
-static CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
+lazy_static! {
+    static ref CONSOLE_TEXT: Mutex<Vec<ConsoleText>> = Mutex::new(Vec::new());
+    static ref CONSOLE_TEXT_OUT_QUEUE: Mutex<Vec<String>> = Mutex::new(Vec::new());
+    static ref CONSOLE_INPUT_COMMANDS: Mutex<Vec<String>> = Mutex::new(Vec::new());
+    static ref PYTHON_PATH: Mutex<String> = Mutex::new(String::new());
+    static ref BOT_FOLDER_SETTINGS: Mutex<Option<BotFolders>> = Mutex::new(None);
+    static ref MATCH_HANDLER_STDIN: Mutex<Option<ChildStdin>> = Mutex::new(None);
+    static ref CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
+}
 
 lazy_static! {
     static ref BOTS_BASE: AsyncMutex<Option<JsonMap>> = AsyncMutex::new(None);
@@ -525,6 +527,10 @@ fn is_debug_build() -> bool {
 
 fn main() {
     println!("Config path: {}", get_config_path().display());
+
+    initialize(&CONSOLE_TEXT);
+    initialize(&CONSOLE_INPUT_COMMANDS);
+    initialize(&MATCH_HANDLER_STDIN);
 
     tauri::Builder::default()
         .setup(|app| gui_setup(app))
