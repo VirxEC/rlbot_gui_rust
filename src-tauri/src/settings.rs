@@ -279,7 +279,7 @@ impl MatchConfig {
     }
 
     fn set_value_in_conf<T: Default + serde::Serialize>(conf: &mut Ini, key: &str, item: &T) {
-        set_value_in_conf(conf, "mutator_settings", key, item);
+        set_value_in_conf(conf, "match_settings", key, item);
     }
 
     pub fn save_to_config(&mut self, conf: &mut Ini) {

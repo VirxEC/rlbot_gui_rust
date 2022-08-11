@@ -81,7 +81,7 @@ pub enum BeginBotError {
 pub async fn begin_python_bot(window: Window, bot_name: String) -> Result<BotConfigBundle, String> {
     async fn inner(window: &Window, bot_name: String) -> Result<BotConfigBundle, BeginBotError> {
         let config_file = bootstrap_python_bot(window, bot_name, ensure_bot_directory(window)).await?;
-        Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file))?)
+        Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file)).await?)
     }
 
     inner(&window, bot_name).await.map_err(|e| {
@@ -95,7 +95,7 @@ pub async fn begin_python_bot(window: Window, bot_name: String) -> Result<BotCon
 pub async fn begin_python_hivemind(window: Window, hive_name: String) -> Result<BotConfigBundle, String> {
     async fn inner(window: &Window, hive_name: String) -> Result<BotConfigBundle, BeginBotError> {
         let config_file = bootstrap_python_hivemind(window, hive_name, ensure_bot_directory(window)).await?;
-        Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file))?)
+        Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file)).await?)
     }
 
     inner(&window, hive_name).await.map_err(|e| {
@@ -109,7 +109,7 @@ pub async fn begin_python_hivemind(window: Window, hive_name: String) -> Result<
 pub async fn begin_rust_bot(window: Window, bot_name: String) -> Result<BotConfigBundle, String> {
     async fn inner(window: &Window, bot_name: String) -> Result<BotConfigBundle, BeginBotError> {
         let config_file = bootstrap_rust_bot(window, bot_name, ensure_bot_directory(window)).await?;
-        Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file))?)
+        Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file)).await?)
     }
 
     inner(&window, bot_name).await.map_err(|e| {
@@ -123,7 +123,7 @@ pub async fn begin_rust_bot(window: Window, bot_name: String) -> Result<BotConfi
 pub async fn begin_scratch_bot(window: Window, bot_name: String) -> Result<BotConfigBundle, String> {
     async fn inner(window: &Window, bot_name: String) -> Result<BotConfigBundle, BeginBotError> {
         let config_file = bootstrap_scratch_bot(window, bot_name, ensure_bot_directory(window)).await?;
-        Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file))?)
+        Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file)).await?)
     }
 
     inner(&window, bot_name).await.map_err(|e| {
@@ -167,7 +167,7 @@ pub enum InstallRequirementseError {
 #[tauri::command]
 pub async fn install_requirements(window: Window, config_path: String) -> Result<PackageResult, String> {
     async fn inner(window: &Window, config_path: String) -> Result<PackageResult, InstallRequirementseError> {
-        let bundle = BotConfigBundle::minimal_from_path(Path::new(&config_path))?;
+        let bundle = BotConfigBundle::minimal_from_path(Path::new(&config_path)).await?;
 
         Ok(if let Some(file) = bundle.get_requirements_file() {
             let packages = bundle.get_missing_packages(window);

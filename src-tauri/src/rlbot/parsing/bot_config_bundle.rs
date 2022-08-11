@@ -1,5 +1,5 @@
 use crate::{
-    bot_management::cfg_helper::{load_cfg, CfgHelperError},
+    bot_management::cfg_helper::{load_cfg, load_cfg_sync, CfgHelperError},
     ccprintln, get_command_status,
     rlbot::agents::{base_script::SCRIPT_FILE_KEY, runnable::Runnable},
     PYTHON_PATH,
@@ -163,10 +163,21 @@ pub struct BotConfigBundle {
 }
 
 impl BotConfigBundle {
-    pub fn minimal_from_path(config_path: &Path) -> Result<Self, RLBotCfgParseError> {
+    pub async fn minimal_from_path(config_path: &Path) -> Result<Self, RLBotCfgParseError> {
         let config_path_str = config_path.display().to_string();
-        let conf = load_cfg(config_path)?;
+        let conf = load_cfg(config_path).await?;
 
+        Self::minimal_from_conf(config_path, config_path_str, conf)
+    }
+
+    pub fn minimal_from_path_sync(config_path: &Path) -> Result<Self, RLBotCfgParseError> {
+        let config_path_str = config_path.display().to_string();
+        let conf = load_cfg_sync(config_path)?;
+
+        Self::minimal_from_conf(config_path, config_path_str, conf)
+    }
+
+    fn minimal_from_conf(config_path: &Path, config_path_str: String, conf: Ini) -> Result<Self, RLBotCfgParseError> {
         let path = config_path.to_string_lossy().to_string();
         let config_directory = config_path.parent().unwrap().to_string_lossy().to_string();
         let config_file_name = Some(config_path.file_name().unwrap().to_string_lossy().to_string());
@@ -240,7 +251,7 @@ impl BotConfigBundle {
 
     pub fn name_from_path(config_path: &Path) -> Result<(String, String), RLBotCfgParseError> {
         let config_path_str = config_path.display().to_string();
-        let conf = load_cfg(config_path)?;
+        let conf = load_cfg_sync(config_path)?;
 
         let name = if let Some(the_name) = conf.get(BOT_CONFIG_MODULE_HEADER, NAME_KEY) {
             the_name
@@ -401,7 +412,7 @@ pub struct ScriptConfigBundle {
 impl ScriptConfigBundle {
     pub fn minimal_from_path(config_path: &Path) -> Result<Self, RLBotCfgParseError> {
         let config_path_str = config_path.display().to_string();
-        let conf = load_cfg(config_path)?;
+        let conf = load_cfg_sync(config_path)?;
 
         let name = conf.get(BOT_CONFIG_MODULE_HEADER, NAME_KEY);
         let runnable_type = String::from("script");

@@ -82,6 +82,9 @@ export default {
 		toggleScrollLock: function() {
 			this.userChoseLock = true;
 			this.scrollLock = !this.scrollLock;
+			if (this.scrollLock) {
+				this.$refs.scroller.scrollToItem(this.texts - 1)
+			}
 		},
 		onUp: function(event) {
 			if (this.commandsIndex < this.previousCommands.length - 1) {

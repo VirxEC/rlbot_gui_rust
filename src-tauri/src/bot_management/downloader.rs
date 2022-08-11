@@ -1,4 +1,4 @@
-use super::cfg_helper::load_cfg;
+use super::cfg_helper::load_cfg_sync;
 use crate::{bot_management::zip_extract_fixed, ccprintln, ccprintlne, ccprintlnr, commands::UPDATE_DOWNLOAD_PROGRESS_SIGNAL, get_config_path, load_gui_config};
 use fs_extra::dir;
 use futures_util::StreamExt;
@@ -208,7 +208,7 @@ pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, c
 
 /// Load the GUI config and check the get the current version number of the botpack
 pub fn get_current_tag_name() -> Option<u32> {
-    load_cfg(get_config_path())
+    load_cfg_sync(get_config_path())
         .ok()?
         .get("bot_folder_settings", "incr")?
         .replace("incr-", "")

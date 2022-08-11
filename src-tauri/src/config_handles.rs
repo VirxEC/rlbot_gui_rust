@@ -85,25 +85,29 @@ fn filter_hidden_bundles<T: Runnable + Clone>(bundles: &HashSet<T>) -> Vec<T> {
     bundles.iter().filter(|b| !b.get_config_file_name().starts_with('_')).cloned().collect()
 }
 
-fn get_bots_from_directory(path: &str) -> Vec<BotConfigBundle> {
-    filter_hidden_bundles(&scan_directory_for_bot_configs(path))
+async fn get_bots_from_directory(path: &str) -> Vec<BotConfigBundle> {
+    filter_hidden_bundles(&scan_directory_for_bot_configs(path).await)
 }
 
 #[tauri::command]
 pub async fn scan_for_bots() -> Result<Vec<BotConfigBundle>, String> {
-    let bfs_lock = BOT_FOLDER_SETTINGS.lock().map_err(|err| err.to_string())?;
-    let bfs = bfs_lock.as_ref().ok_or("BOT_FOLDER_SETTINGS is None")?;
+    let bfs = BOT_FOLDER_SETTINGS
+        .lock()
+        .map_err(|_| "Mutex BOT_FOLDER_SETTINGS was poisoned".to_owned())?
+        .as_ref()
+        .ok_or("BOT_FOLDER_SETTINGS is None")?
+        .clone();
     let mut bots = Vec::new();
 
     for (path, props) in &bfs.folders {
         if props.visible {
-            bots.extend(get_bots_from_directory(&*path));
+            bots.extend(get_bots_from_directory(&*path).await);
         }
     }
 
     for (path, props) in &bfs.files {
         if props.visible {
-            if let Ok(bundle) = BotConfigBundle::minimal_from_path(Path::new(path)) {
+            if let Ok(bundle) = BotConfigBundle::minimal_from_path_sync(Path::new(path)) {
                 bots.push(bundle);
             }
         }
@@ -206,7 +210,7 @@ pub async fn show_path_in_explorer(window: Window, path: String) {
 
 #[tauri::command]
 pub async fn get_looks(path: String) -> Option<BotLooksConfig> {
-    match BotLooksConfig::from_path(&*path) {
+    match BotLooksConfig::from_path(&*path).await {
         Ok(looks) => Some(looks),
         Err(_) => None,
     }
@@ -383,7 +387,7 @@ pub async fn get_recommendations(window: Window) -> Option<AllRecommendations<Bo
         j.change_generic(&|bot_name| {
             for (name, path) in &name_path_pairs {
                 if name == bot_name {
-                    if let Ok(mut bundle) = BotConfigBundle::minimal_from_path(Path::new(path)) {
+                    if let Ok(mut bundle) = BotConfigBundle::minimal_from_path_sync(Path::new(path)) {
                         bundle.logo = bundle.load_logo();
 
                         if has_rlbot {
