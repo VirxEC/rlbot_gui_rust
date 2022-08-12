@@ -44,6 +44,7 @@ serde-enum-str = "0.2.5"
 shlex = "1.1"
 thiserror = "1.0.31"
 indexmap = "1"
+ansi-to-html = "0.1.0"
 
 [target.'cfg(windows)'.dependencies]
 registry = "1.2"

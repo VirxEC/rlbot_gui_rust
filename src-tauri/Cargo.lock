@@ -39,6 +39,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ansi-to-html"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "19ee82de0545b181a17cbdef44fce80ecaf394e001da7ea279008bf2e0944bee"
+dependencies = [
+ "regex",
+ "thiserror",
+]
+
+[[package]]
 name = "ansi_term"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2416,6 +2426,7 @@ dependencies = [
 name = "rl-bot-gui"
 version = "1.0.17"
 dependencies = [
+ "ansi-to-html",
  "base64",
  "fs_extra",
  "futures-util",
