@@ -368,33 +368,21 @@ pub struct LogoUpdate {
     pub logo: String,
 }
 
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct ConsoleText {
-    pub text: String,
-    pub color: Option<String>,
-}
-
-impl ConsoleText {
-    pub const fn from(text: String, color: Option<String>) -> ConsoleText {
-        ConsoleText { text, color }
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConsoleTextUpdate {
-    pub content: ConsoleText,
+    pub content: String,
     pub replace_last: bool,
 }
 
 impl ConsoleTextUpdate {
-    const fn new(text: String, color: Option<String>, replace_last: bool) -> Self {
+    const fn new(text: String, replace_last: bool) -> Self {
         ConsoleTextUpdate {
-            content: ConsoleText::from(text, color),
+            content: text,
             replace_last,
         }
     }
 
-    pub fn from(text: String, replace_last: bool) -> Self {
+    pub fn from(mut text: String, replace_last: bool) -> Self {
         let color = {
             let text = text.to_ascii_lowercase();
             if text.contains("error") {
@@ -408,7 +396,11 @@ impl ConsoleTextUpdate {
             }
         };
 
-        ConsoleTextUpdate::new(text, color, replace_last)
+        if let Some(color) = color {
+            text = format!("<span style='color: {color}'>{text}</span>");
+        }
+
+        ConsoleTextUpdate::new(text, replace_last)
     }
 }
 

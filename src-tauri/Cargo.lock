@@ -39,6 +39,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ansi-to-html"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "19ee82de0545b181a17cbdef44fce80ecaf394e001da7ea279008bf2e0944bee"
+dependencies = [
+ "regex",
+ "thiserror",
+]
+
+[[package]]
 name = "ansi_term"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1463,9 +1473,9 @@ checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
-version = "0.2.129"
+version = "0.2.131"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64de3cc433455c14174d42e554d4027ee631c4d046d43e3ecc6efc4636cdc7a7"
+checksum = "04c3b4822ccebfa39c02fc03d1534441b22ead323fa0f48bb7ddd8e6ba076a40"
 
 [[package]]
 name = "line-wrap"
@@ -2414,8 +2424,9 @@ dependencies = [
 
 [[package]]
 name = "rl-bot-gui"
-version = "1.0.16"
+version = "1.0.17"
 dependencies = [
+ "ansi-to-html",
  "base64",
  "fs_extra",
  "futures-util",
@@ -3018,9 +3029,11 @@ dependencies = [
  "minisign-verify",
  "objc",
  "once_cell",
+ "open",
  "percent-encoding",
  "rand 0.8.5",
  "raw-window-handle",
+ "regex",
  "reqwest",
  "rfd",
  "semver 1.0.13",
@@ -3076,6 +3089,7 @@ dependencies = [
  "png 0.17.5",
  "proc-macro2",
  "quote",
+ "regex",
  "semver 1.0.13",
  "serde",
  "serde_json",

@@ -218,7 +218,7 @@ pub async fn install_basic_packages(window: Window) -> Result<PackageResult, Str
 }
 
 #[tauri::command]
-pub async fn get_console_texts() -> Result<Vec<ConsoleText>, String> {
+pub async fn get_console_texts() -> Result<Vec<String>, String> {
     Ok(CONSOLE_TEXT.lock().map_err(|err| err.to_string())?.clone())
 }
 

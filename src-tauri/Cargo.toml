@@ -1,13 +1,13 @@
 [package]
 name = "rl-bot-gui"
-version = "1.0.16"
+version = "1.0.17"
 description = "The RLBot GUI ported to Rust"
 authors = ["VirxEC"]
 license = "MIT"
 repository = "https://github.com/VirxEC/rlbot_gui_rust"
 default-run = "rl-bot-gui"
 edition = "2021"
-rust-version = "1.62"
+rust-version = "1.63"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -44,6 +44,7 @@ serde-enum-str = "0.2.5"
 shlex = "1.1"
 thiserror = "1.0.31"
 indexmap = "1"
+ansi-to-html = "0.1.0"
 
 [target.'cfg(windows)'.dependencies]
 registry = "1.2"
@@ -52,11 +53,11 @@ registry = "1.2"
 
 [target.'cfg(not(any(windows, target_os = "macos")))'.dependencies.tauri]
 version = "1.0"
-features = ["devtools", "dialog", "reqwest-client"]
+features = ["devtools", "dialog", "reqwest-client", "shell-open"]
 
 [target.'cfg(any(windows, target_os = "macos"))'.dependencies.tauri]
 version = "1.0"
-features = ["devtools", "dialog", "reqwest-client", "updater"]
+features = ["devtools", "dialog", "reqwest-client", "shell-open", "updater"]
 
 [features]
 # by default Tauri runs in production mode

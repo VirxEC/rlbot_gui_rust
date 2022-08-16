@@ -8,6 +8,11 @@
     "withGlobalTauri": true
   },
   "tauri": {
+    "allowlist": {
+      "shell": {
+        "open": true
+      }
+    },
     "bundle": {
       "active": true,
       "identifier": "org.rlbot.gui",

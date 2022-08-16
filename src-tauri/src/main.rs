@@ -15,9 +15,9 @@ mod stories;
 use crate::{
     commands::*,
     config_handles::*,
-    settings::{BotFolders, ConsoleText, ConsoleTextUpdate, GameTickPacket, StoryConfig, StoryState},
+    settings::{BotFolders, ConsoleTextUpdate, GameTickPacket, StoryConfig, StoryState},
 };
-use lazy_static::{initialize, lazy_static};
+use lazy_static::lazy_static;
 use os_pipe::{pipe, PipeWriter};
 #[cfg(windows)]
 use registry::{Hive, Security};
@@ -49,15 +49,13 @@ const BOTPACK_REPO_OWNER: &str = "RLBot";
 const BOTPACK_REPO_NAME: &str = "RLBotPack";
 const MAX_CONSOLE_LINES: usize = 840;
 
-lazy_static! {
-    static ref CONSOLE_TEXT: Mutex<Vec<ConsoleText>> = Mutex::new(Vec::new());
-    static ref CONSOLE_TEXT_OUT_QUEUE: Mutex<Vec<String>> = Mutex::new(Vec::new());
-    static ref CONSOLE_INPUT_COMMANDS: Mutex<Vec<String>> = Mutex::new(Vec::new());
-    static ref PYTHON_PATH: Mutex<String> = Mutex::new(String::new());
-    static ref BOT_FOLDER_SETTINGS: Mutex<Option<BotFolders>> = Mutex::new(None);
-    static ref MATCH_HANDLER_STDIN: Mutex<Option<ChildStdin>> = Mutex::new(None);
-    static ref CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
-}
+static CONSOLE_TEXT: Mutex<Vec<String>> = Mutex::new(Vec::new());
+static CONSOLE_TEXT_OUT_QUEUE: Mutex<Vec<String>> = Mutex::new(Vec::new());
+static CONSOLE_INPUT_COMMANDS: Mutex<Vec<String>> = Mutex::new(Vec::new());
+static PYTHON_PATH: Mutex<String> = Mutex::new(String::new());
+static BOT_FOLDER_SETTINGS: Mutex<Option<BotFolders>> = Mutex::new(None);
+static MATCH_HANDLER_STDIN: Mutex<Option<ChildStdin>> = Mutex::new(None);
+static CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
 
 lazy_static! {
     static ref BOTS_BASE: AsyncMutex<Option<JsonMap>> = AsyncMutex::new(None);
@@ -404,11 +402,6 @@ fn update_internal_console(update: &ConsoleTextUpdate) -> Result<(), InternalCon
     }
     console_text.push(update.content.clone());
 
-    CONSOLE_TEXT_OUT_QUEUE
-        .lock()
-        .map_err(|_| InternalConsoleError::Poisoned("CONSOLE_TEXT_OUT_QUEUE".to_owned()))?
-        .push(update.content.text.clone());
-
     if console_text.len() > MAX_CONSOLE_LINES {
         console_text.remove(0);
     }
@@ -421,11 +414,24 @@ fn try_emit_signal<S: Serialize + Clone>(window: &Window, signal: &str, payload:
 }
 
 fn issue_console_update(window: &Window, text: String, replace_last: bool) -> (String, Option<TauriError>) {
-    let update = ConsoleTextUpdate::from(text, replace_last);
-    if let Err(e) = update_internal_console(&update) {
-        ccprintlne(window, e.to_string());
+    match CONSOLE_TEXT_OUT_QUEUE.lock() {
+        Ok(mut ctoq) => ctoq.push(text.clone()),
+        Err(_) => ccprintlne(window, "Mutex CONSOLE_TEXT_OUT_QUEUE is poisoned".to_owned()),
     }
-    try_emit_signal(window, "new-console-text", update)
+
+    match ansi_to_html::convert_escaped(&text) {
+        Ok(converted_and_escaped) => {
+            let update = ConsoleTextUpdate::from(converted_and_escaped, replace_last);
+            if let Err(e) = update_internal_console(&update) {
+                ccprintlne(window, e.to_string());
+            }
+            try_emit_signal(window, "new-console-text", update)
+        }
+        Err(e) =>  {
+            ccprintlne(window, e.to_string());
+            Default::default()
+        }
+    }
 }
 
 fn try_emit_text<T: AsRef<str>>(window: &Window, text: T, replace_last: bool) -> (String, Option<TauriError>) {
@@ -527,10 +533,6 @@ fn is_debug_build() -> bool {
 
 fn main() {
     println!("Config path: {}", get_config_path().display());
-
-    initialize(&CONSOLE_TEXT);
-    initialize(&CONSOLE_INPUT_COMMANDS);
-    initialize(&MATCH_HANDLER_STDIN);
 
     tauri::Builder::default()
         .setup(|app| gui_setup(app))

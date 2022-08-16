@@ -15,14 +15,13 @@ export default {
 					:item="item"
 					:active="active"
 					:size-dependencies="[
-						item.content.text,
+						item.content,
 					]"
 					:data-index="index"
 					:data-active="active"
 					class="console-text-item"
-				>
-					<span :style="'color:' + (item.content.color ? item.content.color : 'black') + ';'">{{ item.content.text }}</span>
-				</DynamicScrollerItem>
+					v-html="item.content"
+				></DynamicScrollerItem>
 			</template>
 		</DynamicScroller>
 	</b-card>
