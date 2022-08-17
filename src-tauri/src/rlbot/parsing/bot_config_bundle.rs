@@ -188,9 +188,9 @@ impl BotConfigBundle {
         let looks_path = conf.get(BOT_CONFIG_MODULE_HEADER, LOOKS_CONFIG_KEY).map(|path| format!("{config_directory}/{path}"));
         let python_path = conf.get(BOT_CONFIG_MODULE_HEADER, PYTHON_FILE_KEY).map(|path| format!("{config_directory}/{path}"));
         let supports_standalone = conf.get(BOT_CONFIG_MODULE_HEADER, SUPPORTS_STANDALONE).map(|s| s.parse::<bool>().unwrap_or_default());
-        let use_virtual_environment = conf.getbool(BOT_CONFIG_MODULE_HEADER, USE_VIRTUAL_ENVIRONMENT_KEY).unwrap_or(None);
+        let use_virtual_environment = conf.getboolcoerce(BOT_CONFIG_MODULE_HEADER, USE_VIRTUAL_ENVIRONMENT_KEY).unwrap_or(None);
         let requirements_file = conf.get(BOT_CONFIG_MODULE_HEADER, REQUIREMENTS_FILE_KEY).map(|path| format!("{config_directory}/{path}"));
-        let requires_tkinter = conf.getbool(BOT_CONFIG_MODULE_HEADER, REQUIRES_TKINTER).unwrap_or(Some(false));
+        let requires_tkinter = conf.getboolcoerce(BOT_CONFIG_MODULE_HEADER, REQUIRES_TKINTER).unwrap_or(Some(false));
 
         if name.is_none() {
             return Err(RLBotCfgParseError::NoName(config_path_str));
@@ -424,11 +424,14 @@ impl ScriptConfigBundle {
         let path = config_path.to_string_lossy().to_string();
         let config_directory = config_path.parent().unwrap().to_string_lossy().to_string();
         let config_file_name = config_path.file_name().unwrap().to_string_lossy().to_string();
-        let use_virtual_environment = conf.getbool(BOT_CONFIG_MODULE_HEADER, USE_VIRTUAL_ENVIRONMENT_KEY).unwrap_or(None).unwrap_or_default();
+        let use_virtual_environment = conf
+            .getboolcoerce(BOT_CONFIG_MODULE_HEADER, USE_VIRTUAL_ENVIRONMENT_KEY)
+            .unwrap_or(None)
+            .unwrap_or_default();
         let requirements_file = conf
             .get(BOT_CONFIG_MODULE_HEADER, REQUIREMENTS_FILE_KEY)
             .map(|path| format!("{}/{}", config_directory, path));
-        let requires_tkinter = conf.getbool(BOT_CONFIG_MODULE_HEADER, REQUIRES_TKINTER).unwrap_or(None).unwrap_or_default();
+        let requires_tkinter = conf.getboolcoerce(BOT_CONFIG_MODULE_HEADER, REQUIRES_TKINTER).unwrap_or(None).unwrap_or_default();
 
         let script_file = conf
             .get(BOT_CONFIG_MODULE_HEADER, SCRIPT_FILE_KEY)
