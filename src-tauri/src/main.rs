@@ -386,9 +386,12 @@ fn write_console_text_out_queue_to_file() -> Result<(), InternalConsoleError> {
         return Ok(());
     }
 
+    let to_write_out = queue.drain(..).collect::<Vec<_>>();
+    drop(queue);
+
     let mut file = OpenOptions::new().write(true).append(true).open(get_log_path())?;
 
-    for line in queue.drain(..) {
+    for line in to_write_out  {
         writeln!(file, "{line}")?;
     }
 
