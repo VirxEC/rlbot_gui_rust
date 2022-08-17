@@ -530,12 +530,12 @@ pub async fn is_botpack_up_to_date(window: Window) -> bool {
 
 #[tauri::command]
 pub async fn get_launcher_settings(window: Window) -> LauncherConfig {
-    LauncherConfig::load(&window)
+    LauncherConfig::load(&window).await
 }
 
 #[tauri::command]
 pub async fn save_launcher_settings(window: Window, settings: LauncherConfig) {
-    settings.write_to_file(&window);
+    settings.write_to_file(&window).await;
 }
 
 /// Starts the match handler, which is written in Python so it can use the RLBot package (also written in Python)
@@ -633,7 +633,7 @@ async fn pre_start_match(window: &Window) -> Result<(), String> {
 async fn start_match_helper(window: &Window, bot_list: Vec<TeamBotBundle>, match_settings: MiniMatchConfig) -> Result<(), String> {
     pre_start_match(window).await?;
 
-    let launcher_settings = LauncherConfig::load(window);
+    let launcher_settings = LauncherConfig::load(window).await;
     let match_settings = match_settings.setup_for_start_match(
         window,
         &BOT_FOLDER_SETTINGS
@@ -701,7 +701,7 @@ pub async fn set_state(window: Window, state: HashMap<String, serde_json::Value>
 
 #[tauri::command]
 pub async fn spawn_car_for_viewing(window: Window, config: BotLooksConfig, team: u8, showcase_type: String, map: String) -> Result<(), String> {
-    let launcher_settings = LauncherConfig::load(&window);
+    let launcher_settings = LauncherConfig::load(&window).await;
 
     let args = [
         "spawn_car_for_viewing".to_owned(),
@@ -1022,7 +1022,7 @@ async fn run_challenge(window: &Window, save_state: &StoryState, challenge_id: S
 
     let player_configs = make_player_configs(&challenge, picked_teammates, &all_bots, botpack_root.as_path());
     let match_settings = make_match_config(&challenge, save_state.get_upgrades(), make_script_configs(&challenge, &all_scripts, botpack_root.as_path()));
-    let launcher_prefs = LauncherConfig::load(window);
+    let launcher_prefs = LauncherConfig::load(window).await;
 
     let args = [
         "launch_challenge".to_owned(),

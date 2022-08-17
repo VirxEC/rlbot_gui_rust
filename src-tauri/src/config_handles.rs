@@ -18,19 +18,31 @@ use crate::{
 };
 use glob::glob;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     fs::{create_dir_all, read_to_string},
     path::Path,
     process::Command,
 };
 use tauri::{api::dialog::FileDialogBuilder, Window};
 
+fn set_gui_config_to_default(conf: &mut Ini) {
+    conf.set("bot_folder_settings", "files", Some("{}".to_owned()));
+    conf.set("bot_folder_settings", "folders", Some("{}".to_owned()));
+    conf.set("bot_folder_settings", "incr", None);
+    MatchConfig::default().save_to_config(conf);
+    conf.set("python_config", "path", Some(auto_detect_python().unwrap_or_default().0));
+    conf.set("launcher_settings", "preferred_launcher", Some("epic".to_owned()));
+    conf.set("launcher_settings", "use_login_tricks", Some("true".to_owned()));
+    conf.set("launcher_settings", "rocket_league_exe_path", None);
+    conf.set("story_mode", "save_state", None);
+}
+
 /// Loads the GUI config, creating it if it doesn't exist.
 ///
 /// # Arguments
 ///
 /// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
-pub fn load_gui_config(window: &Window) -> Ini {
+pub async fn load_gui_config(window: &Window) -> Ini {
     let mut conf = Ini::new();
     conf.set_comment_symbols(&[';']);
     let config_path = get_config_path();
@@ -40,15 +52,34 @@ pub fn load_gui_config(window: &Window) -> Ini {
             ccprintlne(window, format!("Failed to create config directory: {e}"));
         }
 
-        conf.set("bot_folder_settings", "files", Some("{}".to_owned()));
-        conf.set("bot_folder_settings", "folders", Some("{}".to_owned()));
-        conf.set("bot_folder_settings", "incr", None);
-        MatchConfig::default().save_to_config(&mut conf);
-        conf.set("python_config", "path", Some(auto_detect_python().unwrap_or_default().0));
-        conf.set("launcher_settings", "preferred_launcher", Some("epic".to_owned()));
-        conf.set("launcher_settings", "use_login_tricks", Some("true".to_owned()));
-        conf.set("launcher_settings", "rocket_league_exe_path", None);
-        conf.set("story_mode", "save_state", None);
+        set_gui_config_to_default(&mut conf);
+
+        if let Err(e) = conf.write_async(&config_path).await {
+            ccprintlne(window, format!("Failed to write config file: {e}"));
+        }
+    } else if let Err(e) = conf.load_async(config_path).await {
+        ccprintlne(window, format!("Failed to load config: {e}"));
+    }
+
+    conf
+}
+
+/// Synchronously loads the GUI config, creating it if it doesn't exist.
+///
+/// # Arguments
+///
+/// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
+pub fn load_gui_config_sync(window: &Window) -> Ini {
+    let mut conf = Ini::new();
+    conf.set_comment_symbols(&[';']);
+    let config_path = get_config_path();
+
+    if !config_path.exists() {
+        if let Err(e) = create_dir_all(config_path.parent().unwrap()) {
+            ccprintlne(window, format!("Failed to create config directory: {e}"));
+        }
+
+        set_gui_config_to_default(&mut conf);
 
         if let Err(e) = conf.write(&config_path) {
             ccprintlne(window, format!("Failed to write config file: {e}"));
@@ -65,7 +96,7 @@ pub async fn save_folder_settings(window: Window, bot_folder_settings: BotFolder
     BOT_FOLDER_SETTINGS
         .lock()
         .map_err(|err| err.to_string())?
-        .as_mut()
+        .clone()
         .ok_or("BOT_FOLDER_SETTINGS is None")?
         .update_config(&window, bot_folder_settings);
     Ok(())
@@ -73,20 +104,19 @@ pub async fn save_folder_settings(window: Window, bot_folder_settings: BotFolder
 
 #[tauri::command]
 pub async fn get_folder_settings() -> Result<BotFolders, String> {
-    Ok(BOT_FOLDER_SETTINGS
-        .lock()
-        .map_err(|err| err.to_string())?
-        .as_ref()
-        .ok_or("BOT_FOLDER_SETTINGS is None")?
-        .clone())
+    Ok(BOT_FOLDER_SETTINGS.lock().map_err(|err| err.to_string())?.clone().ok_or("BOT_FOLDER_SETTINGS is None")?)
 }
 
-fn filter_hidden_bundles<T: Runnable + Clone>(bundles: &HashSet<T>) -> Vec<T> {
-    bundles.iter().filter(|b| !b.get_config_file_name().starts_with('_')).cloned().collect()
+fn filter_hidden_bundles<I>(bundles: I) -> Vec<I::Item>
+where
+    I: IntoIterator,
+    I::Item: Runnable + Clone,
+{
+    bundles.into_iter().filter(|b| !b.get_config_file_name().starts_with('_')).collect()
 }
 
 async fn get_bots_from_directory(path: &str) -> Vec<BotConfigBundle> {
-    filter_hidden_bundles(&scan_directory_for_bot_configs(path).await)
+    filter_hidden_bundles(scan_directory_for_bot_configs(path).await)
 }
 
 #[tauri::command]
@@ -94,9 +124,8 @@ pub async fn scan_for_bots() -> Result<Vec<BotConfigBundle>, String> {
     let bfs = BOT_FOLDER_SETTINGS
         .lock()
         .map_err(|_| "Mutex BOT_FOLDER_SETTINGS was poisoned".to_owned())?
-        .as_ref()
-        .ok_or("BOT_FOLDER_SETTINGS is None")?
-        .clone();
+        .clone()
+        .ok_or("BOT_FOLDER_SETTINGS is None")?;
     let mut bots = Vec::new();
 
     for (path, props) in &bfs.folders {
@@ -107,7 +136,7 @@ pub async fn scan_for_bots() -> Result<Vec<BotConfigBundle>, String> {
 
     for (path, props) in &bfs.files {
         if props.visible {
-            if let Ok(bundle) = BotConfigBundle::minimal_from_path_sync(Path::new(path)) {
+            if let Ok(bundle) = BotConfigBundle::minimal_from_path(Path::new(path)).await {
                 bots.push(bundle);
             }
         }
@@ -116,25 +145,29 @@ pub async fn scan_for_bots() -> Result<Vec<BotConfigBundle>, String> {
     Ok(bots)
 }
 
-fn get_scripts_from_directory(path: &str) -> Vec<ScriptConfigBundle> {
-    filter_hidden_bundles(&scan_directory_for_script_configs(path))
+async fn get_scripts_from_directory(path: &str) -> Vec<ScriptConfigBundle> {
+    filter_hidden_bundles(scan_directory_for_script_configs(path).await)
 }
 
 #[tauri::command]
 pub async fn scan_for_scripts() -> Result<Vec<ScriptConfigBundle>, String> {
-    let bfs_lock = BOT_FOLDER_SETTINGS.lock().map_err(|err| err.to_string())?;
-    let bfs = bfs_lock.as_ref().ok_or("BOT_FOLDER_SETTINGS is None")?;
+    let bfs = BOT_FOLDER_SETTINGS
+        .lock()
+        .map_err(|_| "Mutex BOT_FOLDER_SETTINGS was poisoned".to_owned())?
+        .as_ref()
+        .ok_or("BOT_FOLDER_SETTINGS is None")?
+        .clone();
     let mut scripts = Vec::with_capacity(bfs.folders.len() + bfs.files.len());
 
     for (path, props) in &bfs.folders {
         if props.visible {
-            scripts.extend(get_scripts_from_directory(&**path));
+            scripts.extend(get_scripts_from_directory(&**path).await);
         }
     }
 
     for (path, props) in &bfs.files {
         if props.visible {
-            if let Ok(bundle) = ScriptConfigBundle::minimal_from_path(Path::new(path)) {
+            if let Ok(bundle) = ScriptConfigBundle::minimal_from_path(Path::new(path)).await {
                 scripts.push(bundle);
             }
         }
@@ -237,17 +270,17 @@ pub async fn get_match_options() -> Result<MatchOptions, String> {
 
 #[tauri::command]
 pub async fn get_match_settings(window: Window) -> MatchConfig {
-    MatchConfig::load(&window)
+    MatchConfig::load(&window).await
 }
 
 #[tauri::command]
 pub async fn save_match_settings(window: Window, settings: MatchConfig) {
-    settings.cleaned_scripts().save_config(&window);
+    settings.cleaned_scripts().save_config(&window).await;
 }
 
 #[tauri::command]
 pub async fn get_team_settings(window: Window) -> HashMap<String, Vec<BotConfigBundle>> {
-    let config = load_gui_config(&window);
+    let config = load_gui_config(&window).await;
     let blue_team = serde_json::from_str(
         &config
             .get("team_settings", "blue_team")
@@ -265,7 +298,7 @@ pub async fn get_team_settings(window: Window) -> HashMap<String, Vec<BotConfigB
 
 #[tauri::command]
 pub async fn save_team_settings(window: Window, blue_team: Vec<BotConfigBundle>, orange_team: Vec<BotConfigBundle>) {
-    let mut config = load_gui_config(&window);
+    let mut config = load_gui_config(&window).await;
     config.set("team_settings", "blue_team", Some(serde_json::to_string(&clean(&blue_team)).unwrap()));
     config.set("team_settings", "orange_team", Some(serde_json::to_string(&clean(&orange_team)).unwrap()));
 
@@ -302,7 +335,7 @@ pub async fn get_python_path() -> Result<String, String> {
 #[tauri::command]
 pub async fn set_python_path(window: Window, path: String) -> Result<(), String> {
     *PYTHON_PATH.lock().map_err(|err| err.to_string())? = path.clone();
-    let mut config = load_gui_config(&window);
+    let mut config = load_gui_config(&window).await;
     config.set("python_config", "path", Some(path));
 
     if let Err(e) = config.write(get_config_path()) {
@@ -410,7 +443,7 @@ pub async fn get_recommendations(window: Window) -> Option<AllRecommendations<Bo
 
 #[tauri::command]
 pub async fn story_load_save(window: Window) -> Option<StoryState> {
-    serde_json::from_str(&load_gui_config(&window).get("story_mode", "save_state")?).ok()
+    serde_json::from_str(&load_gui_config(&window).await.get("story_mode", "save_state")?).ok()
 }
 
 #[tauri::command]
@@ -429,7 +462,7 @@ pub async fn story_save_state(window: Window, story_state: Option<StoryState>) {
 
 #[tauri::command]
 pub async fn story_delete_save(window: Window) {
-    let mut conf = load_gui_config(&window);
+    let mut conf = load_gui_config(&window).await;
     conf.set("story_mode", "save_state", None);
 
     if let Err(e) = conf.write(get_config_path()) {

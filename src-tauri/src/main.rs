@@ -386,9 +386,12 @@ fn write_console_text_out_queue_to_file() -> Result<(), InternalConsoleError> {
         return Ok(());
     }
 
+    let to_write_out = queue.drain(..).collect::<Vec<_>>();
+    drop(queue);
+
     let mut file = OpenOptions::new().write(true).append(true).open(get_log_path())?;
 
-    for line in queue.drain(..) {
+    for line in to_write_out {
         writeln!(file, "{line}")?;
     }
 
@@ -427,7 +430,7 @@ fn issue_console_update(window: &Window, text: String, replace_last: bool) -> (S
             }
             try_emit_signal(window, "new-console-text", update)
         }
-        Err(e) =>  {
+        Err(e) => {
             ccprintlne(window, e.to_string());
             Default::default()
         }
@@ -465,7 +468,7 @@ fn emit_text<T: AsRef<str>>(window: &Window, text: T, replace_last: bool) {
 }
 
 fn gui_setup_load_config(window: &Window) -> Result<(), Box<dyn StdError>> {
-    let gui_config = load_gui_config(window);
+    let gui_config = load_gui_config_sync(window);
     *PYTHON_PATH.lock()? = gui_config.get("python_config", "path").unwrap_or_else(|| auto_detect_python().unwrap_or_default().0);
     *BOT_FOLDER_SETTINGS.lock()? = Some(BotFolders::load_from_conf(&gui_config));
     Ok(())

@@ -1,5 +1,7 @@
 # RLBotGUI
 
+[![unsafe forbidden](https://img.shields.io/badge/unsafe-forbidden-success.svg)](https://github.com/rust-secure-code/safety-dance/)
+
 ## About
 
 RLBotGUI is a streamlined user interface that helps you run custom

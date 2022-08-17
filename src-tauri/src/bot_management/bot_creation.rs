@@ -87,7 +87,7 @@ pub async fn bootstrap_python_bot(window: &Window, bot_name: String, directory: 
     download_extract_bot_template(window, "https://github.com/RLBot/RLBotPythonExample/archive/master.zip", top_dir.as_path()).await?;
 
     let bundles = scan_directory_for_bot_configs(&top_dir.to_string_lossy()).await;
-    let bundle = bundles.iter().next().unwrap();
+    let bundle = &bundles[0];
     let config_file = bundle.path.clone().unwrap();
     let python_file = bundle.python_path.clone().unwrap();
 

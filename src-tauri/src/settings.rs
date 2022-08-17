@@ -1,6 +1,6 @@
 use crate::{
     ccprintlne,
-    config_handles::load_gui_config,
+    config_handles::{load_gui_config, load_gui_config_sync},
     configparser::Ini,
     custom_maps::convert_to_path,
     get_config_path,
@@ -53,7 +53,7 @@ impl BotFolders {
     pub fn update_config(&mut self, window: &Window, bfs: Self) {
         *self = bfs;
 
-        let mut conf = load_gui_config(window);
+        let mut conf = load_gui_config_sync(window);
         conf.set("bot_folder_settings", "files", serde_json::to_string(&self.files).ok());
         conf.set("bot_folder_settings", "folders", serde_json::to_string(&self.folders).ok());
 
@@ -98,8 +98,8 @@ pub struct MutatorConfig {
 }
 
 impl MutatorConfig {
-    pub fn load(window: &Window) -> Self {
-        let conf = load_gui_config(window);
+    pub async fn load(window: &Window) -> Self {
+        let conf = load_gui_config(window).await;
 
         let match_length = conf.get("mutator_settings", "match_length").and_then(|x| serde_json::from_str(&x).ok()).unwrap_or_default();
         let max_score = conf.get("mutator_settings", "max_score").and_then(|x| serde_json::from_str(&x).ok()).unwrap_or_default();
@@ -247,8 +247,8 @@ pub struct MatchConfig {
 }
 
 impl MatchConfig {
-    pub fn load(window: &Window) -> Self {
-        let conf = load_gui_config(window);
+    pub async fn load(window: &Window) -> Self {
+        let conf = load_gui_config(window).await;
 
         let map = conf.get("match_settings", "map").and_then(|x| serde_json::from_str(&x).ok()).unwrap_or_default();
         let game_mode = conf.get("match_settings", "game_mode").and_then(|x| serde_json::from_str(&x).ok()).unwrap_or_default();
@@ -274,7 +274,7 @@ impl MatchConfig {
             enable_state_setting,
             auto_save_replay,
             scripts,
-            mutators: MutatorConfig::load(window),
+            mutators: MutatorConfig::load(window).await,
         }
     }
 
@@ -297,11 +297,11 @@ impl MatchConfig {
         self.mutators.save_config(conf);
     }
 
-    pub fn save_config(&mut self, window: &Window) {
-        let mut conf = load_gui_config(window);
+    pub async fn save_config(&mut self, window: &Window) {
+        let mut conf = load_gui_config(window).await;
         self.save_to_config(&mut conf);
 
-        if let Err(e) = conf.write(get_config_path()) {
+        if let Err(e) = conf.write_async(get_config_path()).await {
             ccprintlne(window, format!("Error writing config file: {e}"));
         }
     }
@@ -376,10 +376,7 @@ pub struct ConsoleTextUpdate {
 
 impl ConsoleTextUpdate {
     const fn new(text: String, replace_last: bool) -> Self {
-        ConsoleTextUpdate {
-            content: text,
-            replace_last,
-        }
+        ConsoleTextUpdate { content: text, replace_last }
     }
 
     pub fn from(mut text: String, replace_last: bool) -> Self {
@@ -412,8 +409,8 @@ pub struct LauncherConfig {
 }
 
 impl LauncherConfig {
-    pub fn load(window: &Window) -> Self {
-        let config = load_gui_config(window);
+    pub async fn load(window: &Window) -> Self {
+        let config = load_gui_config(window).await;
 
         Self {
             preferred_launcher: config.get("launcher_settings", "preferred_launcher").unwrap_or_else(|| "epic".to_owned()),
@@ -422,14 +419,14 @@ impl LauncherConfig {
         }
     }
 
-    pub fn write_to_file(self, window: &Window) {
-        let mut config = load_gui_config(window);
+    pub async fn write_to_file(self, window: &Window) {
+        let mut config = load_gui_config(window).await;
 
         config.set("launcher_settings", "preferred_launcher", Some(self.preferred_launcher));
         config.set("launcher_settings", "use_login_tricks", Some(self.use_login_tricks.to_string()));
         config.set("launcher_settings", "rocket_league_exe_path", self.rocket_league_exe_path);
 
-        if let Err(e) = config.write(get_config_path()) {
+        if let Err(e) = config.write_async(get_config_path()).await {
             ccprintlne(window, format!("Error writing config file: {e}"));
         }
     }
@@ -577,7 +574,7 @@ impl StoryState {
     }
 
     pub fn save(&self, window: &Window) {
-        let mut conf = load_gui_config(window);
+        let mut conf = load_gui_config_sync(window);
         conf.set("story_mode", "save_state", serde_json::to_string(self).ok());
 
         if let Err(e) = conf.write(get_config_path()) {
