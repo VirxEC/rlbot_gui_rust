@@ -357,7 +357,7 @@ pub async fn pick_appearance_file(window: Window) {
 }
 
 fn read_recommendations_json<P: AsRef<Path>>(path: P) -> Result<AllRecommendations<String>, String> {
-    let raw_json = read_to_string(&path).map_err(|e| format!("Failed to read {}", e))?;
+    let raw_json = read_to_string(&path).map_err(|e| format!("Failed to read {e}"))?;
 
     serde_json::from_str(&raw_json).map_err(|e| format!("Failed to parse file {}: {e}", path.as_ref().to_string_lossy()))
 }
@@ -365,13 +365,16 @@ fn read_recommendations_json<P: AsRef<Path>>(path: P) -> Result<AllRecommendatio
 fn get_recommendations_json(window: &Window, bfs: &BotFolders) -> Option<AllRecommendations<String>> {
     // Search for and load the json file
     for path in bfs.folders.keys() {
-        let pattern = Path::new(path).join("**/recommendations.json");
-
-        for path2 in glob(&pattern.to_string_lossy().clone()).unwrap().flatten() {
-            match read_recommendations_json(path2) {
-                Ok(recommendations) => return Some(recommendations),
-                Err(e) => ccprintlne(window, e),
+        match glob(&format!("{path}/**/recommendations.json")) {
+            Ok(pattern) => {
+                for path2 in pattern.flatten() {
+                    match read_recommendations_json(path2) {
+                        Ok(recommendations) => return Some(recommendations),
+                        Err(e) => ccprintlne(window, e),
+                    }
+                }
             }
+            Err(e) => ccprintlne(window, e.to_string()),
         }
     }
 
@@ -394,10 +397,13 @@ pub async fn get_recommendations(window: Window) -> Option<AllRecommendations<Bo
                     .iter()
                     .filter_map(|(path, props)| {
                         if props.visible {
-                            let pattern = Path::new(path).join("**/*.cfg");
-                            let paths = glob(&pattern.to_string_lossy().clone()).unwrap().flatten().collect::<Vec<_>>();
-
-                            Some(paths.iter().filter_map(|path| BotConfigBundle::name_from_path(path.as_path()).ok()).collect::<Vec<_>>())
+                            match glob(&format!("{path}/**/*.cfg")) {
+                                Ok(paths) => Some(paths.flatten().filter_map(|path| BotConfigBundle::name_from_path(path.as_path()).ok()).collect::<Vec<_>>()),
+                                Err(e) => {
+                                    ccprintlne(&window, e.to_string());
+                                    None
+                                }
+                            }
                         } else {
                             None
                         }
