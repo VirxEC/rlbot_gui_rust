@@ -376,10 +376,7 @@ pub struct ConsoleTextUpdate {
 
 impl ConsoleTextUpdate {
     const fn new(text: String, replace_last: bool) -> Self {
-        ConsoleTextUpdate {
-            content: text,
-            replace_last,
-        }
+        ConsoleTextUpdate { content: text, replace_last }
     }
 
     pub fn from(mut text: String, replace_last: bool) -> Self {

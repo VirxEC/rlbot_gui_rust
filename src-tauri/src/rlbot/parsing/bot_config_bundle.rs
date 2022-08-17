@@ -164,7 +164,8 @@ pub struct BotConfigBundle {
 }
 
 impl BotConfigBundle {
-    pub async fn minimal_from_path(config_path: &Path) -> Result<Self, RLBotCfgParseError> {
+    pub async fn minimal_from_path<T: AsRef<Path>>(config_path: T) -> Result<Self, RLBotCfgParseError> {
+        let config_path = config_path.as_ref();
         let config_path_str = config_path.display().to_string();
         let conf = load_cfg(config_path).await?;
 
@@ -411,9 +412,10 @@ pub struct ScriptConfigBundle {
 }
 
 impl ScriptConfigBundle {
-    pub fn minimal_from_path(config_path: &Path) -> Result<Self, RLBotCfgParseError> {
+    pub async fn minimal_from_path<T: AsRef<Path>>(config_path: T) -> Result<Self, RLBotCfgParseError> {
+        let config_path = config_path.as_ref();
         let config_path_str = config_path.display().to_string();
-        let conf = load_cfg_sync(config_path)?;
+        let conf = load_cfg(config_path).await?;
 
         let name = conf.get(BOT_CONFIG_MODULE_HEADER, NAME_KEY);
         let runnable_type = String::from("script");

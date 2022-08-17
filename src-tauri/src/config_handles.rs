@@ -18,7 +18,7 @@ use crate::{
 };
 use glob::glob;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     fs::{create_dir_all, read_to_string},
     path::Path,
     process::Command,
@@ -81,12 +81,16 @@ pub async fn get_folder_settings() -> Result<BotFolders, String> {
         .clone())
 }
 
-fn filter_hidden_bundles<T: Runnable + Clone>(bundles: &HashSet<T>) -> Vec<T> {
-    bundles.iter().filter(|b| !b.get_config_file_name().starts_with('_')).cloned().collect()
+fn filter_hidden_bundles<I>(bundles: I) -> Vec<I::Item>
+where
+    I: IntoIterator,
+    I::Item: Runnable + Clone,
+{
+    bundles.into_iter().filter(|b| !b.get_config_file_name().starts_with('_')).collect()
 }
 
 async fn get_bots_from_directory(path: &str) -> Vec<BotConfigBundle> {
-    filter_hidden_bundles(&scan_directory_for_bot_configs(path).await)
+    filter_hidden_bundles(scan_directory_for_bot_configs(path).await)
 }
 
 #[tauri::command]
@@ -107,7 +111,7 @@ pub async fn scan_for_bots() -> Result<Vec<BotConfigBundle>, String> {
 
     for (path, props) in &bfs.files {
         if props.visible {
-            if let Ok(bundle) = BotConfigBundle::minimal_from_path_sync(Path::new(path)) {
+            if let Ok(bundle) = BotConfigBundle::minimal_from_path(Path::new(path)).await {
                 bots.push(bundle);
             }
         }
@@ -116,25 +120,29 @@ pub async fn scan_for_bots() -> Result<Vec<BotConfigBundle>, String> {
     Ok(bots)
 }
 
-fn get_scripts_from_directory(path: &str) -> Vec<ScriptConfigBundle> {
-    filter_hidden_bundles(&scan_directory_for_script_configs(path))
+async fn get_scripts_from_directory(path: &str) -> Vec<ScriptConfigBundle> {
+    filter_hidden_bundles(scan_directory_for_script_configs(path).await)
 }
 
 #[tauri::command]
 pub async fn scan_for_scripts() -> Result<Vec<ScriptConfigBundle>, String> {
-    let bfs_lock = BOT_FOLDER_SETTINGS.lock().map_err(|err| err.to_string())?;
-    let bfs = bfs_lock.as_ref().ok_or("BOT_FOLDER_SETTINGS is None")?;
+    let bfs = BOT_FOLDER_SETTINGS
+        .lock()
+        .map_err(|_| "Mutex BOT_FOLDER_SETTINGS was poisoned".to_owned())?
+        .as_ref()
+        .ok_or("BOT_FOLDER_SETTINGS is None")?
+        .clone();
     let mut scripts = Vec::with_capacity(bfs.folders.len() + bfs.files.len());
 
     for (path, props) in &bfs.folders {
         if props.visible {
-            scripts.extend(get_scripts_from_directory(&**path));
+            scripts.extend(get_scripts_from_directory(&**path).await);
         }
     }
 
     for (path, props) in &bfs.files {
         if props.visible {
-            if let Ok(bundle) = ScriptConfigBundle::minimal_from_path(Path::new(path)) {
+            if let Ok(bundle) = ScriptConfigBundle::minimal_from_path(Path::new(path)).await {
                 scripts.push(bundle);
             }
         }

@@ -391,7 +391,7 @@ fn write_console_text_out_queue_to_file() -> Result<(), InternalConsoleError> {
 
     let mut file = OpenOptions::new().write(true).append(true).open(get_log_path())?;
 
-    for line in to_write_out  {
+    for line in to_write_out {
         writeln!(file, "{line}")?;
     }
 
@@ -430,7 +430,7 @@ fn issue_console_update(window: &Window, text: String, replace_last: bool) -> (S
             }
             try_emit_signal(window, "new-console-text", update)
         }
-        Err(e) =>  {
+        Err(e) => {
             ccprintlne(window, e.to_string());
             Default::default()
         }
