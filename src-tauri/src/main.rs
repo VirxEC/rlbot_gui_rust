@@ -468,7 +468,7 @@ fn emit_text<T: AsRef<str>>(window: &Window, text: T, replace_last: bool) {
 }
 
 fn gui_setup_load_config(window: &Window) -> Result<(), Box<dyn StdError>> {
-    let gui_config = load_gui_config(window);
+    let gui_config = load_gui_config_sync(window);
     *PYTHON_PATH.lock()? = gui_config.get("python_config", "path").unwrap_or_else(|| auto_detect_python().unwrap_or_default().0);
     *BOT_FOLDER_SETTINGS.lock()? = Some(BotFolders::load_from_conf(&gui_config));
     Ok(())

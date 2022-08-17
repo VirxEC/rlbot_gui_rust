@@ -187,7 +187,7 @@ pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, c
         };
 
         let config_path = get_config_path();
-        let mut config = load_gui_config(window);
+        let mut config = load_gui_config(window).await;
 
         config.set("bot_folder_settings", "incr", Some(latest_release_tag_name));
 
@@ -304,7 +304,7 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
     }
 
     let config_path = get_config_path();
-    let mut config = load_gui_config(window);
+    let mut config = load_gui_config(window).await;
 
     let tag_deleted_files_path = local_folder_path.join(".deleted");
 
