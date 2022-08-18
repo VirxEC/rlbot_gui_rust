@@ -7,7 +7,7 @@ export default {
 	template: /*html*/`
 	<div class="overflow-hidden flex-grow-1">
 	<b-navbar class="navbar">
-		<b-navbar-brand>de
+		<b-navbar-brand>
 			<img class="logo" src="imgs/rlbot_logo.png">
 			<span class="rlbot-brand" style="flex: 1">RLBot Console</span>
 		</b-navbar-brand>
