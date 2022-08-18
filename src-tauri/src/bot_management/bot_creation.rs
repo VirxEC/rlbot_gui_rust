@@ -86,12 +86,11 @@ pub async fn bootstrap_python_bot(window: &Window, bot_name: String, directory: 
 
     download_extract_bot_template(window, "https://github.com/RLBot/RLBotPythonExample/archive/master.zip", top_dir.as_path()).await?;
 
-    let bundles = scan_directory_for_bot_configs(&top_dir.to_string_lossy()).await;
-    let bundle = &bundles[0];
-    let config_file = bundle.path.clone().unwrap();
-    let python_file = bundle.python_path.clone().unwrap();
+    let bundles = scan_directory_for_bot_configs(window, &top_dir.to_string_lossy()).await;
+    let config_file = &bundles[0].path;
+    let python_file = &bundles[0].python_path;
 
-    change_key_in_cfg(&config_file, BOT_CONFIG_MODULE_HEADER, NAME_KEY, bot_name).await?;
+    change_key_in_cfg(config_file, BOT_CONFIG_MODULE_HEADER, NAME_KEY, bot_name).await?;
 
     BOT_FOLDER_SETTINGS
         .lock()
@@ -108,7 +107,7 @@ pub async fn bootstrap_python_bot(window: &Window, bot_name: String, directory: 
         );
     }
 
-    Ok(config_file)
+    Ok(config_file.clone())
 }
 
 /// Load a file, replace all the matching regex with the replacement, and save the file - returns potential IO errors

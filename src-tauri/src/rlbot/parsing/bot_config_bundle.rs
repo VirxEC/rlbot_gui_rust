@@ -142,80 +142,79 @@ pub enum RLBotCfgParseError {
     NoScriptFile(String),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(default)]
 pub struct BotConfigBundle {
-    pub name: Option<String>,
-    pub looks_path: Option<String>,
-    pub path: Option<String>,
-    config_file_name: Option<String>,
-    config_directory: Option<String>,
+    pub name: String,
+    pub looks_path: String,
+    pub path: String,
+    config_file_name: String,
+    config_directory: String,
     pub info: Option<DevInfo>,
-    pub logo_path: Option<String>,
+    pub logo_path: String,
     pub logo: Option<String>,
     pub runnable_type: String,
     pub warn: Option<String>,
     pub image: String,
-    supports_standalone: Option<bool>,
-    use_virtual_environment: Option<bool>,
+    supports_standalone: bool,
+    use_virtual_environment: bool,
     requirements_file: Option<String>,
-    requires_tkinter: Option<bool>,
+    requires_tkinter: bool,
     pub missing_python_packages: Option<Vec<String>>,
-    pub python_path: Option<String>,
+    pub python_path: String,
 }
 
 impl BotConfigBundle {
     pub async fn minimal_from_path<T: AsRef<Path>>(config_path: T) -> Result<Self, RLBotCfgParseError> {
         let config_path = config_path.as_ref();
-        let config_path_str = config_path.display().to_string();
-        let conf = load_cfg(config_path).await?;
-
-        Self::minimal_from_conf(config_path, config_path_str, conf)
+        Self::minimal_from_conf(config_path, load_cfg(config_path).await?)
     }
 
     pub fn minimal_from_path_sync(config_path: &Path) -> Result<Self, RLBotCfgParseError> {
-        let config_path_str = config_path.display().to_string();
-        let conf = load_cfg_sync(config_path)?;
-
-        Self::minimal_from_conf(config_path, config_path_str, conf)
+        Self::minimal_from_conf(config_path, load_cfg_sync(config_path)?)
     }
 
-    fn minimal_from_conf(config_path: &Path, config_path_str: String, conf: Ini) -> Result<Self, RLBotCfgParseError> {
+    fn minimal_from_conf(config_path: &Path, conf: Ini) -> Result<Self, RLBotCfgParseError> {
         let path = config_path.to_string_lossy().to_string();
+        let config_path_str = config_path.display().to_string();
+        // the follow unwrap calls will probably never fail because the config file was loaded successfully, already
+        let config_file_name = config_path.file_name().unwrap().to_string_lossy().to_string();
         let config_directory = config_path.parent().unwrap().to_string_lossy().to_string();
-        let config_file_name = Some(config_path.file_name().unwrap().to_string_lossy().to_string());
 
-        let name = conf.get(BOT_CONFIG_MODULE_HEADER, NAME_KEY);
-        let looks_path = conf.get(BOT_CONFIG_MODULE_HEADER, LOOKS_CONFIG_KEY).map(|path| format!("{config_directory}/{path}"));
-        let python_path = conf.get(BOT_CONFIG_MODULE_HEADER, PYTHON_FILE_KEY).map(|path| format!("{config_directory}/{path}"));
-        let supports_standalone = conf.get(BOT_CONFIG_MODULE_HEADER, SUPPORTS_STANDALONE).map(|s| s.parse::<bool>().unwrap_or_default());
-        let use_virtual_environment = conf.getboolcoerce(BOT_CONFIG_MODULE_HEADER, USE_VIRTUAL_ENVIRONMENT_KEY).unwrap_or(None);
-        let requirements_file = conf.get(BOT_CONFIG_MODULE_HEADER, REQUIREMENTS_FILE_KEY).map(|path| format!("{config_directory}/{path}"));
-        let requires_tkinter = conf.getboolcoerce(BOT_CONFIG_MODULE_HEADER, REQUIRES_TKINTER).unwrap_or(Some(false));
+        let python_path = conf
+            .get(BOT_CONFIG_MODULE_HEADER, PYTHON_FILE_KEY)
+            .map(|path| format!("{config_directory}/{path}"))
+            .ok_or_else(|| RLBotCfgParseError::NoPythonFile(config_path_str.clone()))?;
 
-        if name.is_none() {
-            return Err(RLBotCfgParseError::NoName(config_path_str));
-        }
-
-        let valid_looks = match &looks_path {
-            Some(path) => Path::new(path).exists(),
-            None => false,
-        };
-
-        if !valid_looks {
-            return Err(RLBotCfgParseError::NoLooksConfig(config_path_str));
-        }
-
-        let valid_path = match &python_path {
-            Some(path) => Path::new(path).exists(),
-            None => false,
-        };
-
-        if !valid_path {
+        if !Path::new(&python_path).exists() {
             return Err(RLBotCfgParseError::NoPythonFile(config_path_str));
         }
 
+        let name = conf
+            .get(BOT_CONFIG_MODULE_HEADER, NAME_KEY)
+            .ok_or_else(|| RLBotCfgParseError::NoName(config_path_str.clone()))?;
+
+        let looks_path = conf
+            .get(BOT_CONFIG_MODULE_HEADER, LOOKS_CONFIG_KEY)
+            .map(|path| format!("{config_directory}/{path}"))
+            .ok_or_else(|| RLBotCfgParseError::NoLooksConfig(config_path_str.clone()))?;
+        let supports_standalone = conf
+            .get(BOT_CONFIG_MODULE_HEADER, SUPPORTS_STANDALONE)
+            .map(|s| s.parse::<bool>().unwrap_or_default())
+            .unwrap_or_default();
+        let use_virtual_environment = conf
+            .getboolcoerce(BOT_CONFIG_MODULE_HEADER, USE_VIRTUAL_ENVIRONMENT_KEY)
+            .unwrap_or_default()
+            .unwrap_or_default();
+        let requirements_file = conf.get(BOT_CONFIG_MODULE_HEADER, REQUIREMENTS_FILE_KEY).map(|path| format!("{config_directory}/{path}"));
+        let requires_tkinter = conf.getboolcoerce(BOT_CONFIG_MODULE_HEADER, REQUIRES_TKINTER).unwrap_or_default().unwrap_or_default();
+
+        if !Path::new(&looks_path).exists() {
+            return Err(RLBotCfgParseError::NoLooksConfig(config_path_str));
+        }
+
         let relative_logo_path = conf.get(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY).unwrap_or_else(|| String::from("logo.png"));
-        let absolute_logo_path = format!("{config_directory}/{relative_logo_path}");
+        let logo_path = format!("{config_directory}/{relative_logo_path}");
 
         let logo = None;
 
@@ -225,10 +224,6 @@ impl BotConfigBundle {
         let warn = None;
         let image = String::from("imgs/rlbot.png");
         let missing_python_packages = None;
-
-        let path = Some(path);
-        let logo_path = Some(absolute_logo_path);
-        let config_directory = Some(config_directory);
 
         Ok(Self {
             name,
@@ -307,7 +302,7 @@ impl Clean for BotConfigBundle {
 
 impl Runnable for BotConfigBundle {
     fn get_config_file_name(&self) -> &str {
-        self.config_file_name.as_ref().unwrap()
+        &self.config_file_name
     }
 
     fn get_requirements_file(&self) -> &Option<String> {
@@ -315,7 +310,7 @@ impl Runnable for BotConfigBundle {
     }
 
     fn use_virtual_environment(&self) -> bool {
-        self.supports_standalone.unwrap_or_default() && self.use_virtual_environment.unwrap_or_default()
+        self.supports_standalone && self.use_virtual_environment
     }
 
     fn get_missing_packages(&self, window: &Window) -> Vec<String> {
@@ -329,12 +324,10 @@ impl Runnable for BotConfigBundle {
             return Vec::new();
         };
 
-        let requires_tkinter = self.requires_tkinter.unwrap_or_default();
-
         if let Some(req_file) = self.get_requirements_file() {
             let mut args: Vec<&str> = vec!["-c", "from rlbot_smh.get_missing_packages import run; run()"];
 
-            if requires_tkinter {
+            if self.requires_tkinter {
                 args.push("requires_tkinter");
             }
 
@@ -360,7 +353,7 @@ impl Runnable for BotConfigBundle {
                 }
                 Err(e) => ccprintln(window, format!("Failed to calculate missing packages: {e}")),
             }
-        } else if requires_tkinter && !get_command_status(python, ["-c", "import tkinter"]) {
+        } else if self.requires_tkinter && !get_command_status(python, ["-c", "import tkinter"]) {
             return vec![String::from("tkinter")];
         }
 
@@ -372,11 +365,7 @@ impl Runnable for BotConfigBundle {
     }
 
     fn load_logo(&self) -> Option<String> {
-        if let Some(logo_path) = &self.logo_path {
-            to_base64(logo_path)
-        } else {
-            None
-        }
+        to_base64(&self.logo_path)
     }
 
     fn is_rlbot_controlled(&self) -> bool {
@@ -392,9 +381,10 @@ impl Runnable for BotConfigBundle {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(default)]
 pub struct ScriptConfigBundle {
-    pub name: Option<String>,
+    pub name: String,
     pub runnable_type: String,
     pub warn: Option<String>,
     pub image: String,
@@ -414,16 +404,29 @@ pub struct ScriptConfigBundle {
 impl ScriptConfigBundle {
     pub async fn minimal_from_path<T: AsRef<Path>>(config_path: T) -> Result<Self, RLBotCfgParseError> {
         let config_path = config_path.as_ref();
-        let config_path_str = config_path.display().to_string();
         let conf = load_cfg(config_path).await?;
 
-        let name = conf.get(BOT_CONFIG_MODULE_HEADER, NAME_KEY);
+        let config_path_str = config_path.display().to_string();
+        // the follow unwrap calls will probably never fail because the config file was loaded successfully, already
+        let config_file_name = config_path.file_name().unwrap().to_string_lossy().to_string();
+        let config_directory = config_path.parent().unwrap().to_string_lossy().to_string();
+
+        let script_file = conf
+            .get(BOT_CONFIG_MODULE_HEADER, SCRIPT_FILE_KEY)
+            .map(|path| format!("{config_directory}/{path}"))
+            .ok_or_else(|| RLBotCfgParseError::NoScriptFile(config_path_str.clone()))?;
+
+        if !Path::new(&script_file).exists() {
+            return Err(RLBotCfgParseError::NoScriptFile(config_path_str));
+        }
+
+        let name = conf
+            .get(BOT_CONFIG_MODULE_HEADER, NAME_KEY)
+            .ok_or_else(|| RLBotCfgParseError::NoName(config_path_str.clone()))?;
         let runnable_type = String::from("script");
         let warn = None;
         let image = String::from("imgs/rlbot.png");
         let path = config_path.to_string_lossy().to_string();
-        let config_directory = config_path.parent().unwrap().to_string_lossy().to_string();
-        let config_file_name = config_path.file_name().unwrap().to_string_lossy().to_string();
         let use_virtual_environment = conf
             .getboolcoerce(BOT_CONFIG_MODULE_HEADER, USE_VIRTUAL_ENVIRONMENT_KEY)
             .unwrap_or(None)
@@ -432,19 +435,6 @@ impl ScriptConfigBundle {
             .get(BOT_CONFIG_MODULE_HEADER, REQUIREMENTS_FILE_KEY)
             .map(|path| format!("{}/{}", config_directory, path));
         let requires_tkinter = conf.getboolcoerce(BOT_CONFIG_MODULE_HEADER, REQUIRES_TKINTER).unwrap_or(None).unwrap_or_default();
-
-        let script_file = conf
-            .get(BOT_CONFIG_MODULE_HEADER, SCRIPT_FILE_KEY)
-            .map(|path| format!("{config_directory}/{path}"))
-            .unwrap_or_default();
-
-        if name.is_none() {
-            return Err(RLBotCfgParseError::NoName(config_path_str));
-        }
-
-        if !Path::new(&script_file).exists() {
-            return Err(RLBotCfgParseError::NoScriptFile(config_path_str));
-        }
 
         let relative_logo_path = conf.get(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY).unwrap_or_else(|| String::from("logo.png"));
         let absolute_logo_path = format!("{config_directory}/{relative_logo_path}");

@@ -95,8 +95,8 @@ pub fn load_gui_config_sync(window: &Window) -> Ini {
 pub async fn save_folder_settings(window: Window, bot_folder_settings: BotFolders) -> Result<(), String> {
     BOT_FOLDER_SETTINGS
         .lock()
-        .map_err(|err| err.to_string())?
-        .clone()
+        .map_err(|_| "Mutex BOT_FOLDER_SETTINGS was poisoned")?
+        .as_mut()
         .ok_or("BOT_FOLDER_SETTINGS is None")?
         .update_config(&window, bot_folder_settings);
     Ok(())
@@ -115,22 +115,22 @@ where
     bundles.into_iter().filter(|b| !b.get_config_file_name().starts_with('_')).collect()
 }
 
-async fn get_bots_from_directory(path: &str) -> Vec<BotConfigBundle> {
-    filter_hidden_bundles(scan_directory_for_bot_configs(path).await)
+async fn get_bots_from_directory(window: &Window, path: &str) -> Vec<BotConfigBundle> {
+    filter_hidden_bundles(scan_directory_for_bot_configs(window, path).await)
 }
 
 #[tauri::command]
-pub async fn scan_for_bots() -> Result<Vec<BotConfigBundle>, String> {
+pub async fn scan_for_bots(window: Window) -> Result<Vec<BotConfigBundle>, String> {
     let bfs = BOT_FOLDER_SETTINGS
         .lock()
-        .map_err(|_| "Mutex BOT_FOLDER_SETTINGS was poisoned".to_owned())?
+        .map_err(|_| "Mutex BOT_FOLDER_SETTINGS was poisoned")?
         .clone()
         .ok_or("BOT_FOLDER_SETTINGS is None")?;
     let mut bots = Vec::new();
 
     for (path, props) in &bfs.folders {
         if props.visible {
-            bots.extend(get_bots_from_directory(&**path).await);
+            bots.extend(get_bots_from_directory(&window, &**path).await);
         }
     }
 
@@ -145,15 +145,15 @@ pub async fn scan_for_bots() -> Result<Vec<BotConfigBundle>, String> {
     Ok(bots)
 }
 
-async fn get_scripts_from_directory(path: &str) -> Vec<ScriptConfigBundle> {
-    filter_hidden_bundles(scan_directory_for_script_configs(path).await)
+async fn get_scripts_from_directory(window: &Window, path: &str) -> Vec<ScriptConfigBundle> {
+    filter_hidden_bundles(scan_directory_for_script_configs(window, path).await)
 }
 
 #[tauri::command]
-pub async fn scan_for_scripts() -> Result<Vec<ScriptConfigBundle>, String> {
+pub async fn scan_for_scripts(window: Window) -> Result<Vec<ScriptConfigBundle>, String> {
     let bfs = BOT_FOLDER_SETTINGS
         .lock()
-        .map_err(|_| "Mutex BOT_FOLDER_SETTINGS was poisoned".to_owned())?
+        .map_err(|_| "Mutex BOT_FOLDER_SETTINGS was poisoned")?
         .as_ref()
         .ok_or("BOT_FOLDER_SETTINGS is None")?
         .clone();
@@ -161,7 +161,7 @@ pub async fn scan_for_scripts() -> Result<Vec<ScriptConfigBundle>, String> {
 
     for (path, props) in &bfs.folders {
         if props.visible {
-            scripts.extend(get_scripts_from_directory(&**path).await);
+            scripts.extend(get_scripts_from_directory(&window, &**path).await);
         }
     }
 
