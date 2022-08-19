@@ -33,7 +33,6 @@ use std::{
     io::{Read, Result as IoResult, Write},
     path::PathBuf,
     process::{Child, ChildStdin, Command, Stdio},
-    string::FromUtf8Error,
     sync::Mutex,
     thread,
     time::Duration,
@@ -92,10 +91,11 @@ fn auto_detect_python() -> Option<(String, bool)> {
     }
 }
 
+#[cfg(windows)]
 #[derive(Debug, Error)]
 pub enum WindowsPipLocateError {
     #[error("Couldn't convert stdout to string: {0}")]
-    InvalidUTF8(#[from] FromUtf8Error),
+    InvalidUTF8(#[from] std::string::FromUtf8Error),
     #[error("{0} has no parent")]
     NoParentError(String),
     #[error("I/O error: {0}")]

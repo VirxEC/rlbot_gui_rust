@@ -95,8 +95,8 @@ pub fn load_gui_config_sync(window: &Window) -> Ini {
 pub async fn save_folder_settings(window: Window, bot_folder_settings: BotFolders) -> Result<(), String> {
     BOT_FOLDER_SETTINGS
         .lock()
-        .map_err(|err| err.to_string())?
-        .clone()
+        .map_err(|_| "Mutex BOT_FOLDER_SETTINGS was poisoned")?
+        .as_mut()
         .ok_or("BOT_FOLDER_SETTINGS is None")?
         .update_config(&window, bot_folder_settings);
     Ok(())
@@ -115,22 +115,22 @@ where
     bundles.into_iter().filter(|b| !b.get_config_file_name().starts_with('_')).collect()
 }
 
-async fn get_bots_from_directory(path: &str) -> Vec<BotConfigBundle> {
-    filter_hidden_bundles(scan_directory_for_bot_configs(path).await)
+async fn get_bots_from_directory(window: &Window, path: &str) -> Vec<BotConfigBundle> {
+    filter_hidden_bundles(scan_directory_for_bot_configs(window, path).await)
 }
 
 #[tauri::command]
-pub async fn scan_for_bots() -> Result<Vec<BotConfigBundle>, String> {
+pub async fn scan_for_bots(window: Window) -> Result<Vec<BotConfigBundle>, String> {
     let bfs = BOT_FOLDER_SETTINGS
         .lock()
-        .map_err(|_| "Mutex BOT_FOLDER_SETTINGS was poisoned".to_owned())?
+        .map_err(|_| "Mutex BOT_FOLDER_SETTINGS was poisoned")?
         .clone()
         .ok_or("BOT_FOLDER_SETTINGS is None")?;
     let mut bots = Vec::new();
 
     for (path, props) in &bfs.folders {
         if props.visible {
-            bots.extend(get_bots_from_directory(&**path).await);
+            bots.extend(get_bots_from_directory(&window, &**path).await);
         }
     }
 
@@ -145,15 +145,15 @@ pub async fn scan_for_bots() -> Result<Vec<BotConfigBundle>, String> {
     Ok(bots)
 }
 
-async fn get_scripts_from_directory(path: &str) -> Vec<ScriptConfigBundle> {
-    filter_hidden_bundles(scan_directory_for_script_configs(path).await)
+async fn get_scripts_from_directory(window: &Window, path: &str) -> Vec<ScriptConfigBundle> {
+    filter_hidden_bundles(scan_directory_for_script_configs(window, path).await)
 }
 
 #[tauri::command]
-pub async fn scan_for_scripts() -> Result<Vec<ScriptConfigBundle>, String> {
+pub async fn scan_for_scripts(window: Window) -> Result<Vec<ScriptConfigBundle>, String> {
     let bfs = BOT_FOLDER_SETTINGS
         .lock()
-        .map_err(|_| "Mutex BOT_FOLDER_SETTINGS was poisoned".to_owned())?
+        .map_err(|_| "Mutex BOT_FOLDER_SETTINGS was poisoned")?
         .as_ref()
         .ok_or("BOT_FOLDER_SETTINGS is None")?
         .clone();
@@ -161,7 +161,7 @@ pub async fn scan_for_scripts() -> Result<Vec<ScriptConfigBundle>, String> {
 
     for (path, props) in &bfs.folders {
         if props.visible {
-            scripts.extend(get_scripts_from_directory(&**path).await);
+            scripts.extend(get_scripts_from_directory(&window, &**path).await);
         }
     }
 
@@ -357,7 +357,7 @@ pub async fn pick_appearance_file(window: Window) {
 }
 
 fn read_recommendations_json<P: AsRef<Path>>(path: P) -> Result<AllRecommendations<String>, String> {
-    let raw_json = read_to_string(&path).map_err(|e| format!("Failed to read {}", e))?;
+    let raw_json = read_to_string(&path).map_err(|e| format!("Failed to read {e}"))?;
 
     serde_json::from_str(&raw_json).map_err(|e| format!("Failed to parse file {}: {e}", path.as_ref().to_string_lossy()))
 }
@@ -365,13 +365,16 @@ fn read_recommendations_json<P: AsRef<Path>>(path: P) -> Result<AllRecommendatio
 fn get_recommendations_json(window: &Window, bfs: &BotFolders) -> Option<AllRecommendations<String>> {
     // Search for and load the json file
     for path in bfs.folders.keys() {
-        let pattern = Path::new(path).join("**/recommendations.json");
-
-        for path2 in glob(&pattern.to_string_lossy().clone()).unwrap().flatten() {
-            match read_recommendations_json(path2) {
-                Ok(recommendations) => return Some(recommendations),
-                Err(e) => ccprintlne(window, e),
+        match glob(&format!("{path}/**/recommendations.json")) {
+            Ok(pattern) => {
+                for path2 in pattern.flatten() {
+                    match read_recommendations_json(path2) {
+                        Ok(recommendations) => return Some(recommendations),
+                        Err(e) => ccprintlne(window, e),
+                    }
+                }
             }
+            Err(e) => ccprintlne(window, e.to_string()),
         }
     }
 
@@ -394,10 +397,13 @@ pub async fn get_recommendations(window: Window) -> Option<AllRecommendations<Bo
                     .iter()
                     .filter_map(|(path, props)| {
                         if props.visible {
-                            let pattern = Path::new(path).join("**/*.cfg");
-                            let paths = glob(&pattern.to_string_lossy().clone()).unwrap().flatten().collect::<Vec<_>>();
-
-                            Some(paths.iter().filter_map(|path| BotConfigBundle::name_from_path(path.as_path()).ok()).collect::<Vec<_>>())
+                            match glob(&format!("{path}/**/*.cfg")) {
+                                Ok(paths) => Some(paths.flatten().filter_map(|path| BotConfigBundle::name_from_path(path.as_path()).ok()).collect::<Vec<_>>()),
+                                Err(e) => {
+                                    ccprintlne(&window, e.to_string());
+                                    None
+                                }
+                            }
                         } else {
                             None
                         }

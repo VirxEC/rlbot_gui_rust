@@ -11,7 +11,7 @@ pub fn find_all(bf: &HashMap<String, BotFolder>) -> Vec<MapType> {
         .iter()
         .flat_map(|folder| {
             glob(&format!("{folder}/**/*.u[pd]k")).unwrap().flatten().filter_map(|match_| {
-                let basename = match_.file_name().unwrap().to_string_lossy();
+                let basename = match_.file_name()?.to_string_lossy();
                 if basename.starts_with('_') {
                     None
                 } else {
@@ -24,8 +24,10 @@ pub fn find_all(bf: &HashMap<String, BotFolder>) -> Vec<MapType> {
 
 pub fn convert_to_path(map: &str, bf: &HashMap<String, BotFolder>) -> Option<String> {
     for folder in get_search_folders(bf) {
-        if let Some(map_path) = glob(&format!("{folder}/**/{map}")).unwrap().flatten().next() {
-            return Some(map_path.to_string_lossy().to_string());
+        if let Ok(pattern) = glob(&format!("{folder}/**/{map}")) {
+            if let Some(map_path) = pattern.flatten().next() {
+                return Some(map_path.to_string_lossy().to_string());
+            }
         }
     }
     None
