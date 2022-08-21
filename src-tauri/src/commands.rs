@@ -251,7 +251,7 @@ fn get_missing_packages_generic<T: Runnable + Send + Sync>(window: &Window, runn
             .par_iter()
             .enumerate()
             .filter_map(|(index, runnable)| {
-                if runnable.is_rlbot_controlled() {
+                if runnable.is_rlbot_controlled() && runnable.may_require_python_packages() {
                     let mut warn = runnable.warn().clone();
                     let mut missing_packages = runnable.missing_python_packages().clone();
 
@@ -345,9 +345,9 @@ pub enum BootstrapCustomPythonError {
     NotWindows,
     #[error("Couldn't download the custom python zip: {0}")]
     Download(#[from] reqwest::Error),
-    #[error("Couldn't emit signal {UPDATE_DOWNLOAD_PROGRESS_SIGNAL}")]
+    #[error(transparent)]
     EmitSignal(#[from] tauri::Error),
-    #[error("File handle error: {0}")]
+    #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error("Coudn't extract the zip: {0}")]
     ExtractZip(#[from] ExtractError),

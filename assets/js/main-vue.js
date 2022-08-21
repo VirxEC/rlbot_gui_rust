@@ -333,6 +333,15 @@ export default {
 						<li>Restart RLBotGUI</li>
 					</ol>
 				</div>
+				<div v-if="activeBot.warn === 'dotnet'">
+					<p><b>{{activeBot.name}}</b> requires the .NET 5 runtime and it looks like you don't have it installed!</p>
+					To play with it, you'll need to:
+					<ol>
+						<li>Download the .NET Runtime 5 (no need for the SDK/ASP.NET) from <a href="https://dotnet.microsoft.com/en-us/download/dotnet/5.0" target="_blank">Microsoft</a></li>
+						<li>Install it</li>
+						<li>Restart RLBotGUI</li>
+					</ol>
+				</div>
 			</div>
 		</b-modal>
 
@@ -568,9 +577,7 @@ export default {
 				});
 			});
 
-			for (let i = 0; i < this.blueTeam.length; i++) {
-				this.blueTeam[i].missing_python_packages = null;
-			}
+			this.blueTeam.forEach(bot => bot.missing_python_packages = null);
 
 			invoke("get_missing_bot_packages", { bots: this.blueTeam }).then(bots => {
 				bots.forEach(packageInfo => {
@@ -579,9 +586,7 @@ export default {
 				});
 			});
 
-			for (let i = 0; i < this.orangeTeam.length; i++) {
-				this.orangeTeam[i].missing_python_packages = null;
-			}
+			this.orangeTeam.forEach(bot => bot.missing_python_packages = null);
 
 			invoke("get_missing_bot_packages", { bots: this.orangeTeam }).then(bots => {
 				bots.forEach(packageInfo => {
@@ -590,9 +595,7 @@ export default {
 				});
 			});
 
-			for (let i = 0; i < this.scriptPool.length; i++) {
-				this.scriptPool[i].missing_python_packages = null;
-			}
+			this.scriptPool.forEach(bot => bot.missing_python_packages = null);
 
 			invoke("get_missing_script_packages", { scripts: this.scriptPool }).then(scripts => {
 				scripts.forEach(packageInfo => {
@@ -805,7 +808,6 @@ export default {
 		botsReceived: function (bots) {
 			const freshBots = bots.filter( (bot) =>
 					!this.botPool.find( (element) => element.path === bot.path ));
-			freshBots.forEach((bot) => bot.warn = null);
 
 			this.applyLanguageWarnings(freshBots);
 			let botPool = this.botPool.slice(STARTING_BOT_POOL.length).concat(freshBots);
@@ -828,8 +830,6 @@ export default {
 					this.botPool[index].logo = botLogo.logo;
 				});
 			});
-
-			invoke("get_recommendations").then(this.recommendationsReceived);
 		},
 
 		scriptsReceived: function (scripts) {
@@ -860,14 +860,21 @@ export default {
 				bots.forEach((bot) => {
 					if (bot.info && bot.info.language) {
 						const language = bot.info.language.toLowerCase();
-						if (!this.languageSupport.java && language.match(/java|kotlin|scala/) && !language.match(/javascript/)) {
+						if (language.match(/python/i)) {
+							// Python is handled elsewhere
+							return;
+						}
+						if (!this.languageSupport.node && language.match(/(java|type|coffee)( |_)?script|js|ts|node/i)) {
+							bot.warn = 'node';
+						}
+						if (!this.languageSupport.java && language.match(/java|kotlin|scala/i)) {
 							bot.warn = 'java';
 						}
-						if (!this.languageSupport.chrome && language.match(/scratch/)) {
+						if (!this.languageSupport.chrome && language.match(/scratch/i)) {
 							bot.warn = 'chrome';
 						}
-						if (!this.languageSupport.node && language.match(/(java|type|coffee)script|js|ts|node/)) {
-							bot.warn = 'node';
+						if (!this.languageSupport.dotnet && language.match(/c( |_)?(#|sharp|sharp)|(dot|\.)( |_)?net/i)) {
+							bot.warn = 'dotnet';
 						}
 					}
 				});
@@ -917,6 +924,8 @@ export default {
 				this.orangeTeam = teamSettings.orange_team;
 			}
 
+			this.distinguishDuplicateBots(this.blueTeam.concat(this.orangeTeam));
+
 			invoke("get_missing_bot_packages", { bots: this.blueTeam }).then(botPackageInfos => {
 				botPackageInfos.forEach(botPackageInfo => {
 					this.blueTeam[botPackageInfo.index].warn = botPackageInfo.warn;
@@ -943,7 +952,6 @@ export default {
 				});
 			});
 
-			this.distinguishDuplicateBots(this.blueTeam.concat(this.orangeTeam));
 			this.applyLanguageWarnings(this.blueTeam.concat(this.orangeTeam));
 		},
 
@@ -970,7 +978,6 @@ export default {
 			this.showSnackbar = true;
 			this.$bvModal.hide('download-modal');
 			invoke("get_folder_settings").then(this.folderSettingsReceived);
-			invoke("get_match_options").then(this.matchOptionsReceived);
 			this.$refs.botPool.setDefaultCategory();
 		},
 
@@ -1064,29 +1071,20 @@ export default {
 			});
 		},
 		startup_inner: function() {
-			invoke('get_folder_settings').then(this.folderSettingsReceived);
-			invoke("get_match_options").then(this.matchOptionsReceived);
-			invoke("get_match_settings").then(this.matchSettingsReceived);
-			invoke("get_team_settings").then(this.teamSettingsReceived);
-			invoke("get_python_path").then(path => this.python_path = path);
-
 			invoke("get_language_support").then(support => {
 				this.languageSupport = support;
-				this.applyLanguageWarnings(this.botPool.concat(this.scriptPool));
-			});
 
-			invoke("is_botpack_up_to_date").then(this.botpackUpdateChecked);
+				invoke('get_folder_settings').then(this.folderSettingsReceived);
+				invoke("get_team_settings").then(this.teamSettingsReceived);
+			});
+			
+			invoke("get_match_settings").then(this.matchSettingsReceived);
 			invoke("get_recommendations").then(this.recommendationsReceived);
+			invoke("get_python_path").then(path => this.python_path = path);
+			invoke("is_botpack_up_to_date").then(this.botpackUpdateChecked);
 
 			this.init = true;
-		},
-		allUsableRunnables: function() {
-			let runnables = this.botPool.concat(this.scriptPool).concat(this.blueTeam).concat(this.orangeTeam).concat(this.matchSettings.scripts);
-			if (this.recommendations) this.recommendations.recommendations.forEach(recommendation => {
-				runnables = runnables.concat(recommendation.bots);
-			});
-			return runnables;
-		},
+		}
 	},
 	computed: {
 		activeMutatorCount: function() {

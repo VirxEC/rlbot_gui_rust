@@ -18,7 +18,7 @@ use zip::{result::ZipError, ZipArchive};
 pub enum ExtractError {
     #[error("Invalid ZIP archive: {0}")]
     Zip(#[from] ZipError),
-    #[error("Block from file operation: {0}")]
+    #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error("Couldn't strip the top level ({top_level}) from {path}")]
     StripToplevel {

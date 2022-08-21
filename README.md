@@ -16,7 +16,6 @@ You can download, update or create bots
 
 ![HomeScreenshot](screenshots/gui-home.png)
 
-
 In Story Mode, you can take over cities by beating challenges and can also
 recruit teammates and purchase upgrades for your car!
 
@@ -33,6 +32,7 @@ recruit teammates and purchase upgrades for your car!
 - Full self-updating of the GUI: Implemented for Windows and Ubunutu users & reserved spot on AUR
 - Prints get dumped asyncronously to log.txt in content folder
 - "Upload GUI log for help" button in Menu (top right) which uploads the log.txt file to HasteBin
+- DotNet runtime detection for C# bots to display warning message
 
 ### Unique to this version
 
@@ -75,14 +75,14 @@ Without using an AUR helper:
 
 ### Other Linux distros (no easy updates)
 
-We have a pre-compiled binary, icon, and `.desktop` just for you! [Get the `linux-basics.tar.gz` from here](https://github.com/VirxEC/rlbot_gui_rust_apt/releases/latest).
+We have a pre-compiled binary, icon, and `.desktop` for you! [Get the `linux-basics.tar.gz` from here](https://github.com/VirxEC/rlbot_gui_rust_apt/releases/latest).
 
 If you want to have a script that checks for updates, you could:
 
 1. [Download this JSON](https://api.github.com/repos/VirxEC/rlbot_gui_rust_apt/releases/latest)
 2. Compare the `tag_name` from when you last download the binary to the current `tag_name`
 3. Download the `asset` with the name `linux-basics.tar.gz` using `browser_download_url`
-4. Unzip the `.tar.gz` and put the files in their proper places on your system (currently `rl-bot-gui.desktop` and `rl-bot-gui` executable)
+4. Unzip the `.tar.gz` and put the files in their proper places on your system
 
 ### MacOS (no easy updates)
 

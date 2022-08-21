@@ -10,4 +10,5 @@ pub trait Runnable {
     fn is_rlbot_controlled(&self) -> bool;
     fn warn(&self) -> &Option<String>;
     fn missing_python_packages(&self) -> &Option<Vec<String>>;
+    fn may_require_python_packages(&self) -> bool;
 }
