@@ -318,6 +318,7 @@ pub async fn get_language_support() -> Result<HashMap<String, bool>, String> {
         "fullpython".to_owned(),
         get_command_status(&*PYTHON_PATH.lock().map_err(|err| err.to_string())?, ["-c", "import tkinter"]),
     );
+    lang_support.insert("dotnet".to_owned(), get_command_status("dotnet", ["--list"]));
 
     Ok(dbg!(lang_support))
 }

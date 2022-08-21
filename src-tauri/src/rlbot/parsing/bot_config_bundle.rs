@@ -379,6 +379,10 @@ impl Runnable for BotConfigBundle {
     fn missing_python_packages(&self) -> &Option<Vec<String>> {
         &self.missing_python_packages
     }
+
+    fn may_require_python_packages(&self) -> bool {
+        self.info.as_ref().map(|info| info.language.to_lowercase().contains("python")).unwrap_or_default()
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
@@ -557,5 +561,9 @@ impl Runnable for ScriptConfigBundle {
 
     fn missing_python_packages(&self) -> &Option<Vec<String>> {
         &self.missing_python_packages
+    }
+
+    fn may_require_python_packages(&self) -> bool {
+        true
     }
 }

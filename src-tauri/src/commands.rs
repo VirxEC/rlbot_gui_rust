@@ -251,7 +251,7 @@ fn get_missing_packages_generic<T: Runnable + Send + Sync>(window: &Window, runn
             .par_iter()
             .enumerate()
             .filter_map(|(index, runnable)| {
-                if runnable.is_rlbot_controlled() {
+                if runnable.is_rlbot_controlled() && runnable.may_require_python_packages() {
                     let mut warn = runnable.warn().clone();
                     let mut missing_packages = runnable.missing_python_packages().clone();
 
