@@ -577,9 +577,7 @@ export default {
 				});
 			});
 
-			for (let i = 0; i < this.blueTeam.length; i++) {
-				this.blueTeam[i].missing_python_packages = null;
-			}
+			this.blueTeam.forEach(bot => bot.missing_python_packages = null);
 
 			invoke("get_missing_bot_packages", { bots: this.blueTeam }).then(bots => {
 				bots.forEach(packageInfo => {
@@ -588,9 +586,7 @@ export default {
 				});
 			});
 
-			for (let i = 0; i < this.orangeTeam.length; i++) {
-				this.orangeTeam[i].missing_python_packages = null;
-			}
+			this.orangeTeam.forEach(bot => bot.missing_python_packages = null);
 
 			invoke("get_missing_bot_packages", { bots: this.orangeTeam }).then(bots => {
 				bots.forEach(packageInfo => {
@@ -599,9 +595,7 @@ export default {
 				});
 			});
 
-			for (let i = 0; i < this.scriptPool.length; i++) {
-				this.scriptPool[i].missing_python_packages = null;
-			}
+			this.scriptPool.forEach(bot => bot.missing_python_packages = null);
 
 			invoke("get_missing_script_packages", { scripts: this.scriptPool }).then(scripts => {
 				scripts.forEach(packageInfo => {
@@ -836,8 +830,6 @@ export default {
 					this.botPool[index].logo = botLogo.logo;
 				});
 			});
-
-			invoke("get_recommendations").then(this.recommendationsReceived);
 		},
 
 		scriptsReceived: function (scripts) {
@@ -932,6 +924,8 @@ export default {
 				this.orangeTeam = teamSettings.orange_team;
 			}
 
+			this.distinguishDuplicateBots(this.blueTeam.concat(this.orangeTeam));
+
 			invoke("get_missing_bot_packages", { bots: this.blueTeam }).then(botPackageInfos => {
 				botPackageInfos.forEach(botPackageInfo => {
 					this.blueTeam[botPackageInfo.index].warn = botPackageInfo.warn;
@@ -958,7 +952,6 @@ export default {
 				});
 			});
 
-			this.distinguishDuplicateBots(this.blueTeam.concat(this.orangeTeam));
 			this.applyLanguageWarnings(this.blueTeam.concat(this.orangeTeam));
 		},
 
@@ -985,7 +978,6 @@ export default {
 			this.showSnackbar = true;
 			this.$bvModal.hide('download-modal');
 			invoke("get_folder_settings").then(this.folderSettingsReceived);
-			invoke("get_match_options").then(this.matchOptionsReceived);
 			this.$refs.botPool.setDefaultCategory();
 		},
 
@@ -1083,24 +1075,16 @@ export default {
 				this.languageSupport = support;
 
 				invoke('get_folder_settings').then(this.folderSettingsReceived);
-				invoke("get_match_options").then(this.matchOptionsReceived);
-				invoke("get_match_settings").then(this.matchSettingsReceived);
 				invoke("get_team_settings").then(this.teamSettingsReceived);
 			});
 			
+			invoke("get_match_settings").then(this.matchSettingsReceived);
 			invoke("get_recommendations").then(this.recommendationsReceived);
 			invoke("get_python_path").then(path => this.python_path = path);
 			invoke("is_botpack_up_to_date").then(this.botpackUpdateChecked);
 
 			this.init = true;
-		},
-		allUsableRunnables: function() {
-			let runnables = this.botPool.concat(this.scriptPool).concat(this.blueTeam).concat(this.orangeTeam).concat(this.matchSettings.scripts);
-			if (this.recommendations) this.recommendations.recommendations.forEach(recommendation => {
-				runnables = runnables.concat(recommendation.bots);
-			});
-			return runnables;
-		},
+		}
 	},
 	computed: {
 		activeMutatorCount: function() {

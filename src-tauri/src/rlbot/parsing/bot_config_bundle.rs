@@ -130,7 +130,7 @@ pub trait Clean {
 
 #[derive(Debug, Error)]
 pub enum RLBotCfgParseError {
-    #[error("Failed to load config file from disk: {0}")]
+    #[error(transparent)]
     CfgLoad(#[from] CfgHelperError),
     #[error("No name found in config file {0}")]
     NoName(String),

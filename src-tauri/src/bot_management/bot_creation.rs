@@ -29,7 +29,7 @@ pub const CREATED_BOTS_FOLDER: &str = "MyBots";
 
 #[derive(Debug, Error)]
 pub enum DownloadExtractError {
-    #[error("Failed to download: {0}")]
+    #[error(transparent)]
     Download(#[from] reqwest::Error),
     #[error("Failed to extract zip: {0}")]
     Extract(#[from] zip_extract_fixed::ExtractError),
@@ -63,7 +63,7 @@ pub enum BoostrapError {
     SetupTemplate(#[from] DownloadExtractError),
     #[error("Failed change key in cfg: {0}")]
     ChangeKey(#[from] cfg_helper::CfgHelperError),
-    #[error("File operation not completed: {0}")]
+    #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error("Couldn't to rename folder: {0}")]
     FolderRename(#[from] fs_extra::error::Error),

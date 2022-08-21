@@ -345,9 +345,9 @@ pub enum BootstrapCustomPythonError {
     NotWindows,
     #[error("Couldn't download the custom python zip: {0}")]
     Download(#[from] reqwest::Error),
-    #[error("Couldn't emit signal {UPDATE_DOWNLOAD_PROGRESS_SIGNAL}")]
+    #[error(transparent)]
     EmitSignal(#[from] tauri::Error),
-    #[error("File handle error: {0}")]
+    #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error("Coudn't extract the zip: {0}")]
     ExtractZip(#[from] ExtractError),

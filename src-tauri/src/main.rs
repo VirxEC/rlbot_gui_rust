@@ -98,7 +98,7 @@ pub enum WindowsPipLocateError {
     InvalidUTF8(#[from] std::string::FromUtf8Error),
     #[error("{0} has no parent")]
     NoParentError(String),
-    #[error("I/O error: {0}")]
+    #[error(transparent)]
     IO(#[from] std::io::Error),
     #[error("Could not find python.exe")]
     NoPython,
