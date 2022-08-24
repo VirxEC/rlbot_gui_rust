@@ -418,6 +418,8 @@ fn try_emit_signal<S: Serialize + Clone>(window: &Window, signal: &str, payload:
 }
 
 fn issue_console_update(window: &Window, text: String, replace_last: bool) -> (String, Option<TauriError>) {
+    println!("{}", text);
+    
     match CONSOLE_TEXT_OUT_QUEUE.lock() {
         Ok(mut ctoq) => ctoq.push(text.clone()),
         Err(_) => ccprintlne(window, "Mutex CONSOLE_TEXT_OUT_QUEUE is poisoned".to_owned()),
