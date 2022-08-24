@@ -33,13 +33,13 @@ use std::{
     io::{Read, Result as IoResult, Write},
     path::PathBuf,
     process::{Child, ChildStdin, Command, Stdio},
-    sync::Mutex,
+    sync::{Mutex, RwLock},
     thread,
     time::Duration,
 };
 use tauri::{App, Error as TauriError, Manager, Window};
 use thiserror::Error;
-use tokio::sync::Mutex as AsyncMutex;
+use tokio::sync::RwLock as AsyncRwLock;
 
 const BOTPACK_FOLDER: &str = "RLBotPackDeletable";
 const MAPPACK_FOLDER: &str = "RLBotMapPackDeletable";
@@ -51,14 +51,15 @@ const MAX_CONSOLE_LINES: usize = 840;
 static CONSOLE_TEXT: Mutex<Vec<String>> = Mutex::new(Vec::new());
 static CONSOLE_TEXT_OUT_QUEUE: Mutex<Vec<String>> = Mutex::new(Vec::new());
 static CONSOLE_INPUT_COMMANDS: Mutex<Vec<String>> = Mutex::new(Vec::new());
-static PYTHON_PATH: Mutex<String> = Mutex::new(String::new());
-static BOT_FOLDER_SETTINGS: Mutex<Option<BotFolders>> = Mutex::new(None);
 static MATCH_HANDLER_STDIN: Mutex<Option<ChildStdin>> = Mutex::new(None);
 static CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
 
+static PYTHON_PATH: RwLock<String> = RwLock::new(String::new());
+static BOT_FOLDER_SETTINGS: RwLock<Option<BotFolders>> = RwLock::new(None);
+
 lazy_static! {
-    static ref BOTS_BASE: AsyncMutex<Option<JsonMap>> = AsyncMutex::new(None);
-    static ref STORIES_CACHE: AsyncMutex<HashMap<StoryConfig, JsonMap>> = AsyncMutex::new(HashMap::new());
+    static ref BOTS_BASE: AsyncRwLock<Option<JsonMap>> = AsyncRwLock::new(None);
+    static ref STORIES_CACHE: AsyncRwLock<HashMap<StoryConfig, JsonMap>> = AsyncRwLock::new(HashMap::new());
 }
 
 #[cfg(windows)]
@@ -341,7 +342,7 @@ pub fn spawn_capture_process_and_get_exit_code<S: AsRef<OsStr>, A: AsRef<OsStr>,
 ///
 /// This function will return an error if `PYTHON_PATH`'s lock has been poisoned.
 pub fn check_has_rlbot() -> Result<bool, String> {
-    Ok(get_command_status(&*PYTHON_PATH.lock().map_err(|err| err.to_string())?, ["-c", "import rlbot"]))
+    Ok(get_command_status(&*PYTHON_PATH.read().map_err(|err| err.to_string())?, ["-c", "import rlbot"]))
 }
 
 #[cfg(windows)]
@@ -469,8 +470,8 @@ fn emit_text<T: AsRef<str>>(window: &Window, text: T, replace_last: bool) {
 
 fn gui_setup_load_config(window: &Window) -> Result<(), Box<dyn StdError>> {
     let gui_config = load_gui_config_sync(window);
-    *PYTHON_PATH.lock()? = gui_config.get("python_config", "path").unwrap_or_else(|| auto_detect_python().unwrap_or_default().0);
-    *BOT_FOLDER_SETTINGS.lock()? = Some(BotFolders::load_from_conf(&gui_config));
+    *PYTHON_PATH.write()? = gui_config.get("python_config", "path").unwrap_or_else(|| auto_detect_python().unwrap_or_default().0);
+    *BOT_FOLDER_SETTINGS.write()? = Some(BotFolders::load_from_conf(&gui_config));
     Ok(())
 }
 

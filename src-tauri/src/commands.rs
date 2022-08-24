@@ -41,7 +41,7 @@ pub const UPDATE_DOWNLOAD_PROGRESS_SIGNAL: &str = "update-download-progress";
 pub async fn check_rlbot_python() -> Result<HashMap<String, bool>, String> {
     let mut python_support = HashMap::new();
 
-    let python_path = PYTHON_PATH.lock().map_err(|err| err.to_string())?.to_owned();
+    let python_path = PYTHON_PATH.read().map_err(|err| err.to_string())?.to_owned();
 
     if get_command_status(&python_path, ["--version"]) {
         python_support.insert("python".to_owned(), true);
@@ -149,7 +149,7 @@ fn get_package_name(package_name: &str) -> &str {
 #[tauri::command]
 pub async fn install_package(package_string: String) -> Result<PackageResult, String> {
     let exit_code = spawn_capture_process_and_get_exit_code(
-        &*PYTHON_PATH.lock().map_err(|err| err.to_string())?,
+        &*PYTHON_PATH.read().map_err(|err| err.to_string())?,
         ["-m", "pip", "install", "-U", "--no-warn-script-location", get_package_name(&package_string)],
     );
 
@@ -171,7 +171,7 @@ pub async fn install_requirements(window: Window, config_path: String) -> Result
 
         Ok(if let Some(file) = bundle.get_requirements_file() {
             let packages = bundle.get_missing_packages(window);
-            let python = PYTHON_PATH.lock().map_err(|_| InstallRequirementseError::MutexPoisoned("PYTHON_PATH".to_owned()))?;
+            let python = PYTHON_PATH.read().map_err(|_| InstallRequirementseError::MutexPoisoned("PYTHON_PATH".to_owned()))?;
             let exit_code = spawn_capture_process_and_get_exit_code(&*python, ["-m", "pip", "install", "--no-warn-script-location", "-r", file]);
 
             PackageResult::new(exit_code, packages)
@@ -200,7 +200,7 @@ pub async fn install_basic_packages(window: Window) -> Result<PackageResult, Str
         return Ok(PackageResult::new(3, packages));
     }
 
-    let python = PYTHON_PATH.lock().map_err(|err| err.to_string())?.to_owned();
+    let python = PYTHON_PATH.read().map_err(|err| err.to_string())?.to_owned();
 
     spawn_capture_process_and_get_exit_code(&python, ["-m", "ensurepip"]);
 
@@ -404,7 +404,7 @@ pub async fn bootstrap_custom_python(window: &Window) -> Result<(), BootstrapCus
     zip_extract_fixed::extract(window, File::open(&file_path)?, folder_destination.as_path(), false, false)?;
 
     // Update the Python path
-    *PYTHON_PATH.lock().map_err(|_| BootstrapCustomPythonError::MutexPoisoned("PYTHON_PATH".to_owned()))? =
+    *PYTHON_PATH.write().map_err(|_| BootstrapCustomPythonError::MutexPoisoned("PYTHON_PATH".to_owned()))? =
         folder_destination.join("python.exe").to_string_lossy().to_string();
 
     Ok(())
@@ -428,7 +428,7 @@ pub async fn download_bot_pack(window: Window) -> Result<String, String> {
         downloader::BotpackStatus::Success(message) => {
             // Configure the folder settings
             BOT_FOLDER_SETTINGS
-                .lock()
+                .write()
                 .map_err(|err| err.to_string())?
                 .as_mut()
                 .ok_or("BOT_FOLDER_SETTINGS is None")?
@@ -450,7 +450,7 @@ pub async fn update_bot_pack(window: Window) -> Result<String, String> {
         downloader::BotpackStatus::Success(message) => {
             // Configure the folder settings
             BOT_FOLDER_SETTINGS
-                .lock()
+                .write()
                 .map_err(|err| err.to_string())?
                 .as_mut()
                 .ok_or("BOT_FOLDER_SETTINGS is None")?
@@ -463,7 +463,7 @@ pub async fn update_bot_pack(window: Window) -> Result<String, String> {
             match downloader::download_repo(&window, BOTPACK_REPO_OWNER, BOTPACK_REPO_NAME, &botpack_location, true).await {
                 downloader::BotpackStatus::Success(message) => {
                     BOT_FOLDER_SETTINGS
-                        .lock()
+                        .write()
                         .map_err(|err| err.to_string())?
                         .as_mut()
                         .ok_or("BOT_FOLDER_SETTINGS is None")?
@@ -487,7 +487,7 @@ pub async fn update_map_pack(window: Window) -> Result<String, String> {
     Ok(match updater.needs_update(&window).await {
         downloader::BotpackStatus::Skipped(message) | downloader::BotpackStatus::Success(message) => {
             BOT_FOLDER_SETTINGS
-                .lock()
+                .write()
                 .map_err(|err| err.to_string())?
                 .as_mut()
                 .ok_or("BOT_FOLDER_SETTINGS is None")?
@@ -500,7 +500,7 @@ pub async fn update_map_pack(window: Window) -> Result<String, String> {
             match downloader::download_repo(&window, MAPPACK_REPO.0, MAPPACK_REPO.1, &location, false).await {
                 downloader::BotpackStatus::Success(message) => {
                     BOT_FOLDER_SETTINGS
-                        .lock()
+                        .write()
                         .map_err(|err| err.to_string())?
                         .as_mut()
                         .ok_or("BOT_FOLDER_SETTINGS is None")?
@@ -546,7 +546,7 @@ pub async fn save_launcher_settings(window: Window, settings: LauncherConfig) {
 ///
 /// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
 fn create_match_handler(window: &Window) -> Option<ChildStdin> {
-    match get_capture_command(&*PYTHON_PATH.lock().ok()?, ["-c", "from rlbot_smh.match_handler import listen; listen()"])
+    match get_capture_command(&*PYTHON_PATH.read().ok()?, ["-c", "from rlbot_smh.match_handler import listen; listen()"])
         .ok()?
         .stdin(Stdio::piped())
         .spawn()
@@ -637,7 +637,7 @@ async fn start_match_helper(window: &Window, bot_list: Vec<TeamBotBundle>, match
     let match_settings = match_settings.setup_for_start_match(
         window,
         &BOT_FOLDER_SETTINGS
-            .lock()
+            .read()
             .map_err(|err| err.to_string())?
             .as_ref()
             .ok_or("BOT_FOLDER_SETTINGS is None")?
@@ -1007,9 +1007,9 @@ async fn run_challenge(window: &Window, save_state: &StoryState, challenge_id: S
     let all_scripts = get_all_script_configs(story_settings).await;
 
     let botpack_root = match BOT_FOLDER_SETTINGS
-        .lock()
+        .read()
         .expect("BOT_FOLDER_SETTINGS lock poisoned")
-        .clone()
+        .as_ref()
         .expect("BOT_FOLDER_SETTINGS is None")
         .folders
         .keys()

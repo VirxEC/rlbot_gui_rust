@@ -94,7 +94,7 @@ pub fn load_gui_config_sync(window: &Window) -> Ini {
 #[tauri::command]
 pub async fn save_folder_settings(window: Window, bot_folder_settings: BotFolders) -> Result<(), String> {
     BOT_FOLDER_SETTINGS
-        .lock()
+        .write()
         .map_err(|_| "Mutex BOT_FOLDER_SETTINGS was poisoned")?
         .as_mut()
         .ok_or("BOT_FOLDER_SETTINGS is None")?
@@ -104,7 +104,7 @@ pub async fn save_folder_settings(window: Window, bot_folder_settings: BotFolder
 
 #[tauri::command]
 pub async fn get_folder_settings() -> Result<BotFolders, String> {
-    Ok(BOT_FOLDER_SETTINGS.lock().map_err(|err| err.to_string())?.clone().ok_or("BOT_FOLDER_SETTINGS is None")?)
+    Ok(BOT_FOLDER_SETTINGS.read().map_err(|err| err.to_string())?.clone().ok_or("BOT_FOLDER_SETTINGS is None")?)
 }
 
 fn filter_hidden_bundles<I>(bundles: I) -> Vec<I::Item>
@@ -122,7 +122,7 @@ async fn get_bots_from_directory(window: &Window, path: &str) -> Vec<BotConfigBu
 #[tauri::command]
 pub async fn scan_for_bots(window: Window) -> Result<Vec<BotConfigBundle>, String> {
     let bfs = BOT_FOLDER_SETTINGS
-        .lock()
+        .read()
         .map_err(|_| "Mutex BOT_FOLDER_SETTINGS was poisoned")?
         .clone()
         .ok_or("BOT_FOLDER_SETTINGS is None")?;
@@ -152,7 +152,7 @@ async fn get_scripts_from_directory(window: &Window, path: &str) -> Vec<ScriptCo
 #[tauri::command]
 pub async fn scan_for_scripts(window: Window) -> Result<Vec<ScriptConfigBundle>, String> {
     let bfs = BOT_FOLDER_SETTINGS
-        .lock()
+        .read()
         .map_err(|_| "Mutex BOT_FOLDER_SETTINGS was poisoned")?
         .as_ref()
         .ok_or("BOT_FOLDER_SETTINGS is None")?
@@ -180,7 +180,7 @@ pub async fn scan_for_scripts(window: Window) -> Result<Vec<ScriptConfigBundle>,
 pub async fn pick_bot_folder(window: Window) {
     FileDialogBuilder::new().pick_folder(move |path| {
         if let Some(path) = path {
-            match BOT_FOLDER_SETTINGS.lock() {
+            match BOT_FOLDER_SETTINGS.write() {
                 Ok(mut bfs_lock) => {
                     if let Some(bfs) = bfs_lock.as_mut() {
                         bfs.add_folder(&window, path.to_string_lossy().to_string());
@@ -198,7 +198,7 @@ pub async fn pick_bot_folder(window: Window) {
 pub async fn pick_bot_config(window: Window) {
     FileDialogBuilder::new().add_filter("Bot Cfg File", &["cfg"]).pick_file(move |path| {
         if let Some(path) = path {
-            match BOT_FOLDER_SETTINGS.lock() {
+            match BOT_FOLDER_SETTINGS.write() {
                 Ok(mut bfs_lock) => {
                     if let Some(bfs) = bfs_lock.as_mut() {
                         bfs.add_file(&window, path.to_string_lossy().to_string());
@@ -259,7 +259,7 @@ pub async fn get_match_options() -> Result<MatchOptions, String> {
     let mut mo = MatchOptions::default();
     mo.map_types.extend(custom_maps::find_all(
         &BOT_FOLDER_SETTINGS
-            .lock()
+            .read()
             .map_err(|err| err.to_string())?
             .as_ref()
             .ok_or("BOT_FOLDER_SETTINGS is None")?
@@ -316,7 +316,7 @@ pub async fn get_language_support() -> Result<HashMap<String, bool>, String> {
     lang_support.insert("chrome".to_owned(), has_chrome());
     lang_support.insert(
         "fullpython".to_owned(),
-        get_command_status(&*PYTHON_PATH.lock().map_err(|err| err.to_string())?, ["-c", "import tkinter"]),
+        get_command_status(&*PYTHON_PATH.read().map_err(|err| err.to_string())?, ["-c", "import tkinter"]),
     );
     lang_support.insert("dotnet".to_owned(), get_command_status("dotnet", ["--list"]));
 
@@ -330,12 +330,12 @@ pub async fn get_detected_python_path() -> Option<(String, bool)> {
 
 #[tauri::command]
 pub async fn get_python_path() -> Result<String, String> {
-    Ok(PYTHON_PATH.lock().map_err(|err| err.to_string())?.to_owned())
+    Ok(PYTHON_PATH.read().map_err(|err| err.to_string())?.to_owned())
 }
 
 #[tauri::command]
 pub async fn set_python_path(window: Window, path: String) -> Result<(), String> {
-    *PYTHON_PATH.lock().map_err(|err| err.to_string())? = path.clone();
+    *PYTHON_PATH.write().map_err(|err| err.to_string())? = path.clone();
     let mut config = load_gui_config(&window).await;
     config.set("python_config", "path", Some(path));
 
@@ -384,7 +384,7 @@ fn get_recommendations_json(window: &Window, bfs: &BotFolders) -> Option<AllReco
 
 #[tauri::command]
 pub async fn get_recommendations(window: Window) -> Option<AllRecommendations<BotConfigBundle>> {
-    let bfs_lock = BOT_FOLDER_SETTINGS.lock().ok()?;
+    let bfs_lock = BOT_FOLDER_SETTINGS.read().ok()?;
     let bfs = bfs_lock.as_ref()?;
 
     // If we found the json, return the corresponding BotConfigBundles for the bots
@@ -514,16 +514,12 @@ fn get_story_json(story_settings: &StoryConfig) -> Option<JsonMap> {
 }
 
 async fn get_story_config(story_settings: &StoryConfig) -> Option<JsonMap> {
-    let mut stories_cache = STORIES_CACHE.lock().await;
-
-    if let Some(json) = stories_cache.get(story_settings) {
+    if let Some(json) = STORIES_CACHE.read().await.get(story_settings) {
         return Some(json.clone());
     }
 
     let story_config = get_story_json(story_settings)?;
-
-    stories_cache.insert(story_settings.clone(), story_config.clone());
-
+    STORIES_CACHE.write().await.insert(story_settings.clone(), story_config.clone());
     Some(story_config)
 }
 
@@ -547,14 +543,15 @@ pub async fn get_cities_json(story_settings: StoryConfig) -> JsonMap {
 
 pub async fn get_all_bot_configs(story_settings: &StoryConfig) -> JsonMap {
     let mut bots = {
-        let mut bots_base_lock = BOTS_BASE.lock().await;
-        match bots_base_lock.as_ref() {
-            Some(bots) => bots.clone(),
-            None => {
-                let bots = bots_base::json();
-                *bots_base_lock = Some(bots.clone());
-                bots
-            }
+        let bots_base = BOTS_BASE.read().await;
+        if let Some(bots) = bots_base.as_ref() {
+            bots.clone()
+        } else {
+            // drop the read lock so we can write to it instead
+            drop(bots_base);
+            let bots = bots_base::json();
+            *BOTS_BASE.write().await = Some(bots.clone());
+            bots
         }
     };
 

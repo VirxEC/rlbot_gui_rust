@@ -318,7 +318,7 @@ impl Runnable for BotConfigBundle {
             return Vec::new();
         }
 
-        let python = if let Ok(path) = PYTHON_PATH.lock() {
+        let python = if let Ok(path) = PYTHON_PATH.read() {
             path.to_owned()
         } else {
             return Vec::new();
@@ -497,7 +497,7 @@ impl Runnable for ScriptConfigBundle {
             return Vec::new();
         }
 
-        let python = if let Ok(path) = PYTHON_PATH.lock() {
+        let python = if let Ok(path) = PYTHON_PATH.read() {
             path.to_owned()
         } else {
             return Vec::new();
