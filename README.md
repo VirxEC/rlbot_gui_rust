@@ -29,7 +29,7 @@ recruit teammates and purchase upgrades for your car!
 - Defered bundle logo loading and missing python package checking
 - Better error messages when downloading or upgrading the botpack
 - Letting the user close Rocket League in between matches without restarting the GUI
-- Full self-updating of the GUI: Implemented for Windows and Ubunutu users & reserved spot on AUR
+- Full self-updating of the GUI: Implemented for Windows and Ubuntu users & reserved spot on AUR
 - Prints get dumped asyncronously to log.txt in content folder
 - "Upload GUI log for help" button in Menu (top right) which uploads the log.txt file to HasteBin
 - DotNet runtime detection for C# bots to display warning message

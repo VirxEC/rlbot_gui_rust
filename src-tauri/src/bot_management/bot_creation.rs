@@ -93,7 +93,7 @@ pub async fn bootstrap_python_bot(window: &Window, bot_name: String, directory: 
     change_key_in_cfg(config_file, BOT_CONFIG_MODULE_HEADER, NAME_KEY, bot_name).await?;
 
     BOT_FOLDER_SETTINGS
-        .lock()
+        .write()
         .map_err(|_| BoostrapError::MutexPoisoned("BOT_FOLDER_SETTINGS".to_owned()))?
         .as_mut()
         .ok_or_else(|| BoostrapError::MutexNone("BOT_FOLDER_SETTINGS".to_owned()))?
@@ -168,7 +168,7 @@ pub async fn bootstrap_python_hivemind(window: &Window, hive_name: String, direc
     let config_file = config_file.to_string_lossy();
 
     BOT_FOLDER_SETTINGS
-        .lock()
+        .write()
         .map_err(|_| BoostrapError::MutexPoisoned("BOT_FOLDER_SETTINGS".to_owned()))?
         .as_mut()
         .ok_or_else(|| BoostrapError::MutexNone("BOT_FOLDER_SETTINGS".to_owned()))?

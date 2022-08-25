@@ -10,8 +10,8 @@
 // Also includes a formatting/bug fixes in original code/patches
 
 use indexmap::IndexMap as Map;
-use std::{collections::HashMap, convert::AsRef, fmt::Write, fs, fs::File, io::prelude::*, path::Path};
-use tokio::{fs as async_fs, fs::File as AsyncFile, io::AsyncReadExt};
+use std::{collections::HashMap, fmt::Write, fs, path::Path};
+use tokio::fs as async_fs;
 
 ///The `Ini` struct simply contains a nested hashmap of the loaded configuration, the default section header and comment symbols.
 ///## Example
@@ -302,22 +302,14 @@ impl Ini {
     ///Returns `Ok(map)` with a clone of the stored `Map` if no errors are thrown or else `Err(error_string)`.
     ///Use `get_mut_map()` if you want a mutable reference.
     pub fn load<T: AsRef<Path>>(&mut self, path: T) -> Result<Map<String, Map<String, Option<String>>>, String> {
-        let path = path.as_ref();
-        let display = path.display();
-
-        let mut file = match File::open(&path) {
-            Err(why) => return Err(format!("couldn't open {}: {}", display, why)),
-            Ok(file) => file,
-        };
-
-        let mut s = String::new();
-        self.map = match file.read_to_string(&mut s) {
-            Err(why) => return Err(format!("couldn't read {}: {}", display, why)),
-            Ok(_) => match self.parse(s) {
-                Err(why) => return Err(why),
+        self.map = match fs::read_to_string(&path) {
+            Err(why) => return Err(format!("couldn't read {}: {}", &path.as_ref().display(), why)),
+            Ok(s) => match self.parse(s) {
+                Err(why) => return Err(format!("couldn't read {}: {}", &path.as_ref().display(), why)),
                 Ok(map) => map,
             },
         };
+
         Ok(self.map.clone())
     }
 
@@ -860,22 +852,10 @@ impl Ini {
     ///Returns `Ok(map)` with a clone of the stored `Map` if no errors are thrown or else `Err(error_string)`.
     ///Use `get_mut_map()` if you want a mutable reference.
     pub async fn load_async<T: AsRef<Path>>(&mut self, path: T) -> Result<Map<String, Map<String, Option<String>>>, String> {
-        let path = path.as_ref();
-        let display = path.display();
-
-        let mut file = match AsyncFile::open(&path).await {
-            Err(why) => return Err(format!("couldn't open {}: {}", display, why)),
-            Ok(file) => file,
-        };
-
-        let mut s = String::new();
-        self.map = match file.read_to_string(&mut s).await {
-            Err(why) => return Err(format!("couldn't read {}: {}", display, why)),
-            Ok(_) => match self.parse(s) {
-                Err(why) => return Err(why),
-                Ok(map) => map,
-            },
-        };
+        let s = async_fs::read_to_string(&path)
+            .await
+            .map_err(|why| format!("couldn't read {}: {}", path.as_ref().display(), why))?;
+        self.map = self.parse(s)?;
         Ok(self.map.clone())
     }
 
