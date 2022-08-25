@@ -52,7 +52,13 @@ pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, st
     for i in 0..archive.len() {
         let mut item = archive.by_index(i)?;
         let mut relative_path = match item.enclosed_name() {
-            Some(path) => path,
+            Some(path) => {
+                if cfg!(windows) {
+                    path.to_path_buf()
+                } else {
+                    PathBuf::from(path.to_string_lossy().replace('\\', "/"))
+                }
+            }
             None => continue,
         };
 
@@ -61,11 +67,14 @@ pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, st
                 p.push(c);
                 p
             });
-            relative_path = relative_path.strip_prefix(&base).map_err(|error| ExtractError::StripToplevel {
-                top_level: base,
-                path: relative_path.to_path_buf(),
-                error,
-            })?;
+            relative_path = relative_path
+                .strip_prefix(&base)
+                .map_err(|error| ExtractError::StripToplevel {
+                    top_level: base,
+                    path: relative_path.clone(),
+                    error,
+                })?
+                .to_path_buf();
         }
 
         if relative_path.to_string_lossy().is_empty() {
@@ -73,16 +82,14 @@ pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, st
             continue;
         }
 
-        let outpath = if cfg!(windows) {
-            target_dir.join(relative_path)
-        } else {
-            target_dir.join(relative_path.to_string_lossy().replace('\\', "/"))
-        };
+        let outpath = target_dir.join(&relative_path);
 
         if item.is_dir() {
             ccprintlnr(window, format!("Creating directory {} from {}", outpath.to_string_lossy(), relative_path.display()));
             if !outpath.exists() {
-                fs::create_dir_all(&outpath)?;
+                if let Err(e) = fs::create_dir_all(&outpath) {
+                    ccprintlne(window, format!("Failed to create directory {}: {e}", outpath.display()));
+                }
             }
             continue;
         }
