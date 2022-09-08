@@ -1,5 +1,5 @@
 use super::bot_config_bundle::{BotConfigBundle, RLBotCfgParseError, ScriptConfigBundle};
-use crate::ccprintlne;
+use crate::ccprintln;
 use futures_util::{future::join_all, Future};
 use glob::glob;
 use std::path::PathBuf;
@@ -42,7 +42,7 @@ where
                     return None;
                 }
 
-                ccprintlne(window, err.to_string());
+                ccprintln(window, err.to_string());
 
                 None
             }

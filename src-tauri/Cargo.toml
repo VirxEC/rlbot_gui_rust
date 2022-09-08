@@ -15,6 +15,7 @@ rust-version = "1.63"
 panic = "abort"
 lto = true
 strip = true
+opt-level = "z"
 
 [build-dependencies]
 tauri-build = { version = "1.0", features = [] }

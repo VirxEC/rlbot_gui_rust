@@ -1,4 +1,4 @@
-use crate::{ccprintln, ccprintlne, ccprintlnr};
+use crate::{ccprintln, ccprintlnr};
 use std::{
     fs,
     io::{copy, Read, Seek},
@@ -88,7 +88,7 @@ pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, st
             ccprintlnr(window, format!("Creating directory {} from {}", outpath.to_string_lossy(), relative_path.display()));
             if !outpath.exists() {
                 if let Err(e) = fs::create_dir_all(&outpath) {
-                    ccprintlne(window, format!("Failed to create directory {}: {e}", outpath.display()));
+                    ccprintln(window, format!("Error creating directory {}: {e}", outpath.display()));
                 }
             }
             continue;
@@ -103,7 +103,7 @@ pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, st
         } else if let Some(p) = outpath.parent() {
             if !p.exists() {
                 if let Err(e) = fs::create_dir_all(p) {
-                    ccprintlne(window, format!("Failed to create directory {}: {e}", p.display()));
+                    ccprintln(window, format!("Error creating directory {}: {e}", p.display()));
                 }
             }
         }

@@ -175,8 +175,6 @@ fn clear_log_file() -> IoResult<()> {
 /// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
 /// * `text` - The text to emit
 pub fn ccprintln<T: AsRef<str>>(window: &Window, text: T) {
-    let text = text.as_ref();
-    println!("{}", text);
     emit_text(window, text, false);
 }
 
@@ -187,21 +185,8 @@ pub fn ccprintln<T: AsRef<str>>(window: &Window, text: T) {
 ///
 /// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
 /// * `text` - The text to emit
-pub fn ccprintlnr(window: &Window, text: String) {
-    println!("{}", &text);
+pub fn ccprintlnr<T: AsRef<str>>(window: &Window, text: T) {
     emit_text(window, text, true);
-}
-
-/// Emits text to the console
-/// Also calls printlne!() to print to the console
-///
-/// # Arguments
-///
-/// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
-/// * `text` - The text to emit
-pub fn ccprintlne(window: &Window, text: String) {
-    eprintln!("{}", &text);
-    emit_text(window, text, false);
 }
 
 #[cfg(windows)]
@@ -422,19 +407,19 @@ fn issue_console_update(window: &Window, text: String, replace_last: bool) -> (S
 
     match CONSOLE_TEXT_OUT_QUEUE.lock() {
         Ok(mut ctoq) => ctoq.push(text.clone()),
-        Err(_) => ccprintlne(window, "Mutex CONSOLE_TEXT_OUT_QUEUE is poisoned".to_owned()),
+        Err(_) => ccprintln(window, "Error: Mutex CONSOLE_TEXT_OUT_QUEUE is poisoned"),
     }
 
     match ansi_to_html::convert_escaped(&text) {
         Ok(converted_and_escaped) => {
             let update = ConsoleTextUpdate::from(converted_and_escaped, replace_last);
             if let Err(e) = update_internal_console(&update) {
-                ccprintlne(window, e.to_string());
+                ccprintln(window, e.to_string());
             }
             try_emit_signal(window, "new-console-text", update)
         }
         Err(e) => {
-            ccprintlne(window, e.to_string());
+            ccprintln(window, e.to_string());
             Default::default()
         }
     }
@@ -466,7 +451,7 @@ fn try_emit_text<T: AsRef<str>>(window: &Window, text: T, replace_last: bool) ->
 fn emit_text<T: AsRef<str>>(window: &Window, text: T, replace_last: bool) {
     let (signal, error) = try_emit_text(window, text, replace_last);
     if let Some(e) = error {
-        ccprintlne(window, format!("Error emitting {signal}: {e}"));
+        ccprintln(window, format!("Error emitting {signal}: {e}"));
     }
 }
 
@@ -525,7 +510,7 @@ fn gui_setup(app: &mut App) -> Result<(), Box<dyn StdError>> {
     thread::spawn(move || loop {
         thread::sleep(Duration::from_secs_f32(1. / 5.));
         if let Err(e) = write_console_text_out_queue_to_file() {
-            ccprintlne(&window2, e.to_string());
+            ccprintln(&window2, e.to_string());
         }
     });
 

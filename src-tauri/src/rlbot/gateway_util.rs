@@ -1,4 +1,4 @@
-use crate::{ccprintln, ccprintlne};
+use crate::ccprintln;
 use sysinfo::{ProcessExt, ProcessRefreshKind, RefreshKind, System, SystemExt};
 use tauri::Window;
 
@@ -19,7 +19,7 @@ pub fn find_existing_process(window: &Window) -> Option<u16> {
             let port = arg
                 .parse::<u16>()
                 .map_err(|e| {
-                    ccprintlne(window, e.to_string());
+                    ccprintln(window, e.to_string());
                 })
                 .ok()?;
             ccprintln(window, format!("Found existing RLBot process listening on port {port}"));
