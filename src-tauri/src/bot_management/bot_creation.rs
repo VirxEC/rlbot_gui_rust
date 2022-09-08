@@ -3,7 +3,7 @@ use super::{
     zip_extract_fixed,
 };
 use crate::{
-    ccprintln, ccprintlne,
+    ccprintln,
     rlbot::parsing::{
         bot_config_bundle::{BOT_CONFIG_MODULE_HEADER, BOT_CONFIG_PARAMS_HEADER, EXECUTABLE_PATH_KEY, NAME_KEY},
         directory_scanner::scan_directory_for_bot_configs,
@@ -101,7 +101,7 @@ pub async fn bootstrap_python_bot(window: &Window, bot_name: String, directory: 
 
     if open::that(python_file).is_err() {
         // We don't want to return an error here, because the bot was successfully created
-        ccprintlne(
+        ccprintln(
             window,
             format!("You have no default program to open .py files. Your new bot is located at {}", top_dir.to_string_lossy()),
         );

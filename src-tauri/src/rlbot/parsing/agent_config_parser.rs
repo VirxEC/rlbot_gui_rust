@@ -1,6 +1,6 @@
 use crate::{
     bot_management::cfg_helper::{load_cfg, CfgHelperError},
-    ccprintlne,
+    ccprintln,
     configparser::Ini,
 };
 use serde::{Deserialize, Serialize};
@@ -142,7 +142,7 @@ impl BotLooksConfig {
             .save_to_config(&mut config, BOT_CONFIG_LOADOUT_ORANGE_HEADER, BOT_CONFIG_LOADOUT_PAINT_ORANGE_HEADER);
 
         if let Err(e) = config.write(path) {
-            ccprintlne(window, format!("Failed to save bot config to {path}: {e}"));
+            ccprintln(window, format!("Error saving bot config to {path}: {e}"));
         }
     }
 }

@@ -1,5 +1,5 @@
 use crate::{
-    ccprintlne,
+    ccprintln,
     config_handles::{load_gui_config, load_gui_config_sync},
     configparser::Ini,
     custom_maps::convert_to_path,
@@ -58,7 +58,7 @@ impl BotFolders {
         conf.set("bot_folder_settings", "folders", serde_json::to_string(&self.folders).ok());
 
         if let Err(e) = conf.write(&get_config_path()) {
-            ccprintlne(window, format!("Failed to write config file: {e}"));
+            ccprintln(window, format!("Error writing config file: {e}"));
         }
     }
 
@@ -221,7 +221,7 @@ impl MiniMatchConfig {
         if let MapType::Custom(path) = &mut new.map {
             *path = convert_to_path(path, bf).ok_or_else(|| {
                 let err = format!("Failed to find custom map {path}");
-                ccprintlne(window, err.clone());
+                ccprintln(window, err.clone());
                 err
             })?;
         }
@@ -302,7 +302,7 @@ impl MatchConfig {
         self.save_to_config(&mut conf);
 
         if let Err(e) = conf.write_async(get_config_path()).await {
-            ccprintlne(window, format!("Error writing config file: {e}"));
+            ccprintln(window, format!("Error writing config file: {e}"));
         }
     }
 
@@ -427,7 +427,7 @@ impl LauncherConfig {
         config.set("launcher_settings", "rocket_league_exe_path", self.rocket_league_exe_path);
 
         if let Err(e) = config.write_async(get_config_path()).await {
-            ccprintlne(window, format!("Error writing config file: {e}"));
+            ccprintln(window, format!("Error writing config file: {e}"));
         }
     }
 }
@@ -578,7 +578,7 @@ impl StoryState {
         conf.set("story_mode", "save_state", serde_json::to_string(self).ok());
 
         if let Err(e) = conf.write(get_config_path()) {
-            ccprintlne(window, format!("Failed to write config: {e}"));
+            ccprintln(window, format!("Error writing config: {e}"));
         }
     }
 

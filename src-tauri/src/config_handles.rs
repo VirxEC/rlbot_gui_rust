@@ -49,16 +49,16 @@ pub async fn load_gui_config(window: &Window) -> Ini {
 
     if !config_path.exists() {
         if let Err(e) = create_dir_all(config_path.parent().unwrap()) {
-            ccprintlne(window, format!("Failed to create config directory: {e}"));
+            ccprintln(window, format!("Error creating config directory: {e}"));
         }
 
         set_gui_config_to_default(&mut conf);
 
         if let Err(e) = conf.write_async(&config_path).await {
-            ccprintlne(window, format!("Failed to write config file: {e}"));
+            ccprintln(window, format!("Error writing config file: {e}"));
         }
     } else if let Err(e) = conf.load_async(config_path).await {
-        ccprintlne(window, format!("Failed to load config: {e}"));
+        ccprintln(window, format!("Error loading config: {e}"));
     }
 
     conf
@@ -76,16 +76,16 @@ pub fn load_gui_config_sync(window: &Window) -> Ini {
 
     if !config_path.exists() {
         if let Err(e) = create_dir_all(config_path.parent().unwrap()) {
-            ccprintlne(window, format!("Failed to create config directory: {e}"));
+            ccprintln(window, format!("Error creating config directory: {e}"));
         }
 
         set_gui_config_to_default(&mut conf);
 
         if let Err(e) = conf.write(&config_path) {
-            ccprintlne(window, format!("Failed to write config file: {e}"));
+            ccprintln(window, format!("Error writing config file: {e}"));
         }
     } else if let Err(e) = conf.load(config_path) {
-        ccprintlne(window, format!("Failed to load config: {e}"));
+        ccprintln(window, format!("Error loading config: {e}"));
     }
 
     conf
@@ -185,10 +185,10 @@ pub async fn pick_bot_folder(window: Window) {
                     if let Some(bfs) = bfs_lock.as_mut() {
                         bfs.add_folder(&window, path.to_string_lossy().to_string());
                     } else {
-                        ccprintlne(&window, "BOT_FOLDER_SETTINGS is None".to_owned());
+                        ccprintln(&window, "Error: BOT_FOLDER_SETTINGS is None");
                     }
                 }
-                Err(err) => ccprintlne(&window, format!("Failed to lock BOT_FOLDER_SETTINGS: {err}")),
+                Err(err) => ccprintln(&window, format!("Error locking BOT_FOLDER_SETTINGS: {err}")),
             }
         }
     });
@@ -203,10 +203,10 @@ pub async fn pick_bot_config(window: Window) {
                     if let Some(bfs) = bfs_lock.as_mut() {
                         bfs.add_file(&window, path.to_string_lossy().to_string());
                     } else {
-                        ccprintlne(&window, "BOT_FOLDER_SETTINGS is None".to_owned());
+                        ccprintln(&window, "BOT_FOLDER_SETTINGS is None");
                     }
                 }
-                Err(err) => ccprintlne(&window, format!("Failed to lock BOT_FOLDER_SETTINGS: {err}")),
+                Err(err) => ccprintln(&window, format!("Error locking BOT_FOLDER_SETTINGS: {err}")),
             }
         }
     });
@@ -217,7 +217,7 @@ pub async fn pick_json_file(window: Window) {
     FileDialogBuilder::new().add_filter("JSON File", &["json"]).pick_file(move |path| {
         if let Some(path) = path {
             if let Err(e) = window.emit("json_file_selected", path.to_string_lossy().to_string()) {
-                ccprintlne(&window, format!("Failed to emit json_file_selected event: {e}"));
+                ccprintln(&window, format!("Error emiting json_file_selected event: {e}"));
             }
         }
     });
@@ -237,7 +237,7 @@ pub async fn show_path_in_explorer(window: Window, path: String) {
     let path = if ppath.is_file() { ppath.parent().unwrap().to_string_lossy().to_string() } else { path };
 
     if let Err(e) = Command::new(command).arg(&path).spawn() {
-        ccprintlne(&window, format!("Failed to open path: {e}"));
+        ccprintln(&window, format!("Error opening path: {e}"));
     }
 }
 
@@ -303,7 +303,7 @@ pub async fn save_team_settings(window: Window, blue_team: Vec<BotConfigBundle>,
     config.set("team_settings", "orange_team", Some(serde_json::to_string(&clean(&orange_team)).unwrap()));
 
     if let Err(e) = config.write(get_config_path()) {
-        ccprintlne(&window, format!("Failed to save team settings: {e}"));
+        ccprintln(&window, format!("Error saving team settings: {e}"));
     }
 }
 
@@ -340,7 +340,7 @@ pub async fn set_python_path(window: Window, path: String) -> Result<(), String>
     config.set("python_config", "path", Some(path));
 
     if let Err(e) = config.write(get_config_path()) {
-        ccprintlne(&window, format!("Failed to save python path: {e}"));
+        ccprintln(&window, format!("Error saving python path: {e}"));
     }
 
     Ok(())
@@ -351,7 +351,7 @@ pub async fn pick_appearance_file(window: Window) {
     FileDialogBuilder::new().add_filter("Appearance Cfg File", &["cfg"]).pick_file(move |path| {
         if let Some(path) = path {
             if let Err(e) = window.emit("set_appearance_file", path.to_string_lossy().to_string()) {
-                ccprintlne(&window, format!("Failed to set appearance file: {e}"));
+                ccprintln(&window, format!("Error setting appearance file: {e}"));
             }
         }
     });
@@ -360,7 +360,7 @@ pub async fn pick_appearance_file(window: Window) {
 fn read_recommendations_json<P: AsRef<Path>>(path: P) -> Result<AllRecommendations<String>, String> {
     let raw_json = read_to_string(&path).map_err(|e| format!("Failed to read {e}"))?;
 
-    serde_json::from_str(&raw_json).map_err(|e| format!("Failed to parse file {}: {e}", path.as_ref().to_string_lossy()))
+    serde_json::from_str(&raw_json).map_err(|e| format!("Error parsing file {}: {e}", path.as_ref().to_string_lossy()))
 }
 
 fn get_recommendations_json(window: &Window, bfs: &BotFolders) -> Option<AllRecommendations<String>> {
@@ -371,11 +371,11 @@ fn get_recommendations_json(window: &Window, bfs: &BotFolders) -> Option<AllReco
                 for path2 in pattern.flatten() {
                     match read_recommendations_json(path2) {
                         Ok(recommendations) => return Some(recommendations),
-                        Err(e) => ccprintlne(window, e),
+                        Err(e) => ccprintln(window, e),
                     }
                 }
             }
-            Err(e) => ccprintlne(window, e.to_string()),
+            Err(e) => ccprintln(window, e.to_string()),
         }
     }
 
@@ -401,7 +401,7 @@ pub async fn get_recommendations(window: Window) -> Option<AllRecommendations<Bo
                             match glob(&format!("{path}/**/*.cfg")) {
                                 Ok(paths) => Some(paths.flatten().filter_map(|path| BotConfigBundle::name_from_path(path.as_path()).ok()).collect::<Vec<_>>()),
                                 Err(e) => {
-                                    ccprintlne(&window, e.to_string());
+                                    ccprintln(&window, e.to_string());
                                     None
                                 }
                             }
@@ -473,7 +473,7 @@ pub async fn story_delete_save(window: Window) {
     conf.set("story_mode", "save_state", None);
 
     if let Err(e) = conf.write(get_config_path()) {
-        ccprintlne(&window, format!("Failed to write config: {e}"));
+        ccprintln(&window, format!("Error writing config: {e}"));
     }
 }
 

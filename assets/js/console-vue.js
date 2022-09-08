@@ -116,7 +116,8 @@ export default {
 				}
 			}
 		},
-		onSubmit: function() {
+		onSubmit: function(e) {
+			e.preventDefault();
 			if (this.inputCommand.length == 0) {
 				return;
 			}

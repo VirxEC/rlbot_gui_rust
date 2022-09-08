@@ -1,5 +1,5 @@
-use super::cfg_helper::load_cfg_sync;
-use crate::{bot_management::zip_extract_fixed, ccprintln, ccprintlne, ccprintlnr, commands::UPDATE_DOWNLOAD_PROGRESS_SIGNAL, get_config_path, load_gui_config};
+use super::{cfg_helper::load_cfg_sync, zip_extract_fixed};
+use crate::{ccprintln, ccprintlnr, commands::UPDATE_DOWNLOAD_PROGRESS_SIGNAL, get_config_path, load_gui_config};
 use fs_extra::dir;
 use futures_util::StreamExt;
 use rand::Rng;
@@ -131,7 +131,7 @@ async fn download_and_extract_repo_zip<T: IntoUrl, J: AsRef<Path>>(
         if last_update.elapsed().as_secs_f32() >= 0.1 {
             let progress = bytes.len() as f32 / total_size as f32 * 100.0;
             if let Err(e) = window.emit(UPDATE_DOWNLOAD_PROGRESS_SIGNAL, ProgressBarUpdate::new(progress, "Downloading zip...".to_owned())) {
-                ccprintlne(window, format!("Error when updating progress bar: {}", e));
+                ccprintln(window, format!("Error when updating progress bar: {}", e));
             }
             last_update = Instant::now();
         }
@@ -139,16 +139,16 @@ async fn download_and_extract_repo_zip<T: IntoUrl, J: AsRef<Path>>(
 
     if clobber && local_folder_path.exists() {
         if let Err(e) = dir::remove(local_folder_path) {
-            ccprintlne(window, format!("Error when removing existing folder: {e}"));
+            ccprintln(window, format!("Error when removing existing folder: {e}"));
         }
     }
 
     if let Err(e) = window.emit(UPDATE_DOWNLOAD_PROGRESS_SIGNAL, ProgressBarUpdate::new(100., "Extracting zip...".to_owned())) {
-        ccprintlne(window, format!("Error when updating progress bar: {e}"));
+        ccprintln(window, format!("Error when updating progress bar: {e}"));
     }
 
     if let Err(e) = zip_extract_fixed::extract(window, Cursor::new(bytes), local_folder_path, false, true) {
-        ccprintlne(window, format!("Error when extracting zip: {e}"));
+        ccprintln(window, format!("Error when extracting zip: {e}"));
     }
 
     Ok(())
@@ -181,7 +181,7 @@ pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, c
         let latest_release_tag_name = match get_json_from_url(&client, &format!("https://api.github.com/repos/{repo_full_name}/releases/latest")).await {
             Ok(release) => release["tag_name"].as_str().unwrap_or_default().to_owned(),
             Err(e) => {
-                ccprintlne(window, e.to_string());
+                ccprintln(window, e.to_string());
                 return BotpackStatus::Success("Downloaded the bot pack, but failed to get the latest release tag.".to_owned());
             }
         };
@@ -192,7 +192,7 @@ pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, c
         config.set("bot_folder_settings", "incr", Some(latest_release_tag_name));
 
         if let Err(e) = config.write(config_path) {
-            ccprintlne(window, e.to_string());
+            ccprintln(window, e.to_string());
             return BotpackStatus::Success("Downloaded the bot pack, but failed to write GUI's config.".to_owned());
         }
     }
@@ -200,7 +200,7 @@ pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, c
     match status {
         Ok(_) => BotpackStatus::Success("Downloaded the bot pack!".to_owned()),
         Err(e) => {
-            ccprintlne(window, e.to_string());
+            ccprintln(window, e.to_string());
             BotpackStatus::Skipped("Failed to download the bot pack...".to_owned())
         }
     }
@@ -255,7 +255,7 @@ pub async fn is_botpack_up_to_date(window: &Window, repo_full_name: &str) -> boo
     match get_latest_release_tag(repo_full_name).await {
         Ok(latest_release_tag) => latest_release_tag == current_tag_name,
         Err(e) => {
-            ccprintlne(window, e);
+            ccprintln(window, e);
             true
         }
     }
@@ -280,7 +280,7 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
     let latest_release_tag = match get_latest_release_tag(&repo_full_name).await {
         Ok(value) => value,
         Err(e) => {
-            ccprintlne(window, e);
+            ccprintln(window, e);
             return BotpackStatus::Skipped("Failed to get the latest release tag.".to_owned());
         }
     };
@@ -326,20 +326,20 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
             UPDATE_DOWNLOAD_PROGRESS_SIGNAL,
             ProgressBarUpdate::new(progress, format!("Downloading patch incr-{tag}...")),
         ) {
-            ccprintlne(window, format!("Error when updating progress bar: {e}"));
+            ccprintln(window, format!("Error when updating progress bar: {e}"));
         }
 
         let resp = match handle.await {
             Ok(resp) => resp,
             Err(e) => {
-                ccprintlne(window, format!("Failed to await handle: {e}"));
+                ccprintln(window, format!("Error awaiting handle: {e}"));
                 break;
             }
         };
 
         let progress = progress + 1. / (total_patches as f32 * 2.) * 100.;
         if let Err(e) = window.emit(UPDATE_DOWNLOAD_PROGRESS_SIGNAL, ProgressBarUpdate::new(progress, format!("Applying patch incr-{tag}..."))) {
-            ccprintlne(window, format!("Error when updating progress bar: {}", e));
+            ccprintln(window, format!("Error when updating progress bar: {}", e));
         }
 
         if let ControlFlow::Break(_) = apply_patch(resp, window, &local_folder_path, &tag_deleted_files_path).await {
@@ -349,20 +349,20 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
         config.set("bot_folder_settings", "incr", Some(format!("incr-{tag}")));
 
         if let Err(e) = config.write(&config_path) {
-            ccprintlne(window, e.to_string());
+            ccprintln(window, e.to_string());
         }
 
         tag += 1;
 
         if tag_deleted_files_path.exists() {
             if let Err(e) = remove_file(&tag_deleted_files_path) {
-                ccprintlne(window, format!("Failed to delete {}: {e}", tag_deleted_files_path.display()));
+                ccprintln(window, format!("Error deleting {}: {e}", tag_deleted_files_path.display()));
             }
         }
     }
 
     if let Err(e) = remove_empty_folders(window, local_folder_path) {
-        ccprintlne(window, format!("Failed to remove empty folders: {e}"));
+        ccprintln(window, format!("Error removing empty folders: {e}"));
     }
 
     if tag - 1 == latest_release_tag {
@@ -384,7 +384,7 @@ async fn apply_patch(resp: Result<reqwest::Response, reqwest::Error>, window: &W
     let download = match resp {
         Ok(download) => download,
         Err(e) => {
-            ccprintlne(window, format!("Failed to download upgrade zip: {e}"));
+            ccprintln(window, format!("Error downloading upgrade zip: {e}"));
             return ControlFlow::Break(());
         }
     };
@@ -392,13 +392,13 @@ async fn apply_patch(resp: Result<reqwest::Response, reqwest::Error>, window: &W
     let bytes = match download.bytes().await {
         Ok(bytes) => bytes,
         Err(e) => {
-            ccprintlne(window, format!("Failed to download upgrade zip: {e}"));
+            ccprintln(window, format!("Error downloading upgrade zip: {e}"));
             return ControlFlow::Break(());
         }
     };
 
     if let Err(e) = zip_extract_fixed::extract(window, Cursor::new(&bytes), local_folder_path, false, true) {
-        ccprintlne(window, format!("Failed to extract upgrade zip: {e}"));
+        ccprintln(window, format!("Error extracting upgrade zip: {e}"));
         return ControlFlow::Break(());
     }
 
@@ -411,7 +411,7 @@ async fn apply_patch(resp: Result<reqwest::Response, reqwest::Error>, window: &W
                 if !line.is_empty() {
                     let file_name = local_folder_path.join(line);
                     if let Err(e) = remove_file(&file_name) {
-                        ccprintlne(window, format!("Failed to delete {}: {e}", file_name.display()));
+                        ccprintln(window, format!("Error deleting {}: {e}", file_name.display()));
                         last_ok = false;
                     } else {
                         let text = format!("Deleted {}", file_name.display());
@@ -434,7 +434,7 @@ async fn apply_patch(resp: Result<reqwest::Response, reqwest::Error>, window: &W
             }
         }
         Err(e) => {
-            ccprintlne(window, format!("Failed to open .deleted file: {e}"));
+            ccprintln(window, format!("Error opening .deleted file: {e}"));
             return ControlFlow::Break(());
         }
     }
@@ -466,7 +466,7 @@ impl MapPackUpdater {
             let mut file = match File::open(index_path) {
                 Ok(file) => file,
                 Err(e) => {
-                    ccprintlne(window, format!("Failed to open index.json: {e}"));
+                    ccprintln(window, format!("Error opening index.json: {e}"));
                     return None;
                 }
             };
@@ -474,14 +474,14 @@ impl MapPackUpdater {
             let mut contents = String::new();
 
             if let Err(e) = file.read_to_string(&mut contents) {
-                ccprintlne(window, format!("Failed to read index.json: {e}"));
+                ccprintln(window, format!("Error reading index.json: {e}"));
                 return None;
             }
 
             match serde_json::from_str(&contents) {
                 Ok(json) => Some(json),
                 Err(e) => {
-                    ccprintlne(window, format!("Failed to parse index.json: {e}"));
+                    ccprintln(window, format!("Error parseing index.json: {e}"));
                     None
                 }
             }
@@ -506,7 +506,7 @@ impl MapPackUpdater {
         let latest_release = match get_json_from_url(&self.client, &url).await {
             Ok(latest_release) => latest_release,
             Err(e) => {
-                ccprintlne(window, format!("Failed to get latest release: {e}"));
+                ccprintln(window, format!("Error getting latest release: {e}"));
                 return BotpackStatus::Skipped("Failed to get latest release".to_owned());
             }
         };
@@ -537,7 +537,7 @@ impl MapPackUpdater {
         let new_maps = match self.get_map_index(window) {
             Some(index) => Self::extract_maps_from_index(&index),
             None => {
-                ccprintlne(window, "Failed to get index.json".to_owned());
+                ccprintln(window, "Error getting index.json");
                 return;
             }
         };
@@ -569,7 +569,7 @@ impl MapPackUpdater {
         let latest_release = match get_json_from_url(&self.client, &url).await {
             Ok(latest_release) => latest_release,
             Err(e) => {
-                ccprintlne(window, format!("Failed to get latest release: {e}"));
+                ccprintln(window, format!("Error getting latest release: {e}"));
                 return;
             }
         };
@@ -577,7 +577,7 @@ impl MapPackUpdater {
         for asset in latest_release["assets"].as_array().unwrap() {
             let asset_name = asset["name"].as_str().unwrap();
             if let Err(e) = self.download_asset(window, asset, asset_name, &filename_to_path, &self.full_path).await {
-                ccprintlne(window, format!("Failed to download asset {asset_name}: {e}"));
+                ccprintln(window, format!("Error downloading asset {asset_name}: {e}"));
             }
         }
     }

@@ -62,7 +62,7 @@ fn ensure_bot_directory(window: &Window) -> PathBuf {
 
     if !bot_directory_path.exists() {
         if let Err(e) = create_dir_all(&bot_directory_path) {
-            ccprintlne(window, format!("Error creating bot directory: {e}"));
+            ccprintln(window, format!("Error creating bot directory: {e}"));
         }
     }
 
@@ -86,7 +86,7 @@ pub async fn begin_python_bot(window: Window, bot_name: String) -> Result<BotCon
 
     inner(&window, bot_name).await.map_err(|e| {
         let err = e.to_string();
-        ccprintlne(&window, err.clone());
+        ccprintln(&window, err.clone());
         err
     })
 }
@@ -100,7 +100,7 @@ pub async fn begin_python_hivemind(window: Window, hive_name: String) -> Result<
 
     inner(&window, hive_name).await.map_err(|e| {
         let err = e.to_string();
-        ccprintlne(&window, err.clone());
+        ccprintln(&window, err.clone());
         err
     })
 }
@@ -114,7 +114,7 @@ pub async fn begin_rust_bot(window: Window, bot_name: String) -> Result<BotConfi
 
     inner(&window, bot_name).await.map_err(|e| {
         let err = e.to_string();
-        ccprintlne(&window, err.clone());
+        ccprintln(&window, err.clone());
         err
     })
 }
@@ -128,12 +128,22 @@ pub async fn begin_scratch_bot(window: Window, bot_name: String) -> Result<BotCo
 
     inner(&window, bot_name).await.map_err(|e| {
         let err = e.to_string();
-        ccprintlne(&window, err.clone());
+        ccprintln(&window, err.clone());
         err
     })
 }
 
-const PACKAGES: [&str; 9] = ["pip", "setuptools", "wheel", "numpy<1.23", "scipy", "numba<0.56", "selenium", "rlbot", "rlbot-smh>=1.0.0"];
+const PACKAGES: [&str; 9] = [
+    "pip",
+    "setuptools",
+    "wheel",
+    "numpy<1.23",
+    "scipy",
+    "numba<0.56",
+    "selenium",
+    "rlbot==1.*",
+    "rlbot-smh==1.*",
+];
 
 /// Apply version constraints to the given package name.
 fn get_package_name(package_name: &str) -> &str {
@@ -182,7 +192,7 @@ pub async fn install_requirements(window: Window, config_path: String) -> Result
 
     inner(&window, config_path).await.map_err(|e| {
         let err = e.to_string();
-        ccprintlne(&window, err.clone());
+        ccprintln(&window, err.clone());
         err
     })
 }
@@ -192,9 +202,9 @@ pub async fn install_basic_packages(window: Window) -> Result<PackageResult, Str
     let packages = PACKAGES.iter().map(|s| s.to_string()).collect::<Vec<String>>();
 
     if !is_online::check().await {
-        ccprintlne(
+        ccprintln(
             &window,
-            "Could not connect to the internet to install/update basic packages. Please check your internet connection and try again.".to_string(),
+            "Error connecting to the internet to install/update basic packages. Please check your internet connection and try again.",
         );
 
         return Ok(PackageResult::new(3, packages));
@@ -238,7 +248,7 @@ pub async fn run_command(window: Window, input: String) -> Result<(), String> {
 
     spawn_capture_process(program, args).map_err(|err| {
         let e = err.to_string();
-        ccprintlne(&window, e.clone());
+        ccprintln(&window, e.clone());
         e
     })?;
 
@@ -414,7 +424,7 @@ pub async fn bootstrap_custom_python(window: &Window) -> Result<(), BootstrapCus
 pub async fn install_python(window: Window) -> Result<(), String> {
     bootstrap_custom_python(&window).await.map_err(|e| {
         let e = e.to_string();
-        ccprintlne(&window, e.clone());
+        ccprintln(&window, e.clone());
         e
     })
 }
@@ -507,7 +517,7 @@ pub async fn update_map_pack(window: Window) -> Result<String, String> {
                         .add_folder(&window, location);
 
                     if updater.get_map_index(&window).is_none() {
-                        ccprintlne(&window, "Couldn't find revision number in map pack".to_owned());
+                        ccprintln(&window, "Error: Couldn't find revision number in map pack");
                         return Err("Couldn't find revision number in map pack".to_owned());
                     }
 
@@ -553,7 +563,7 @@ fn create_match_handler(window: &Window) -> Option<ChildStdin> {
     {
         Ok(mut child) => child.stdin.take(),
         Err(err) => {
-            ccprintlne(window, format!("Failed to start match handler: {err}"));
+            ccprintln(window, format!("Error starting match handler: {err}"));
             None
         }
     }
@@ -664,10 +674,10 @@ async fn start_match_helper(window: &Window, bot_list: Vec<TeamBotBundle>, match
 pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_settings: MiniMatchConfig) -> Result<(), String> {
     start_match_helper(&window, bot_list, match_settings).await.map_err(|error| {
         if let Err(e) = window.emit("match-start-failed", ()) {
-            ccprintlne(&window, format!("Failed to emit match-start-failed: {e}"));
+            ccprintln(&window, format!("Failed to emit match-start-failed: {e}"));
         }
 
-        ccprintlne(&window, error.clone());
+        ccprintln(&window, error.clone());
 
         error
     })
@@ -1050,11 +1060,11 @@ async fn run_challenge(window: &Window, save_state: &StoryState, challenge_id: S
 pub async fn launch_challenge(window: Window, save_state: StoryState, challenge_id: String, picked_teammates: Vec<String>) -> Result<(), String> {
     run_challenge(&window, &save_state, challenge_id, &picked_teammates).await.map_err(|err| {
         if let Err(e) = window.emit("match-start-failed", ()) {
-            ccprintlne(&window, format!("Failed to emit match-start-failed: {e}"));
+            ccprintln(&window, format!("Failed to emit match-start-failed: {e}"));
         }
 
         let e = err.to_string();
-        ccprintlne(&window, e.clone());
+        ccprintln(&window, e.clone());
         e
     })
 }
@@ -1062,7 +1072,7 @@ pub async fn launch_challenge(window: Window, save_state: StoryState, challenge_
 #[tauri::command]
 pub async fn purchase_upgrade(window: Window, mut save_state: StoryState, upgrade_id: String, cost: usize) -> Option<StoryState> {
     if let Err(e) = save_state.add_purchase(upgrade_id, cost) {
-        ccprintlne(&window, e);
+        ccprintln(&window, e);
         return None;
     }
 
@@ -1074,7 +1084,7 @@ pub async fn purchase_upgrade(window: Window, mut save_state: StoryState, upgrad
 #[tauri::command]
 pub async fn recruit(window: Window, mut save_state: StoryState, id: String) -> Option<StoryState> {
     if let Err(e) = save_state.add_recruit(id) {
-        ccprintlne(&window, e);
+        ccprintln(&window, e);
         return None;
     }
 
@@ -1141,7 +1151,7 @@ pub async fn upload_log(window: Window) -> Result<String, String> {
 
     inner(&window).await.map_err(|e| {
         let err = e.to_string();
-        ccprintlne(&window, err.clone());
+        ccprintln(&window, err.clone());
         err
     })
 }
