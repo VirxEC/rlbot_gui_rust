@@ -1,6 +1,6 @@
 [package]
 name = "rl-bot-gui"
-version = "1.0.22"
+version = "1.0.23"
 description = "The RLBot GUI ported to Rust"
 authors = ["VirxEC"]
 license = "MIT"
