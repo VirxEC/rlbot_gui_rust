@@ -5,25 +5,25 @@
 mod bot_management;
 mod commands;
 mod config_handles;
-mod configparser;
 mod custom_maps;
 mod is_online;
 mod rlbot;
 mod settings;
 mod stories;
 
+#[cfg(windows)]
+use registry::{Hive, Security};
+#[cfg(windows)]
+use std::{os::windows::process::CommandExt, path::Path};
+
 use crate::{
     commands::*,
     config_handles::*,
     settings::{BotFolders, ConsoleTextUpdate, GameTickPacket, StoryConfig, StoryState},
 };
-use lazy_static::lazy_static;
+use once_cell::sync::Lazy;
 use os_pipe::{pipe, PipeWriter};
-#[cfg(windows)]
-use registry::{Hive, Security};
 use serde::Serialize;
-#[cfg(windows)]
-use std::path::Path;
 use std::{
     collections::HashMap,
     env,
@@ -57,10 +57,8 @@ static CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
 static PYTHON_PATH: RwLock<String> = RwLock::new(String::new());
 static BOT_FOLDER_SETTINGS: RwLock<Option<BotFolders>> = RwLock::new(None);
 
-lazy_static! {
-    static ref BOTS_BASE: AsyncRwLock<Option<JsonMap>> = AsyncRwLock::new(None);
-    static ref STORIES_CACHE: AsyncRwLock<HashMap<StoryConfig, JsonMap>> = AsyncRwLock::new(HashMap::new());
-}
+static BOTS_BASE: Lazy<AsyncRwLock<Option<JsonMap>>> = Lazy::new(|| AsyncRwLock::new(None));
+static STORIES_CACHE: Lazy<AsyncRwLock<HashMap<StoryConfig, JsonMap>>> = Lazy::new(|| AsyncRwLock::new(HashMap::new()));
 
 #[cfg(windows)]
 fn auto_detect_python() -> Option<(String, bool)> {
@@ -231,7 +229,6 @@ fn get_command_status<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A
 
     #[cfg(windows)]
     {
-        use std::os::windows::process::CommandExt;
         // disable window creation
         command.creation_flags(0x08000000);
     };
@@ -271,7 +268,6 @@ pub fn get_capture_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Ite
 
     #[cfg(windows)]
     {
-        use std::os::windows::process::CommandExt;
         // disable window creation
         command.creation_flags(0x08000000);
     };
