@@ -1,3 +1,6 @@
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
 use crate::{
     bot_management::cfg_helper::{load_cfg, load_cfg_sync, CfgHelperError},
     ccprintln, get_command_status,
@@ -197,10 +200,7 @@ impl BotConfigBundle {
             .get(BOT_CONFIG_MODULE_HEADER, LOOKS_CONFIG_KEY)
             .map(|path| format!("{config_directory}/{path}"))
             .ok_or_else(|| RLBotCfgParseError::NoLooksConfig(config_path_str.clone()))?;
-        let supports_standalone = conf
-            .get(BOT_CONFIG_MODULE_HEADER, SUPPORTS_STANDALONE)
-            .map(|s| s.parse::<bool>().unwrap_or_default())
-            .unwrap_or_default();
+        let supports_standalone = conf.getboolcoerce(BOT_CONFIG_MODULE_HEADER, SUPPORTS_STANDALONE).unwrap_or_default().unwrap_or_default();
         let use_virtual_environment = conf
             .getboolcoerce(BOT_CONFIG_MODULE_HEADER, USE_VIRTUAL_ENVIRONMENT_KEY)
             .unwrap_or_default()
@@ -338,7 +338,6 @@ impl Runnable for BotConfigBundle {
 
             #[cfg(windows)]
             {
-                use std::os::windows::process::CommandExt;
                 // disable window creation
                 command.creation_flags(0x08000000);
             };
@@ -517,7 +516,6 @@ impl Runnable for ScriptConfigBundle {
 
             #[cfg(windows)]
             {
-                use std::os::windows::process::CommandExt;
                 // disable window creation
                 command.creation_flags(0x08000000);
             };
