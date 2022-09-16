@@ -1,8 +1,8 @@
 use crate::{
     bot_management::cfg_helper::{load_cfg, CfgHelperError},
     ccprintln,
-    configparser::Ini,
 };
+use configparser::ini::Ini;
 use serde::{Deserialize, Serialize};
 use tauri::Window;
 

@@ -1,6 +1,6 @@
 [package]
 name = "rl-bot-gui"
-version = "1.0.23"
+version = "1.0.24"
 description = "The RLBot GUI ported to Rust"
 authors = ["VirxEC"]
 license = "MIT"
@@ -27,7 +27,6 @@ reqwest = { version = "0.11.10", features = ["json", "stream"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_repr = "0.1"
-lazy_static = "1.4"
 glob = "0.3"
 base64 = "0.13"
 imghdr = "0.7"
@@ -46,6 +45,9 @@ shlex = "1.1"
 thiserror = "1.0.31"
 indexmap = "1"
 ansi-to-html = "0.1.0"
+configparser = { version = "3.0.2", features = ["indexmap", "async-std"] }
+async-std = "1.12.0"
+once_cell = "1.14.0"
 
 [target.'cfg(windows)'.dependencies]
 registry = "1.2"

@@ -1,6 +1,5 @@
 use crate::{
     bot_management::downloader::MapPackUpdater,
-    configparser::Ini,
     custom_maps,
     rlbot::{
         agents::runnable::Runnable,
@@ -16,6 +15,7 @@ use crate::{
     stories::bots_base,
     *,
 };
+use configparser::ini::Ini;
 use glob::glob;
 use std::{
     collections::HashMap,
