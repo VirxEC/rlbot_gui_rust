@@ -19,6 +19,7 @@ pub enum CfgHelperError {
 pub fn load_cfg_sync<T: AsRef<Path>>(path: T) -> Result<Ini, CfgHelperError> {
     let mut conf = Ini::new();
     conf.set_multiline(true);
+    conf.set_comment_symbols(&[';']);
     conf.load(path).map_err(CfgHelperError::Load)?;
 
     Ok(conf)
@@ -31,6 +32,7 @@ pub fn load_cfg_sync<T: AsRef<Path>>(path: T) -> Result<Ini, CfgHelperError> {
 /// * `path`: The path to the CFG file that needs to be loaded
 pub async fn load_cfg<T: AsRef<AsyncPath>>(path: T) -> Result<Ini, CfgHelperError> {
     let mut conf = Ini::new();
+    conf.set_multiline(true);
     conf.set_comment_symbols(&[';']);
     conf.load_async(path).await.map_err(CfgHelperError::Load)?;
 
