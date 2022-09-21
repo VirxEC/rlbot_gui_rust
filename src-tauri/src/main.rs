@@ -29,7 +29,7 @@ use std::{
     env,
     error::Error as StdError,
     ffi::OsStr,
-    fs::{File, OpenOptions},
+    fs::{File, OpenOptions, create_dir_all},
     io::{Read, Result as IoResult, Write},
     path::PathBuf,
     process::{Child, ChildStdin, Command, Stdio},
@@ -162,7 +162,13 @@ fn get_log_path() -> PathBuf {
 
 /// Clear the log file
 fn clear_log_file() -> IoResult<()> {
-    File::create(get_log_path()).map(drop)
+    let log_path = get_log_path();
+
+    if !log_path.exists() {
+        create_dir_all(log_path.parent().unwrap())?;
+    }
+
+    File::create(log_path).map(drop)
 }
 
 /// Emits text to the console
@@ -464,7 +470,6 @@ fn gui_setup(app: &mut App) -> Result<(), Box<dyn StdError>> {
     let window2 = window.clone();
 
     clear_log_file()?;
-
     gui_setup_load_config(&window)?;
 
     let (mut pipe_reader, pipe_writer) = pipe()?;
