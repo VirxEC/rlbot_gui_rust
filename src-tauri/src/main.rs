@@ -65,12 +65,12 @@ fn auto_detect_python() -> Option<(String, bool)> {
     let content_folder = get_content_folder();
 
     let new_python = content_folder.join("Python37\\python.exe");
-    if new_python.exists() {
+    if get_command_status(&new_python, ["--version"]) {
         return Some((new_python.to_string_lossy().to_string(), true));
     }
 
     let old_python = content_folder.join("venv\\Scripts\\python.exe");
-    if old_python.exists() {
+    if get_command_status(&old_python, ["--version"]) {
         return Some((old_python.to_string_lossy().to_string(), true));
     }
 
@@ -115,7 +115,7 @@ fn get_python_from_pip(pip: &str) -> Result<String, WindowsPipLocateError> {
             .parent()
             .ok_or_else(|| WindowsPipLocateError::NoParentError(first_line.to_owned()))?
             .join("python.exe");
-        if python_path.exists() {
+        if get_command_status(&python_path, ["--version"]) {
             return Ok(python_path.to_string_lossy().to_string());
         }
     }
@@ -136,9 +136,16 @@ fn auto_detect_python() -> Option<(String, bool)> {
 
 #[cfg(target_os = "linux")]
 fn auto_detect_python() -> Option<(String, bool)> {
-    let path = get_content_folder().join("env/bin/python");
-    if path.exists() {
-        return Some((path.to_string_lossy().to_string(), true));
+    let content_folder = get_content_folder();
+    let rlbot_venv_paths = [
+        content_folder.join("venv/bin/python"),
+        content_folder.join("env/bin/python"),
+    ];
+
+    for path in rlbot_venv_paths.iter() {
+        if get_command_status(path, ["--version"]) {
+            return Some((path.to_string_lossy().to_string(), true));
+        }
     }
 
     for python in ["python3.7", "python3.8", "python3.9", "python3.6", "python3"] {
@@ -359,12 +366,12 @@ fn get_content_folder() -> PathBuf {
 
 #[cfg(target_os = "macos")]
 fn get_content_folder() -> PathBuf {
-    PathBuf::from(format!("{}/Library/Application Support/rlbotgui", env::var("HOME").unwrap()))
+    get_home_folder().join("Library/Application Support/rlbotgui")
 }
 
 #[cfg(target_os = "linux")]
 fn get_content_folder() -> PathBuf {
-    PathBuf::from(format!("{}/.RLBotGUI", env::var("HOME").unwrap()))
+    get_home_folder().0.join(".RLBotGUI")
 }
 
 #[cfg(windows)]
