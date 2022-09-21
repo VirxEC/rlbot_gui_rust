@@ -1,5 +1,5 @@
 #![cfg_attr(all(not(debug_assertions), target_os = "windows"), windows_subsystem = "windows")]
-#![allow(clippy::items_after_statements, clippy::wildcard_imports, clippy::unused_async)]
+#![allow(clippy::wildcard_imports, clippy::unused_async)]
 #![forbid(unsafe_code)]
 
 mod bot_management;
@@ -29,7 +29,7 @@ use std::{
     env,
     error::Error as StdError,
     ffi::OsStr,
-    fs::{File, OpenOptions, create_dir_all},
+    fs::{create_dir_all, File, OpenOptions},
     io::{Read, Result as IoResult, Write},
     path::PathBuf,
     process::{Child, ChildStdin, Command, Stdio},
@@ -182,6 +182,16 @@ pub fn ccprintln<T: AsRef<str>>(window: &Window, text: T) {
     emit_text(window, text, false);
 }
 
+#[macro_export]
+macro_rules! ccprintln {
+    ($window:expr) => {
+        ccprintln($window, "")
+    };
+    ($window:expr, $($arg:tt)*) => {
+        ccprintln($window, format!($($arg)*))
+    };
+}
+
 /// Emits text to the console, replacing the previous line
 /// Also calls println!() to print to the console
 ///
@@ -191,6 +201,16 @@ pub fn ccprintln<T: AsRef<str>>(window: &Window, text: T) {
 /// * `text` - The text to emit
 pub fn ccprintlnr<T: AsRef<str>>(window: &Window, text: T) {
     emit_text(window, text, true);
+}
+
+#[macro_export]
+macro_rules! ccprintlnr {
+    ($window:expr) => {
+        ccprintlnr($window, "")
+    };
+    ($window:expr, $($arg:tt)*) => {
+        ccprintlnr($window, format!($($arg)*))
+    };
 }
 
 #[cfg(windows)]
@@ -440,7 +460,7 @@ fn try_emit_text<T: AsRef<str>>(window: &Window, text: T, replace_last: bool) ->
         let gtp: GameTickPacket = serde_json::from_str(&text).unwrap();
         try_emit_signal(window, "gtp", gtp)
     } else if text.starts_with("-|-*|STORY_RESULT ") && text.ends_with("|*-|-") {
-        println!("GOT STORY RESULT");
+        println!("GOT STORY RESULT {text}");
         let text = text.replace("-|-*|STORY_RESULT ", "").replace("|*-|-", "");
         let save_state: StoryState = serde_json::from_str(&text).unwrap();
         save_state.save(window);
@@ -453,7 +473,7 @@ fn try_emit_text<T: AsRef<str>>(window: &Window, text: T, replace_last: bool) ->
 fn emit_text<T: AsRef<str>>(window: &Window, text: T, replace_last: bool) {
     let (signal, error) = try_emit_text(window, text, replace_last);
     if let Some(e) = error {
-        ccprintln(window, format!("Error emitting {signal}: {e}"));
+        ccprintln!(window, "Error emitting {signal}: {e}");
     }
 }
 

@@ -383,12 +383,13 @@ export default {
 
 		</b-modal>
 
-		<b-modal id="download-modal" v-bind:title="downloadModalTitle" hide-footer centered no-close-on-backdrop no-close-on-esc hide-header-close>
+		<b-modal id="download-modal" v-bind:title="downloadModalTitle" size="lg" hide-footer centered no-close-on-backdrop no-close-on-esc hide-header-close>
 			<div class="text-center">
 				<b-icon icon="cloud-download" font-scale="3"></b-icon>
 			</div>
 			<b-progress variant="success" :value="downloadProgressPercent" animated class="mt-2 mb-2"></b-progress>
 			<p>{{ downloadStatus }}</p>
+			<mini-console/>
 		</b-modal>
 
 		<b-modal id="recommendations-modal" size="lg" hide-footer centered title="Recommendations" v-if="recommendations">

@@ -142,7 +142,7 @@ impl BotLooksConfig {
             .save_to_config(&mut config, BOT_CONFIG_LOADOUT_ORANGE_HEADER, BOT_CONFIG_LOADOUT_PAINT_ORANGE_HEADER);
 
         if let Err(e) = config.write(path) {
-            ccprintln(window, format!("Error saving bot config to {path}: {e}"));
+            ccprintln!(window, "Error saving bot config to {path}: {e}");
         }
     }
 }

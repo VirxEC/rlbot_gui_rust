@@ -62,7 +62,7 @@ fn ensure_bot_directory(window: &Window) -> PathBuf {
 
     if !bot_directory_path.exists() {
         if let Err(e) = create_dir_all(&bot_directory_path) {
-            ccprintln(window, format!("Error creating bot directory: {e}"));
+            ccprintln!(window, "Error creating bot directory: {e}");
         }
     }
 
@@ -86,7 +86,7 @@ pub async fn begin_python_bot(window: Window, bot_name: String) -> Result<BotCon
 
     inner(&window, bot_name).await.map_err(|e| {
         let err = e.to_string();
-        ccprintln(&window, err.clone());
+        ccprintln(&window, &err);
         err
     })
 }
@@ -100,7 +100,7 @@ pub async fn begin_python_hivemind(window: Window, hive_name: String) -> Result<
 
     inner(&window, hive_name).await.map_err(|e| {
         let err = e.to_string();
-        ccprintln(&window, err.clone());
+        ccprintln(&window, &err);
         err
     })
 }
@@ -114,7 +114,7 @@ pub async fn begin_rust_bot(window: Window, bot_name: String) -> Result<BotConfi
 
     inner(&window, bot_name).await.map_err(|e| {
         let err = e.to_string();
-        ccprintln(&window, err.clone());
+        ccprintln(&window, &err);
         err
     })
 }
@@ -128,7 +128,7 @@ pub async fn begin_scratch_bot(window: Window, bot_name: String) -> Result<BotCo
 
     inner(&window, bot_name).await.map_err(|e| {
         let err = e.to_string();
-        ccprintln(&window, err.clone());
+        ccprintln(&window, &err);
         err
     })
 }
@@ -192,7 +192,7 @@ pub async fn install_requirements(window: Window, config_path: String) -> Result
 
     inner(&window, config_path).await.map_err(|e| {
         let err = e.to_string();
-        ccprintln(&window, err.clone());
+        ccprintln(&window, &err);
         err
     })
 }
@@ -248,7 +248,7 @@ pub async fn run_command(window: Window, input: String) -> Result<(), String> {
 
     spawn_capture_process(program, args).map_err(|err| {
         let e = err.to_string();
-        ccprintln(&window, e.clone());
+        ccprintln(&window, &e);
         e
     })?;
 
@@ -424,7 +424,7 @@ pub async fn bootstrap_custom_python(window: &Window) -> Result<(), BootstrapCus
 pub async fn install_python(window: Window) -> Result<(), String> {
     bootstrap_custom_python(&window).await.map_err(|e| {
         let e = e.to_string();
-        ccprintln(&window, e.clone());
+        ccprintln(&window, &e);
         e
     })
 }
@@ -563,7 +563,7 @@ fn create_match_handler(window: &Window) -> Option<ChildStdin> {
     {
         Ok(mut child) => child.stdin.take(),
         Err(err) => {
-            ccprintln(window, format!("Error starting match handler: {err}"));
+            ccprintln!(window, "Error starting match handler: {err}");
             None
         }
     }
@@ -674,10 +674,10 @@ async fn start_match_helper(window: &Window, bot_list: Vec<TeamBotBundle>, match
 pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_settings: MiniMatchConfig) -> Result<(), String> {
     start_match_helper(&window, bot_list, match_settings).await.map_err(|error| {
         if let Err(e) = window.emit("match-start-failed", ()) {
-            ccprintln(&window, format!("Failed to emit match-start-failed: {e}"));
+            ccprintln!(&window, "Failed to emit match-start-failed: {e}");
         }
 
-        ccprintln(&window, error.clone());
+        ccprintln(&window, &error);
 
         error
     })
@@ -1060,11 +1060,11 @@ async fn run_challenge(window: &Window, save_state: &StoryState, challenge_id: S
 pub async fn launch_challenge(window: Window, save_state: StoryState, challenge_id: String, picked_teammates: Vec<String>) -> Result<(), String> {
     run_challenge(&window, &save_state, challenge_id, &picked_teammates).await.map_err(|err| {
         if let Err(e) = window.emit("match-start-failed", ()) {
-            ccprintln(&window, format!("Failed to emit match-start-failed: {e}"));
+            ccprintln!(&window, "Failed to emit match-start-failed: {e}");
         }
 
         let e = err.to_string();
-        ccprintln(&window, e.clone());
+        ccprintln(&window, &e);
         e
     })
 }
@@ -1109,6 +1109,8 @@ pub enum LogUploadError {
 
 #[tauri::command]
 pub async fn upload_log(window: Window) -> Result<String, String> {
+    const KEY: &str = "key";
+
     /// there are a few references to hastebin in the GUI
     /// you should also change those references to avoid user confusion
     /// (if changing paste provider)
@@ -1136,7 +1138,6 @@ pub async fn upload_log(window: Window) -> Result<String, String> {
         // Take this and return the key attached to the hastebin URL
         let json: serde_json::Value = res.json().await?;
 
-        const KEY: &str = "key";
         let url_postfix = json
             .get(KEY)
             .ok_or_else(|| LogUploadError::NoKey(KEY.to_owned()))?
@@ -1145,13 +1146,13 @@ pub async fn upload_log(window: Window) -> Result<String, String> {
             .to_owned();
 
         let url = format!("https://hastebin.com/{url_postfix}");
-        ccprintln(window, format!("Log file uploaded to: {url}"));
+        ccprintln!(window, "Log file uploaded to: {url}");
         Ok(url)
     }
 
     inner(&window).await.map_err(|e| {
         let err = e.to_string();
-        ccprintln(&window, err.clone());
+        ccprintln(&window, &err);
         err
     })
 }
