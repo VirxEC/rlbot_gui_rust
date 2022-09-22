@@ -18,7 +18,8 @@ pub struct StoryModeConfig {
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Settings {
-    pub min_map_pack_revision: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub min_map_pack_revision: Option<u32>,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -33,6 +34,7 @@ pub struct City {
 pub struct Description {
     pub message: String,
     pub prereqs: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub color: Option<u16>,
 }
 
@@ -48,6 +50,7 @@ pub struct Challenge {
     pub map: MapType,
     pub disabled_boost: bool,
     pub display: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub completion_conditions: Option<CompletionConditions>,
     pub scripts: Vec<String>,
 }
@@ -55,10 +58,15 @@ pub struct Challenge {
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct CompletionConditions {
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub win: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub score_difference: Option<i16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub self_demo_count: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub demo_achieved_count: Option<u16>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub goals_scored: Option<i16>,
 }
 
@@ -77,6 +85,7 @@ pub struct Bot {
     #[serde(rename = "type")]
     pub type_field: BotType,
     pub skill: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<Vec<String>>,
 }
 
