@@ -1,4 +1,4 @@
-crate::rust_json! {
+crate::storymode_json! {
     "settings": {
         "min_map_pack_revision": 3
     },

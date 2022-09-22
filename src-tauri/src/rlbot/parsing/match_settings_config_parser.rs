@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_enum_str::{Deserialize_enum_str, Serialize_enum_str};
 use strum::{EnumIter, IntoEnumIterator};
 
-#[derive(Deserialize_enum_str, Serialize_enum_str, Clone, Debug, Default, EnumIter)]
+#[derive(Deserialize_enum_str, Serialize_enum_str, Clone, Debug, Default, EnumIter, PartialEq, Eq)]
 pub enum MapType {
     #[default]
     #[serde(rename = "DFHStadium")]
@@ -95,7 +95,7 @@ pub enum MapType {
     Custom(String),
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, Default, EnumIter)]
 pub enum GameMode {
     #[default]
     Soccer,
@@ -107,7 +107,7 @@ pub enum GameMode {
     Gridiron,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, Default, EnumIter)]
 pub enum ExistingMatchBehavior {
     #[default]
     #[serde(rename = "Restart If Different")]
@@ -117,7 +117,7 @@ pub enum ExistingMatchBehavior {
     ContinueAndSpawn,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, Default, EnumIter)]
 pub enum MatchLength {
     #[default]
     #[serde(rename = "5 Minutes")]
@@ -129,7 +129,7 @@ pub enum MatchLength {
     Unlimited,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, Default, EnumIter, PartialEq, Eq)]
 pub enum MaxScore {
     #[default]
     #[serde(rename = "Unlimited")]
@@ -142,7 +142,7 @@ pub enum MaxScore {
     FiveGoals,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, Default, EnumIter)]
 pub enum Overtime {
     #[default]
     #[serde(rename = "Unlimited")]
@@ -153,7 +153,7 @@ pub enum Overtime {
     PlusFiveMaxRandomTeam,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, Default, EnumIter)]
 pub enum SeriesLength {
     #[default]
     #[serde(rename = "Unlimited")]
@@ -166,7 +166,7 @@ pub enum SeriesLength {
     SevenGames,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, Default, EnumIter)]
 pub enum GameSpeed {
     #[default]
     Default,
@@ -176,7 +176,7 @@ pub enum GameSpeed {
     TimeWarp,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, Default, EnumIter)]
 pub enum BallMaxSpeed {
     #[default]
     Default,
@@ -188,7 +188,7 @@ pub enum BallMaxSpeed {
     SuperFast,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, Default, EnumIter)]
 pub enum BallType {
     #[default]
     Default,
@@ -197,7 +197,7 @@ pub enum BallType {
     Basketball,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, Default, EnumIter)]
 pub enum BallWeight {
     #[default]
     Default,
@@ -207,7 +207,7 @@ pub enum BallWeight {
     SuperLight,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, Default, EnumIter)]
 pub enum BallSize {
     #[default]
     Default,
@@ -216,7 +216,7 @@ pub enum BallSize {
     Gigantic,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, Default, EnumIter)]
 pub enum BallBounciness {
     #[default]
     Default,
@@ -226,7 +226,7 @@ pub enum BallBounciness {
     SuperHigh,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, Default, EnumIter)]
 pub enum BoostAmount {
     #[default]
     Default,
@@ -239,7 +239,7 @@ pub enum BoostAmount {
     NoBoost,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, Default, EnumIter)]
 pub enum Rumble {
     #[default]
     None,
@@ -256,7 +256,7 @@ pub enum Rumble {
     SpikeRush,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, Default, EnumIter)]
 pub enum BoostStrength {
     #[default]
     #[serde(rename = "1x")]
@@ -269,7 +269,7 @@ pub enum BoostStrength {
     Ten,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, Default, EnumIter)]
 pub enum Gravity {
     #[default]
     Default,
@@ -279,7 +279,7 @@ pub enum Gravity {
     SuperHigh,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, Default, EnumIter)]
 pub enum Demolish {
     #[default]
     Default,
@@ -292,7 +292,7 @@ pub enum Demolish {
     OnContactFriendlyFire,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default, EnumIter)]
+#[derive(Deserialize, Serialize, Clone, Copy, Debug, Default, EnumIter)]
 pub enum RespawnTime {
     #[default]
     #[serde(rename = "3 Seconds")]

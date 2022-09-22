@@ -15,6 +15,7 @@ use crate::{
         setup_manager,
     },
     settings::*,
+    stories::cmaps::{Bot, BotType, Challenge, City, Script},
     *,
 };
 use futures_util::StreamExt;
@@ -789,12 +790,12 @@ fn make_human_config(team: Team) -> TeamBotBundle {
 ///
 /// * `path` - The un-parsed JSON path to collapse
 /// * `botpack_root` - The path to the root of the RLBotPack, which will replace `$RLBOTPACKROOT`
-fn collapse_path(cfg_path: Option<&serde_json::Value>, botpack_root: &Path) -> Option<String> {
+fn collapse_path(cfg_path: Option<&Vec<String>>, botpack_root: &Path) -> Option<String> {
     let cfg_path = cfg_path?;
 
     let mut path = PathBuf::new();
 
-    for part in cfg_path.as_array()?.iter().filter_map(serde_json::Value::as_str) {
+    for part in cfg_path {
         if part == "$RLBOTPACKROOT" {
             path.push(botpack_root);
         } else {
@@ -805,16 +806,6 @@ fn collapse_path(cfg_path: Option<&serde_json::Value>, botpack_root: &Path) -> O
     Some(path.to_string_lossy().to_string())
 }
 
-/// Get the path on the file system as defined by the path key
-///
-/// # Arguments
-///
-/// * `map` - The JSON map that contains the path key
-/// * `botpack_root` - The path to the root of the RLBotPack, which will replace `$RLBOTPACKROOT`
-fn get_path_from_jsonmap(map: &JsonMap, botpack_root: &Path) -> String {
-    collapse_path(map.get("path"), botpack_root).unwrap_or_else(|| map.get("path").and_then(|x| Some(x.as_str()?.to_string())).unwrap_or_default())
-}
-
 /// Load a RLBot-type bot
 ///
 /// # Arguments
@@ -822,13 +813,13 @@ fn get_path_from_jsonmap(map: &JsonMap, botpack_root: &Path) -> String {
 /// `player` - The JSON map that contains the bot's config
 /// `team` - The team the bot should be on
 /// `botpack_root` - The path to the root of the RLBotPack, which will replace `$RLBOTPACKROOT`
-fn rlbot_to_player_config(player: &JsonMap, team: Team, botpack_root: &Path) -> TeamBotBundle {
+fn rlbot_to_player_config(player: &Bot, team: Team, botpack_root: &Path) -> TeamBotBundle {
     TeamBotBundle {
-        name: player.get("name").and_then(serde_json::Value::as_str).unwrap_or_default().to_string(),
+        name: player.name.clone(),
         team,
         skill: 1.0,
         runnable_type: "rlbot".to_owned(),
-        path: Some(get_path_from_jsonmap(player, botpack_root)),
+        path: Some(collapse_path(player.path.as_ref(), botpack_root).unwrap_or_default()),
     }
 }
 
@@ -838,39 +829,29 @@ fn rlbot_to_player_config(player: &JsonMap, team: Team, botpack_root: &Path) -> 
 ///
 /// `player` - The JSON map that contains the bot's config
 /// `team` - The team the bot should be on
-fn pysonix_to_player_config(player: &JsonMap, team: Team) -> TeamBotBundle {
+fn pysonix_to_player_config(player: &Bot, team: Team) -> TeamBotBundle {
     TeamBotBundle {
-        name: player.get("name").and_then(serde_json::Value::as_str).unwrap_or_default().to_string(),
+        name: player.name.clone(),
         team,
-        skill: player.get("skill").and_then(serde_json::Value::as_f64).unwrap_or(1.0) as f32,
+        skill: player.skill.unwrap_or(1.0) as f32,
         runnable_type: "psyonix".to_owned(),
         path: None,
     }
 }
 
-/// Load a bot from a JSON map
+/// Load a `TeamBotBundle` from a Bot
 ///
 /// # Arguments
 ///
 /// `player` - The JSON map that contains the bot's config
 /// `team` - The team the bot should be on
 /// `botpack_root` - The path to the root of the RLBotPack, which will replace `$RLBOTPACKROOT`
-fn jsonmap_to_bot(player: &JsonMap, team: Team, botpack_root: &Path) -> TeamBotBundle {
-    if player.get("type").and_then(serde_json::Value::as_str) == Some("psyonix") {
+fn bot_to_team_bot_bundle(player: &Bot, team: Team, botpack_root: &Path) -> TeamBotBundle {
+    if player.type_field == BotType::Psyonix {
         pysonix_to_player_config(player, team)
     } else {
         rlbot_to_player_config(player, team, botpack_root)
     }
-}
-
-/// Get a JSON map from a key inside the given JSON map
-///
-/// # Arguments
-///
-/// * `map` - The JSON map that contains the key
-/// * `key` - The key to get the value from
-fn get_jsonmap_in_jsonmap(map: &JsonMap, key: &str) -> Option<JsonMap> {
-    Some(map.get(key)?.as_object()?.clone())
 }
 
 /// Load all the bots (+ the human) for a challenge
@@ -881,37 +862,33 @@ fn get_jsonmap_in_jsonmap(map: &JsonMap, key: &str) -> Option<JsonMap> {
 /// * `human_pick` - The names of the bots that the human picked for teammates
 /// * `all_bots` - The JSON that contains a mapping of bot names to bot information
 /// * `botpack_root` - The path to the root of the RLBotPack, which will replace `$RLBOTPACKROOT`
-fn make_player_configs(challenge: &JsonMap, human_picks: &[String], all_bots: &JsonMap, botpack_root: &Path) -> Vec<TeamBotBundle> {
+fn make_player_configs(challenge: &Challenge, human_picks: &[String], all_bots: &HashMap<String, Bot>, botpack_root: &Path) -> Vec<TeamBotBundle> {
     let mut player_configs = vec![make_human_config(Team::Blue)];
 
-    if let Some(human_team_size) = challenge.get("humanTeamSize").and_then(serde_json::Value::as_u64) {
-        for name in human_picks[..human_team_size as usize - 1].iter() {
-            if let Some(bot) = get_jsonmap_in_jsonmap(all_bots, name) {
-                player_configs.push(jsonmap_to_bot(&bot, Team::Blue, botpack_root));
-            }
+    for name in human_picks[..challenge.human_team_size as usize - 1].iter() {
+        if let Some(bot) = all_bots.get(name) {
+            player_configs.push(bot_to_team_bot_bundle(bot, Team::Blue, botpack_root));
         }
     }
 
-    if let Some(opponents) = challenge.get("opponentBots").and_then(serde_json::Value::as_array) {
-        for opponent in opponents.iter().filter_map(serde_json::Value::as_str) {
-            if let Some(bot) = get_jsonmap_in_jsonmap(all_bots, opponent) {
-                player_configs.push(jsonmap_to_bot(&bot, Team::Orange, botpack_root));
-            }
+    for opponent in &challenge.opponent_bots {
+        if let Some(bot) = all_bots.get(opponent) {
+            player_configs.push(bot_to_team_bot_bundle(bot, Team::Orange, botpack_root));
         }
     }
 
     player_configs
 }
 
-/// Load a script from a JSON map
+/// Load a script from a Script config
 ///
 /// # Arguments
 ///
 /// * `script` - The JSON map that the key "path" which points to the script's .py file
 /// * `botpack_root` - The path to the root of the RLBotPack, which will replace `$RLBOTPACKROOT`
-fn jsonmap_to_script(script: &JsonMap, botpack_root: &Path) -> MiniScriptBundle {
+fn script_to_miniscript_bundle(script: &Script, botpack_root: &Path) -> MiniScriptBundle {
     MiniScriptBundle {
-        path: get_path_from_jsonmap(script, botpack_root),
+        path: collapse_path(Some(&script.path), botpack_root).unwrap_or_default(),
     }
 }
 
@@ -922,18 +899,13 @@ fn jsonmap_to_script(script: &JsonMap, botpack_root: &Path) -> MiniScriptBundle 
 /// * `challenge` - The JSON map that contains the key `scripts`
 /// * `all_scripts` - The JSON that contains a mapping of script names to script information
 /// * `botpack_root` - The path to the root of the RLBotPack, which will replace `$RLBOTPACKROOT`
-fn make_script_configs(challenge: &JsonMap, all_scripts: &JsonMap, botpack_root: &Path) -> Vec<MiniScriptBundle> {
-    let mut script_configs = vec![];
-
-    if let Some(scripts) = challenge.get("scripts").and_then(serde_json::Value::as_array) {
-        for script in scripts.iter().map(ToString::to_string) {
-            if let Some(script_config) = get_jsonmap_in_jsonmap(all_scripts, &script) {
-                script_configs.push(jsonmap_to_script(&script_config, botpack_root));
-            }
-        }
-    }
-
-    script_configs
+fn make_script_configs(challenge: &Challenge, all_scripts: &HashMap<String, Script>, botpack_root: &Path) -> Vec<MiniScriptBundle> {
+    challenge
+        .scripts
+        .iter()
+        .filter_map(|script| all_scripts.get(script))
+        .map(|script| script_to_miniscript_bundle(script, botpack_root))
+        .collect()
 }
 
 /// Load the match settings for a challenge
@@ -943,16 +915,12 @@ fn make_script_configs(challenge: &JsonMap, all_scripts: &JsonMap, botpack_root:
 /// * `challenge` - The JSON map that contains the key `matchSettings`
 /// * `upgrades` - The purchased upgrades
 /// * `script_configs` - The loaded scripts that will be used in the challenge
-fn make_match_config(challenge: &JsonMap, upgrades: &HashMap<String, usize>, script_configs: Vec<MiniScriptBundle>) -> MiniMatchConfig {
+fn make_match_config(challenge: &Challenge, upgrades: &HashMap<String, usize>, script_configs: Vec<MiniScriptBundle>) -> MiniMatchConfig {
     MiniMatchConfig {
-        game_mode: challenge
-            .get("limitations") // check if the key "limitations" exists in the challenge
-            .and_then(|x| x.as_array().map(|x| x.iter().filter_map(serde_json::Value::as_str).collect::<Vec<_>>())) // if it does, map it to an vec of strings
-            .unwrap_or_default() // Convert None to an empty vec for simplicity
-            .contains(&"half-field") // check if the vec contains the string "half-field"
+        game_mode: challenge.limitations.contains(&"half-field".to_owned()) // check if the vec contains the string "half-field"
             .then_some(GameMode::Heatseeker) // if it does, set the game mode to Heatseeker
             .unwrap_or_default(), // otherwise, set it to Soccer
-        map: challenge.get("map").and_then(|x| serde_json::from_value(x.clone()).ok()).unwrap_or_default(), // config-defined or DFH Stadium
+        map: challenge.map.clone(),
         enable_state_setting: true,
         scripts: script_configs,
         mutators: MutatorConfig {
@@ -960,28 +928,14 @@ fn make_match_config(challenge: &JsonMap, upgrades: &HashMap<String, usize>, scr
                 MaxScore::ThreeGoals
             } else {
                 // config-defined or unlimited
-                challenge.get("max_score").and_then(|x| serde_json::from_value(x.clone()).ok()).unwrap_or_default()
+                challenge.max_score
             },
-            boost_amount: challenge
-                .get("disabledBoost")
-                .and_then(serde_json::Value::as_bool)
-                .unwrap_or_default()
-                .then_some(BoostAmount::NoBoost)
-                .unwrap_or_default(), // config-defined or normal
-            rumble: upgrades.contains_key("rumble").then_some(Rumble::Default).unwrap_or_default(), // Rumble default / none
+            boost_amount: challenge.disabled_boost.then_some(BoostAmount::NoBoost).unwrap_or_default(), // config-defined or normal
+            rumble: upgrades.contains_key("rumble").then_some(Rumble::Default).unwrap_or_default(),     // Rumble default / none
             ..Default::default()
         },
         ..Default::default()
     }
-}
-
-/// Get the ID of the challenge
-///
-/// # Arguments
-///
-/// * `challenge` - The JSON map that contains the key `id`
-fn get_id_from_challenge(challenge: &serde_json::Value) -> Option<&str> {
-    challenge.get("id")?.as_str()
 }
 
 /// Find the challenge with the given ID in the given city
@@ -990,18 +944,8 @@ fn get_id_from_challenge(challenge: &serde_json::Value) -> Option<&str> {
 ///
 /// * `challenge_id` - The ID of the challenge to find
 /// * `city` - The city to search in
-fn find_challenge_in_city(challenge_id: &str, city: &serde_json::Value) -> Option<JsonMap> {
-    for challenge in city["challenges"].as_array()? {
-        if let Some(id) = get_id_from_challenge(challenge) {
-            if id == challenge_id {
-                if let Some(challenge) = challenge.as_object() {
-                    return Some(challenge.clone());
-                }
-            }
-        }
-    }
-
-    None
+fn find_challenge_in_city(challenge_id: &str, city: &City) -> Option<Challenge> {
+    city.challenges.iter().find(|x| x.id == challenge_id).cloned()
 }
 
 /// Find the challenge and associated city from the given challenge ID
@@ -1010,25 +954,11 @@ fn find_challenge_in_city(challenge_id: &str, city: &serde_json::Value) -> Optio
 ///
 /// * `story_settings` - Information on the story configuration, used to load the inforamation about the cities and challenges
 /// * `challenge_id` - The ID of the challenge to find
-async fn get_challenge_by_id(story_settings: &StoryConfig, challenge_id: &str) -> Option<(serde_json::Value, JsonMap)> {
-    let cities = get_cities(story_settings).await;
-
-    for city in cities.values() {
-        if let Some(challenge) = find_challenge_in_city(challenge_id, city) {
-            return Some((city.clone(), challenge));
-        }
-    }
-
-    None
-}
-
-/// Find the custom color associated with a city, if it exists
-///
-/// # Arguments
-///
-/// * `city` - The city to find the custom color for
-fn get_challenge_city_color(city: &serde_json::Value) -> Option<u64> {
-    city.as_object()?.get("description")?.get("color")?.as_u64()
+async fn get_challenge_by_id(story_settings: &StoryConfig, challenge_id: &str) -> Option<(City, Challenge)> {
+    get_cities(story_settings)
+        .await
+        .values()
+        .find_map(|city| find_challenge_in_city(challenge_id, city).map(|challenge| (city.clone(), challenge)))
 }
 
 /// Launch a challenge for the user to play
@@ -1073,7 +1003,7 @@ async fn run_challenge(window: &Window, save_state: &StoryState, challenge_id: S
     let args = [
         "launch_challenge".to_owned(),
         challenge_id,
-        serde_json::to_string(&get_challenge_city_color(&city)).map_err(|e| e.to_string())?,
+        serde_json::to_string(&city.description.color).map_err(|e| e.to_string())?,
         serde_json::to_string(&save_state.get_team_settings().color).map_err(|e| e.to_string())?,
         serde_json::to_string(&save_state.get_upgrades()).map_err(|e| e.to_string())?,
         serde_json::to_string(&player_configs).map_err(|e| e.to_string())?,

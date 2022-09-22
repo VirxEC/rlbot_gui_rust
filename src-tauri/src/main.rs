@@ -20,6 +20,7 @@ use crate::{
     commands::*,
     config_handles::*,
     settings::{BotFolders, ConsoleTextUpdate, GameTickPacket, StoryConfig, StoryState},
+    stories::cmaps::StoryModeConfig,
 };
 use once_cell::sync::Lazy;
 use os_pipe::{pipe, PipeWriter};
@@ -57,7 +58,7 @@ static CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
 static PYTHON_PATH: RwLock<String> = RwLock::new(String::new());
 static BOT_FOLDER_SETTINGS: RwLock<Option<BotFolders>> = RwLock::new(None);
 
-static STORIES_CACHE: Lazy<AsyncRwLock<HashMap<StoryConfig, JsonMap>>> = Lazy::new(|| AsyncRwLock::new(HashMap::new()));
+static STORIES_CACHE: Lazy<AsyncRwLock<HashMap<StoryConfig, StoryModeConfig>>> = Lazy::new(|| AsyncRwLock::new(HashMap::new()));
 
 #[cfg(windows)]
 fn auto_detect_python() -> Option<(String, bool)> {

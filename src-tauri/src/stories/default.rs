@@ -1,4 +1,4 @@
-crate::rust_json! {
+crate::storymode_json! {
     "bots": { },
     "cities": {
         "INTRO": {

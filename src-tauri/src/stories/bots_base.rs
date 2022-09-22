@@ -1,9 +1,9 @@
-crate::rust_json! {
+crate::storymode_json! {
     "bots": {
         "psyonix-pro": {
             "name": "Psyonix Pro",
             "type": "psyonix",
-            "skill": 0.5
+            "skill": 0.5,
         },
         "psyonix-allstar-name": {
             "name": "Psyonix Allstar",
