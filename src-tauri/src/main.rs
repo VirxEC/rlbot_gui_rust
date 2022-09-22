@@ -57,7 +57,6 @@ static CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
 static PYTHON_PATH: RwLock<String> = RwLock::new(String::new());
 static BOT_FOLDER_SETTINGS: RwLock<Option<BotFolders>> = RwLock::new(None);
 
-static BOTS_BASE: Lazy<AsyncRwLock<Option<JsonMap>>> = Lazy::new(|| AsyncRwLock::new(None));
 static STORIES_CACHE: Lazy<AsyncRwLock<HashMap<StoryConfig, JsonMap>>> = Lazy::new(|| AsyncRwLock::new(HashMap::new()));
 
 #[cfg(windows)]

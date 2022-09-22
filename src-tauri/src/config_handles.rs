@@ -547,18 +547,7 @@ pub async fn get_cities_json(story_settings: StoryConfig) -> JsonMap {
 }
 
 pub async fn get_all_bot_configs(story_settings: &StoryConfig) -> JsonMap {
-    let mut bots = {
-        let bots_base = BOTS_BASE.read().await;
-        if let Some(bots) = bots_base.as_ref() {
-            bots.clone()
-        } else {
-            // drop the read lock so we can write to it instead
-            drop(bots_base);
-            let bots = bots_base::json();
-            *BOTS_BASE.write().await = Some(bots.clone());
-            bots
-        }
-    };
+    let mut bots = bots_base::json().get("bots").unwrap().as_object().unwrap().clone();
 
     if let Some(more_bots) = get_map_from_story_key(story_settings, "bots").await {
         bots.extend(more_bots);
