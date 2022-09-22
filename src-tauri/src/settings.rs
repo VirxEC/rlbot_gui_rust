@@ -230,7 +230,7 @@ impl MiniMatchConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MatchConfig {
     pub map: MapType,
     pub game_mode: GameMode,
@@ -244,6 +244,25 @@ pub struct MatchConfig {
     pub auto_save_replay: bool,
     pub scripts: Vec<ScriptConfigBundle>,
     pub mutators: MutatorConfig,
+}
+
+impl Default for MatchConfig {
+    fn default() -> Self {
+        Self {
+            map: MapType::default(),
+            game_mode: GameMode::default(),
+            match_behavior: ExistingMatchBehavior::default(),
+            skip_replays: false,
+            instant_start: false,
+            enable_lockstep: false,
+            randomize_map: true,
+            enable_rendering: false,
+            enable_state_setting: true,
+            auto_save_replay: false,
+            scripts: Vec::new(),
+            mutators: MutatorConfig::default(),
+        }
+    }
 }
 
 impl MatchConfig {

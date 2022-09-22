@@ -11,7 +11,10 @@ use crate::{
         },
     },
     settings::*,
-    stories::{self, bots_base, cmaps::StoryModeConfig},
+    stories::{
+        bots_base,
+        cmaps::{Bot, City, Script, StoryModeConfig},
+    },
     *,
 };
 use configparser::ini::Ini;
@@ -491,8 +494,6 @@ pub async fn get_map_pack_revision(window: Window) -> Option<String> {
     None
 }
 
-pub type JsonMap = serde_json::Map<String, serde_json::Value>;
-
 async fn get_custom_story_json(story_settings: &StoryConfig) -> Option<StoryModeConfig> {
     if story_settings.story_id != StoryIDs::Custom {
         return None;
@@ -528,20 +529,20 @@ async fn get_story_config(story_settings: &StoryConfig) -> Option<StoryModeConfi
 }
 
 #[tauri::command]
-pub async fn get_story_settings(story_settings: StoryConfig) -> JsonMap {
+pub async fn get_story_settings(story_settings: StoryConfig) -> HashMap<String, serde_json::Value> {
     get_story_config(&story_settings).await.unwrap_or_default().settings
 }
 
-pub async fn get_cities(story_settings: &StoryConfig) -> HashMap<String, stories::cmaps::City> {
+pub async fn get_cities(story_settings: &StoryConfig) -> HashMap<String, City> {
     get_story_config(story_settings).await.unwrap_or_default().cities
 }
 
 #[tauri::command]
-pub async fn get_cities_json(story_settings: StoryConfig) -> HashMap<String, stories::cmaps::City> {
+pub async fn get_cities_json(story_settings: StoryConfig) -> HashMap<String, City> {
     get_cities(&story_settings).await
 }
 
-pub async fn get_all_bot_configs(story_settings: &StoryConfig) -> HashMap<String, stories::cmaps::Bot> {
+pub async fn get_all_bot_configs(story_settings: &StoryConfig) -> HashMap<String, Bot> {
     let mut bots = bots_base::json().bots;
 
     if let Some(config) = get_story_config(story_settings).await {
@@ -551,12 +552,12 @@ pub async fn get_all_bot_configs(story_settings: &StoryConfig) -> HashMap<String
     bots
 }
 
-pub async fn get_all_script_configs(story_settings: &StoryConfig) -> HashMap<String, stories::cmaps::Script> {
+pub async fn get_all_script_configs(story_settings: &StoryConfig) -> HashMap<String, Script> {
     get_story_config(story_settings).await.unwrap_or_default().scripts
 }
 
 // Get the base bots config and merge it with the bots in the story config
 #[tauri::command]
-pub async fn get_bots_configs(story_settings: StoryConfig) -> HashMap<String, stories::cmaps::Bot> {
+pub async fn get_bots_configs(story_settings: StoryConfig) -> HashMap<String, Bot> {
     get_all_bot_configs(&story_settings).await
 }

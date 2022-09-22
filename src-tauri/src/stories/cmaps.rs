@@ -1,6 +1,5 @@
 use crate::rlbot::parsing::match_settings_config_parser::{MapType, MaxScore};
 use serde::{Deserialize, Serialize};
-use serde_json::Map;
 use std::collections::HashMap;
 
 pub mod default;
@@ -9,7 +8,7 @@ pub mod easy;
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct StoryModeConfig {
-    pub settings: Map<String, serde_json::Value>,
+    pub settings: HashMap<String, serde_json::Value>,
     pub bots: HashMap<String, Bot>,
     pub cities: HashMap<String, City>,
     pub scripts: HashMap<String, Script>,
