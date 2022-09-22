@@ -142,8 +142,7 @@ export default {
 			// check things like map pack and bot pack are downloaded
 			invoke("get_story_settings", { storySettings: this.saveState.story_settings }).then(settings => {
 				// check min map pack version
-				let key = "min_map_pack_revision"
-				let min_version = settings[key]
+				let min_version = settings["min_map_pack_revision"]
 
 				invoke("get_map_pack_revision").then(cur_version => {
 					let maps_required = (min_version != null)

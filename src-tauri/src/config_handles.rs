@@ -13,7 +13,7 @@ use crate::{
     settings::*,
     stories::{
         bots_base,
-        cmaps::{Bot, City, Script, StoryModeConfig},
+        cmaps::{Bot, City, Script, StoryModeConfig, Settings},
     },
     *,
 };
@@ -529,7 +529,7 @@ async fn get_story_config(story_settings: &StoryConfig) -> Option<StoryModeConfi
 }
 
 #[tauri::command]
-pub async fn get_story_settings(story_settings: StoryConfig) -> HashMap<String, serde_json::Value> {
+pub async fn get_story_settings(story_settings: StoryConfig) -> Settings {
     get_story_config(&story_settings).await.unwrap_or_default().settings
 }
 

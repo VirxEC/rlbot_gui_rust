@@ -8,10 +8,17 @@ pub mod easy;
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct StoryModeConfig {
-    pub settings: HashMap<String, serde_json::Value>,
+    pub settings: Settings,
     pub bots: HashMap<String, Bot>,
     pub cities: HashMap<String, City>,
     pub scripts: HashMap<String, Script>,
+}
+
+
+#[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Settings {
+    pub min_map_pack_revision: u32,
 }
 
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
