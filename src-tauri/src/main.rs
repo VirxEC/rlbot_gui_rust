@@ -137,10 +137,7 @@ fn auto_detect_python() -> Option<(String, bool)> {
 #[cfg(target_os = "linux")]
 fn auto_detect_python() -> Option<(String, bool)> {
     let content_folder = get_content_folder();
-    let rlbot_venv_paths = [
-        content_folder.join("venv/bin/python"),
-        content_folder.join("env/bin/python"),
-    ];
+    let rlbot_venv_paths = [content_folder.join("venv/bin/python"), content_folder.join("env/bin/python")];
 
     for path in rlbot_venv_paths.iter() {
         if get_command_status(path, ["--version"]) {
@@ -189,13 +186,15 @@ pub fn ccprintln<T: AsRef<str>>(window: &Window, text: T) {
     emit_text(window, text, false);
 }
 
+/// A more convenient way to emit text to the console
+/// Similar to the function, but automatically adds calls format!() on the arguments
 #[macro_export]
 macro_rules! ccprintln {
     ($window:expr) => {
-        ccprintln($window, "")
+        $crate::ccprintln($window, "")
     };
     ($window:expr, $($arg:tt)*) => {
-        ccprintln($window, format!($($arg)*))
+        $crate::ccprintln($window, format!($($arg)*))
     };
 }
 
@@ -210,13 +209,15 @@ pub fn ccprintlnr<T: AsRef<str>>(window: &Window, text: T) {
     emit_text(window, text, true);
 }
 
+/// A more convenient way to emit text to the console
+/// Similar to the function, but automatically adds calls format!() on the arguments
 #[macro_export]
 macro_rules! ccprintlnr {
     ($window:expr) => {
-        ccprintlnr($window, "")
+        $crate::ccprintlnr($window, "")
     };
     ($window:expr, $($arg:tt)*) => {
-        ccprintlnr($window, format!($($arg)*))
+        $crate::ccprintlnr($window, format!($($arg)*))
     };
 }
 
@@ -619,6 +620,7 @@ fn main() {
             is_debug_build,
             run_command,
             upload_log,
+            create_python_venv,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

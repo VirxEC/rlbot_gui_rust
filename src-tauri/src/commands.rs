@@ -429,6 +429,42 @@ pub async fn install_python(window: Window) -> Result<(), String> {
     })
 }
 
+#[derive(Debug, Error)]
+pub enum VenvCreationError {
+    #[error("Failed to create virtual environment at {0}")]
+    Creation(String),
+    #[error("Python was not properly installed ({0})")]
+    ImproperInstallation(String),
+    #[error("Mutex {0} was poisoned")]
+    MutexPoisoned(String),
+}
+
+#[tauri::command]
+pub async fn create_python_venv(window: Window, path: String) -> Result<(), String> {
+    fn inner(path: String) -> Result<(), VenvCreationError> {
+        let python_folder = get_content_folder().join("env");
+        let python_folder_str = python_folder.to_string_lossy().to_string();
+        if !get_command_status(path, ["-m", "venv", &python_folder_str]) {
+            return Err(VenvCreationError::Creation(python_folder_str));
+        }
+
+        let python_path = python_folder.join("bin/python").to_string_lossy().to_string();
+        if !get_command_status(&python_path, ["--version"]) {
+            return Err(VenvCreationError::ImproperInstallation(python_path));
+        }
+
+        *PYTHON_PATH.write().map_err(|_| VenvCreationError::MutexPoisoned("PYTHON_PATH".to_owned()))? = python_path;
+
+        Ok(())
+    }
+
+    inner(path).map_err(|e| {
+        let e = e.to_string();
+        ccprintln(&window, &e);
+        e
+    })
+}
+
 #[tauri::command]
 pub async fn download_bot_pack(window: Window) -> Result<String, String> {
     let botpack_location = get_content_folder().join(BOTPACK_FOLDER).to_string_lossy().to_string();

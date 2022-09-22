@@ -24,6 +24,7 @@ use std::{
     process::Command,
 };
 use tauri::{api::dialog::FileDialogBuilder, Window};
+use tokio::fs::read_to_string as read_to_string_async;
 
 fn set_gui_config_to_default(conf: &mut Ini) {
     conf.set("bot_folder_settings", "files", Some("{}".to_owned()));
@@ -493,7 +494,21 @@ pub async fn get_map_pack_revision(window: Window) -> Option<String> {
 
 pub type JsonMap = serde_json::Map<String, serde_json::Value>;
 
-fn get_story_json(story_settings: &StoryConfig) -> Option<JsonMap> {
+async fn get_custom_story_json(story_settings: &StoryConfig) -> Option<JsonMap> {
+    if story_settings.story_id != StoryIDs::Custom {
+        return None;
+    }
+
+    if let Some(json) = STORIES_CACHE.read().await.get(story_settings) {
+        return Some(json.clone());
+    }
+
+    let story_config: JsonMap = serde_json::from_str(&read_to_string_async(&story_settings.custom_config.story_path).await.ok()?).ok()?;
+    STORIES_CACHE.write().await.insert(story_settings.clone(), story_config.clone());
+    Some(story_config)
+}
+
+async fn get_story_config(story_settings: &StoryConfig) -> Option<JsonMap> {
     match story_settings.story_id {
         StoryIDs::Default => {
             if story_settings.use_custom_maps {
@@ -509,18 +524,8 @@ fn get_story_json(story_settings: &StoryConfig) -> Option<JsonMap> {
                 Some(stories::easy::json())
             }
         }
-        StoryIDs::Custom => serde_json::from_str(&read_to_string(&story_settings.custom_config.story_path).ok()?).ok(),
+        StoryIDs::Custom => get_custom_story_json(story_settings).await,
     }
-}
-
-async fn get_story_config(story_settings: &StoryConfig) -> Option<JsonMap> {
-    if let Some(json) = STORIES_CACHE.read().await.get(story_settings) {
-        return Some(json.clone());
-    }
-
-    let story_config = get_story_json(story_settings)?;
-    STORIES_CACHE.write().await.insert(story_settings.clone(), story_config.clone());
-    Some(story_config)
 }
 
 async fn get_map_from_story_key(story_settings: &StoryConfig, key: &str) -> Option<JsonMap> {

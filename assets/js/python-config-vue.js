@@ -26,8 +26,12 @@ export default {
 				<b-form v-if="advanced || !is_windows">
 					<h6 class="mr-3">Path to python.exe or Python command - verison 3.7.X for best compatibility; virtual environment python.exe's also work:</h6>
 					<b-form-input class="text-center" style="width: 100%" :placeholder="rec_python || (is_rec_isolated && is_windows) ? 'Confused? Click the button just below!' : 'Path to python.exe'" id="python-exe-path" v-model="python_path" size="md"></b-form-input>
-					<span v-if="!is_rec_isolated && is_windows"><b-button variant="success" class="mt-3" @click="installPython()">&nbsp;Install custom isolated Python 3.7</b-button><br></span>
-					<b-button v-if="rec_python && rec_python != python_path" :variant="(!is_rec_isolated && is_windows) ? 'warning' : 'success'" class="mt-3" @click="partialPythonSetup()"><b-icon v-if="!is_rec_isolated && is_windows" icon="exclamation-triangle-fill"/>&nbsp;Use found Python path</b-button>
+					<span v-if="!is_rec_isolated">
+						<b-button v-if="is_windows" variant="success" class="mt-3" @click="installPython()">&nbsp;Install custom isolated Python 3.7</b-button>
+						<b-button v-else variant="success" class="mt-3" @click="createVenv()">&nbsp;Create isolated Python (from {{ rec_python }})</b-button>
+						<br>
+					</span>
+					<b-button v-if="rec_python && rec_python != python_path" :variant="!is_rec_isolated ? 'warning' : 'success'" class="mt-3" @click="partialPythonSetup()"><b-icon v-if="!is_rec_isolated" icon="exclamation-triangle-fill"/>&nbsp;Use found Python path</b-button>
 					<span v-if="python_path != '' && !showProgressSpinner">
 						<hr>
 						<p class="mr-3">RLBot <b>requires</b> some basic Python packages to be installed in order to run <b>that you do not have.</b></p>
@@ -98,6 +102,32 @@ export default {
 		}
 	},
 	methods: {
+		createVenv: function() {
+			this.showProgressSpinner = true;
+			this.snackbarContent = "Creating isolated Python environment...";
+			this.showSnackbar = true;
+			invoke("create_python_venv", { path: this.rec_python }).then(_ => {
+				this.snackbarContent = "Successfully created Python virtual environment, installing required packages";
+				this.showSnackbar = true;
+
+				this.$bvModal.show("install-console");
+				invoke("install_basic_packages").then((result) => {
+					let message = result.exit_code === 0 ? 'Successfully installed ' : 'Failed to install ';
+					message += result.packages.join(", ");
+					if (result.exit_code != 0) {
+						message += " with exit code " + result.exit_code;
+					}
+					this.snackbarContent = message;
+					this.showSnackbar = true;
+
+					this.startup();
+				});
+			}).catch(error => {
+				this.showProgressSpinner = false;
+				this.snackbarContent = "Failed to install Python: " + error;
+				this.showSnackbar = true;
+			});
+		},
 		installPython: function() {
 			this.showProgressSpinner = true;
 			this.downloadModalTitle = "Installing Isolated Python 3.7"
@@ -182,6 +212,7 @@ export default {
 			this.showProgressSpinner = false;
 			invoke("get_python_path").then(path => this.python_path = path);
 			invoke("get_detected_python_path").then(info => {
+				console.log(info)
 				this.rec_python = info[0];
 				this.is_rec_isolated = info[1];
 			});
