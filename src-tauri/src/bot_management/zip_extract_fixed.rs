@@ -44,12 +44,13 @@ pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, st
     }
 
     let mut archive = ZipArchive::new(source)?;
+    let num_files = archive.len();
 
     let do_strip_toplevel = strip_toplevel && has_toplevel(window, &mut archive)?;
 
-    ccprintln(window, format!("Extracting to {}", target_dir.to_string_lossy()));
-    ccprintln(window, "");
-    for i in 0..archive.len() {
+    ccprintln!(window, "Extracting to {}", target_dir.to_string_lossy());
+    ccprintln!(window);
+    for i in 0..num_files {
         let mut item = archive.by_index(i)?;
         let mut relative_path = match item.enclosed_name() {
             Some(path) => {
@@ -85,10 +86,10 @@ pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, st
         let outpath = target_dir.join(&relative_path);
 
         if item.is_dir() {
-            ccprintlnr(window, format!("Creating directory {} from {}", outpath.to_string_lossy(), relative_path.display()));
+            ccprintlnr!(window, "Creating directory {} from {}", outpath.to_string_lossy(), relative_path.display());
             if !outpath.exists() {
                 if let Err(e) = fs::create_dir_all(&outpath) {
-                    ccprintln(window, format!("Error creating directory {}: {e}", outpath.display()));
+                    ccprintln!(window, "Error creating directory {}: {e}", outpath.display());
                 }
             }
             continue;
@@ -103,17 +104,17 @@ pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, st
         } else if let Some(p) = outpath.parent() {
             if !p.exists() {
                 if let Err(e) = fs::create_dir_all(p) {
-                    ccprintln(window, format!("Error creating directory {}: {e}", p.display()));
+                    ccprintln!(window, "Error creating directory {}: {e}", p.display());
                 }
             }
         }
 
-        ccprintlnr(window, format!("Creating {} from {}", outpath.to_string_lossy(), relative_path.display()));
+        ccprintlnr!(window, "({i}/{num_files}) Creating {} from {}", outpath.to_string_lossy(), relative_path.display());
         let mut outfile = fs::File::create(&outpath)?;
         copy(&mut item, &mut outfile)?;
     }
 
-    ccprintlnr(window, format!("Extracted {} items", archive.len()));
+    ccprintlnr!(window, "Extracted {num_files} items");
     Ok(())
 }
 
@@ -139,7 +140,7 @@ fn has_toplevel<S: Read + Seek>(window: &Window, archive: &mut ZipArchive<S>) ->
         } else {
             // First iteration
             let comp: PathBuf = file.components().take(1).collect();
-            ccprintln(window, format!("Checking if path component {} is the only toplevel directory", comp.display()));
+            ccprintln!(window, "Checking if path component {} is the only toplevel directory", comp.display());
             toplevel_dir = Some(comp);
         }
     }

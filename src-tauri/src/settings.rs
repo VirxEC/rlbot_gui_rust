@@ -58,7 +58,7 @@ impl BotFolders {
         conf.set("bot_folder_settings", "folders", serde_json::to_string(&self.folders).ok());
 
         if let Err(e) = conf.write(&get_config_path()) {
-            ccprintln(window, format!("Error writing config file: {e}"));
+            ccprintln!(window, "Error writing config file: {e}");
         }
     }
 
@@ -221,7 +221,7 @@ impl MiniMatchConfig {
         if let MapType::Custom(path) = &mut new.map {
             *path = convert_to_path(path, bf).ok_or_else(|| {
                 let err = format!("Failed to find custom map {path}");
-                ccprintln(window, err.clone());
+                ccprintln(window, &err);
                 err
             })?;
         }
@@ -230,7 +230,7 @@ impl MiniMatchConfig {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MatchConfig {
     pub map: MapType,
     pub game_mode: GameMode,
@@ -244,6 +244,25 @@ pub struct MatchConfig {
     pub auto_save_replay: bool,
     pub scripts: Vec<ScriptConfigBundle>,
     pub mutators: MutatorConfig,
+}
+
+impl Default for MatchConfig {
+    fn default() -> Self {
+        Self {
+            map: MapType::default(),
+            game_mode: GameMode::default(),
+            match_behavior: ExistingMatchBehavior::default(),
+            skip_replays: false,
+            instant_start: false,
+            enable_lockstep: false,
+            randomize_map: true,
+            enable_rendering: false,
+            enable_state_setting: true,
+            auto_save_replay: false,
+            scripts: Vec::new(),
+            mutators: MutatorConfig::default(),
+        }
+    }
 }
 
 impl MatchConfig {
@@ -302,7 +321,7 @@ impl MatchConfig {
         self.save_to_config(&mut conf);
 
         if let Err(e) = conf.write_async(get_config_path()).await {
-            ccprintln(window, format!("Error writing config file: {e}"));
+            ccprintln!(window, "Error writing config file: {e}");
         }
     }
 
@@ -427,7 +446,7 @@ impl LauncherConfig {
         config.set("launcher_settings", "rocket_league_exe_path", self.rocket_league_exe_path);
 
         if let Err(e) = config.write_async(get_config_path()).await {
-            ccprintln(window, format!("Error writing config file: {e}"));
+            ccprintln!(window, "Error writing config file: {e}");
         }
     }
 }
@@ -578,7 +597,7 @@ impl StoryState {
         conf.set("story_mode", "save_state", serde_json::to_string(self).ok());
 
         if let Err(e) = conf.write(get_config_path()) {
-            ccprintln(window, format!("Error writing config: {e}"));
+            ccprintln!(window, "Error writing config: {e}");
         }
     }
 

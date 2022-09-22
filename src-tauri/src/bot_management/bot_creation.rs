@@ -101,9 +101,10 @@ pub async fn bootstrap_python_bot(window: &Window, bot_name: String, directory: 
 
     if open::that(python_file).is_err() {
         // We don't want to return an error here, because the bot was successfully created
-        ccprintln(
+        ccprintln!(
             window,
-            format!("You have no default program to open .py files. Your new bot is located at {}", top_dir.to_string_lossy()),
+            "You have no default program to open .py files. Your new bot is located at {}",
+            top_dir.to_string_lossy(),
         );
     }
 
@@ -175,9 +176,10 @@ pub async fn bootstrap_python_hivemind(window: &Window, hive_name: String, direc
         .add_file(window, config_file.to_string());
 
     if open::that(hive_file).is_err() {
-        ccprintln(
+        ccprintln!(
             window,
-            format!("You have no default program to open .py files. Your new bot is located at {}", top_dir.to_string_lossy()),
+            "You have no default program to open .py files. Your new bot is located at {}",
+            top_dir.to_string_lossy(),
         );
     }
 
@@ -220,9 +222,10 @@ pub async fn bootstrap_rust_bot(window: &Window, bot_name: String, directory: Pa
     save_cfg(&conf, cargo_toml_file).await?;
 
     if open::that(top_dir.join("src").join("main.rs")).is_err() {
-        ccprintln(
+        ccprintln!(
             window,
-            format!("You have no default program to open .rs files. Your new bot is located at {}", top_dir.to_string_lossy()),
+            "You have no default program to open .rs files. Your new bot is located at {}",
+            top_dir.to_string_lossy()
         );
     }
 
@@ -285,7 +288,7 @@ pub async fn bootstrap_scratch_bot(window: &Window, bot_name: String, directory:
     // delete the old config file
     remove_file(old_config_file)?;
 
-    ccprintln(window, format!("Your new bot is located at {}", top_dir.to_string_lossy()));
+    ccprintln!(window, "Your new bot is located at {}", top_dir.to_string_lossy());
 
     Ok(config_file.to_string_lossy().to_string())
 }

@@ -1,10 +1,9 @@
-#[allow(clippy::too_many_lines)]
-pub fn json() -> serde_json::Map<String, serde_json::Value> {
-    serde_json::json!({
+crate::storymode_json! {
+    "bots": {
         "psyonix-pro": {
             "name": "Psyonix Pro",
             "type": "psyonix",
-            "skill": 0.5
+            "skill": 0.5,
         },
         "psyonix-allstar-name": {
             "name": "Psyonix Allstar",
@@ -141,8 +140,5 @@ pub fn json() -> serde_json::Map<String, serde_json::Value> {
             "type": "rlbot",
             "path": ["$RLBOTPACKROOT", "RLBotPack", "Invisibot", "src", "invisibot.cfg"]
         }
-    })
-    .as_object()
-    .unwrap()
-    .clone()
+    }
 }

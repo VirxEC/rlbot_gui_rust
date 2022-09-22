@@ -11,8 +11,10 @@ use crate::{
         },
     },
     settings::*,
-    stories,
-    stories::bots_base,
+    stories::{
+        bots_base,
+        cmaps::{Bot, City, Script, StoryModeConfig, Settings},
+    },
     *,
 };
 use configparser::ini::Ini;
@@ -24,6 +26,7 @@ use std::{
     process::Command,
 };
 use tauri::{api::dialog::FileDialogBuilder, Window};
+use tokio::fs::read_to_string as read_to_string_async;
 
 fn set_gui_config_to_default(conf: &mut Ini) {
     conf.set("bot_folder_settings", "files", Some("{}".to_owned()));
@@ -49,16 +52,16 @@ pub async fn load_gui_config(window: &Window) -> Ini {
 
     if !config_path.exists() {
         if let Err(e) = create_dir_all(config_path.parent().unwrap()) {
-            ccprintln(window, format!("Error creating config directory: {e}"));
+            ccprintln!(window, "Error creating config directory: {e}");
         }
 
         set_gui_config_to_default(&mut conf);
 
         if let Err(e) = conf.write_async(&config_path).await {
-            ccprintln(window, format!("Error writing config file: {e}"));
+            ccprintln!(window, "Error writing config file: {e}");
         }
     } else if let Err(e) = conf.load_async(config_path).await {
-        ccprintln(window, format!("Error loading config: {e}"));
+        ccprintln!(window, "Error loading config: {e}");
     }
 
     conf
@@ -76,16 +79,16 @@ pub fn load_gui_config_sync(window: &Window) -> Ini {
 
     if !config_path.exists() {
         if let Err(e) = create_dir_all(config_path.parent().unwrap()) {
-            ccprintln(window, format!("Error creating config directory: {e}"));
+            ccprintln!(window, "Error creating config directory: {e}");
         }
 
         set_gui_config_to_default(&mut conf);
 
         if let Err(e) = conf.write(&config_path) {
-            ccprintln(window, format!("Error writing config file: {e}"));
+            ccprintln!(window, "Error writing config file: {e}");
         }
     } else if let Err(e) = conf.load(config_path) {
-        ccprintln(window, format!("Error loading config: {e}"));
+        ccprintln!(window, "Error loading config: {e}");
     }
 
     conf
@@ -188,7 +191,7 @@ pub async fn pick_bot_folder(window: Window) {
                         ccprintln(&window, "Error: BOT_FOLDER_SETTINGS is None");
                     }
                 }
-                Err(err) => ccprintln(&window, format!("Error locking BOT_FOLDER_SETTINGS: {err}")),
+                Err(err) => ccprintln!(&window, "Error locking BOT_FOLDER_SETTINGS: {err}"),
             }
         }
     });
@@ -206,7 +209,7 @@ pub async fn pick_bot_config(window: Window) {
                         ccprintln(&window, "BOT_FOLDER_SETTINGS is None");
                     }
                 }
-                Err(err) => ccprintln(&window, format!("Error locking BOT_FOLDER_SETTINGS: {err}")),
+                Err(err) => ccprintln!(&window, "Error locking BOT_FOLDER_SETTINGS: {err}"),
             }
         }
     });
@@ -217,7 +220,7 @@ pub async fn pick_json_file(window: Window) {
     FileDialogBuilder::new().add_filter("JSON File", &["json"]).pick_file(move |path| {
         if let Some(path) = path {
             if let Err(e) = window.emit("json_file_selected", path.to_string_lossy().to_string()) {
-                ccprintln(&window, format!("Error emiting json_file_selected event: {e}"));
+                ccprintln!(&window, "Error emiting json_file_selected event: {e}");
             }
         }
     });
@@ -237,7 +240,7 @@ pub async fn show_path_in_explorer(window: Window, path: String) {
     let path = if ppath.is_file() { ppath.parent().unwrap().to_string_lossy().to_string() } else { path };
 
     if let Err(e) = Command::new(command).arg(&path).spawn() {
-        ccprintln(&window, format!("Error opening path: {e}"));
+        ccprintln!(&window, "Error opening path: {e}");
     }
 }
 
@@ -303,7 +306,7 @@ pub async fn save_team_settings(window: Window, blue_team: Vec<BotConfigBundle>,
     config.set("team_settings", "orange_team", Some(serde_json::to_string(&clean(&orange_team)).unwrap()));
 
     if let Err(e) = config.write(get_config_path()) {
-        ccprintln(&window, format!("Error saving team settings: {e}"));
+        ccprintln!(&window, "Error saving team settings: {e}");
     }
 }
 
@@ -340,7 +343,7 @@ pub async fn set_python_path(window: Window, path: String) -> Result<(), String>
     config.set("python_config", "path", Some(path));
 
     if let Err(e) = config.write(get_config_path()) {
-        ccprintln(&window, format!("Error saving python path: {e}"));
+        ccprintln!(&window, "Error saving python path: {e}");
     }
 
     Ok(())
@@ -351,7 +354,7 @@ pub async fn pick_appearance_file(window: Window) {
     FileDialogBuilder::new().add_filter("Appearance Cfg File", &["cfg"]).pick_file(move |path| {
         if let Some(path) = path {
             if let Err(e) = window.emit("set_appearance_file", path.to_string_lossy().to_string()) {
-                ccprintln(&window, format!("Error setting appearance file: {e}"));
+                ccprintln!(&window, "Error setting appearance file: {e}");
             }
         }
     });
@@ -473,7 +476,7 @@ pub async fn story_delete_save(window: Window) {
     conf.set("story_mode", "save_state", None);
 
     if let Err(e) = conf.write(get_config_path()) {
-        ccprintln(&window, format!("Error writing config: {e}"));
+        ccprintln!(&window, "Error writing config: {e}");
     }
 }
 
@@ -491,9 +494,21 @@ pub async fn get_map_pack_revision(window: Window) -> Option<String> {
     None
 }
 
-pub type JsonMap = serde_json::Map<String, serde_json::Value>;
+async fn get_custom_story_json(story_settings: &StoryConfig) -> Option<StoryModeConfig> {
+    if story_settings.story_id != StoryIDs::Custom {
+        return None;
+    }
 
-fn get_story_json(story_settings: &StoryConfig) -> Option<JsonMap> {
+    if let Some(json) = STORIES_CACHE.read().await.get(story_settings) {
+        return Some(json.clone());
+    }
+
+    let story_config: StoryModeConfig = serde_json::from_str(&read_to_string_async(&story_settings.custom_config.story_path).await.ok()?).ok()?;
+    STORIES_CACHE.write().await.insert(story_settings.clone(), story_config.clone());
+    Some(story_config)
+}
+
+async fn get_story_config(story_settings: &StoryConfig) -> Option<StoryModeConfig> {
     match story_settings.story_id {
         StoryIDs::Default => {
             if story_settings.use_custom_maps {
@@ -509,65 +524,40 @@ fn get_story_json(story_settings: &StoryConfig) -> Option<JsonMap> {
                 Some(stories::easy::json())
             }
         }
-        StoryIDs::Custom => serde_json::from_str(&read_to_string(&story_settings.custom_config.story_path).ok()?).ok(),
+        StoryIDs::Custom => get_custom_story_json(story_settings).await,
     }
 }
 
-async fn get_story_config(story_settings: &StoryConfig) -> Option<JsonMap> {
-    if let Some(json) = STORIES_CACHE.read().await.get(story_settings) {
-        return Some(json.clone());
-    }
-
-    let story_config = get_story_json(story_settings)?;
-    STORIES_CACHE.write().await.insert(story_settings.clone(), story_config.clone());
-    Some(story_config)
+#[tauri::command]
+pub async fn get_story_settings(story_settings: StoryConfig) -> Settings {
+    get_story_config(&story_settings).await.unwrap_or_default().settings
 }
 
-async fn get_map_from_story_key(story_settings: &StoryConfig, key: &str) -> Option<JsonMap> {
-    Some(get_story_config(story_settings).await?.get(key)?.as_object()?.clone())
+pub async fn get_cities(story_settings: &StoryConfig) -> HashMap<String, City> {
+    get_story_config(story_settings).await.unwrap_or_default().cities
 }
 
 #[tauri::command]
-pub async fn get_story_settings(story_settings: StoryConfig) -> JsonMap {
-    get_map_from_story_key(&story_settings, "settings").await.unwrap_or_default()
-}
-
-pub async fn get_cities(story_settings: &StoryConfig) -> JsonMap {
-    get_map_from_story_key(story_settings, "cities").await.unwrap_or_default()
-}
-
-#[tauri::command]
-pub async fn get_cities_json(story_settings: StoryConfig) -> JsonMap {
+pub async fn get_cities_json(story_settings: StoryConfig) -> HashMap<String, City> {
     get_cities(&story_settings).await
 }
 
-pub async fn get_all_bot_configs(story_settings: &StoryConfig) -> JsonMap {
-    let mut bots = {
-        let bots_base = BOTS_BASE.read().await;
-        if let Some(bots) = bots_base.as_ref() {
-            bots.clone()
-        } else {
-            // drop the read lock so we can write to it instead
-            drop(bots_base);
-            let bots = bots_base::json();
-            *BOTS_BASE.write().await = Some(bots.clone());
-            bots
-        }
-    };
+pub async fn get_all_bot_configs(story_settings: &StoryConfig) -> HashMap<String, Bot> {
+    let mut bots = bots_base::json().bots;
 
-    if let Some(more_bots) = get_map_from_story_key(story_settings, "bots").await {
-        bots.extend(more_bots);
+    if let Some(config) = get_story_config(story_settings).await {
+        bots.extend(config.bots);
     }
 
     bots
 }
 
-pub async fn get_all_script_configs(story_settings: &StoryConfig) -> JsonMap {
-    get_map_from_story_key(story_settings, "scripts").await.unwrap_or_default()
+pub async fn get_all_script_configs(story_settings: &StoryConfig) -> HashMap<String, Script> {
+    get_story_config(story_settings).await.unwrap_or_default().scripts
 }
 
 // Get the base bots config and merge it with the bots in the story config
 #[tauri::command]
-pub async fn get_bots_configs(story_settings: StoryConfig) -> JsonMap {
+pub async fn get_bots_configs(story_settings: StoryConfig) -> HashMap<String, Bot> {
     get_all_bot_configs(&story_settings).await
 }

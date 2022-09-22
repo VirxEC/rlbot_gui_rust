@@ -22,7 +22,7 @@ pub fn find_existing_process(window: &Window) -> Option<u16> {
                     ccprintln(window, e.to_string());
                 })
                 .ok()?;
-            ccprintln(window, format!("Found existing RLBot process listening on port {port}"));
+            ccprintln!(window, "Found existing RLBot process listening on port {port}");
             return Some(port);
         }
     }

@@ -2551,7 +2551,7 @@ dependencies = [
 
 [[package]]
 name = "rl-bot-gui"
-version = "1.0.25"
+version = "1.0.26"
 dependencies = [
  "ansi-to-html",
  "async-std",

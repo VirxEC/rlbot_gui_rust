@@ -1,5 +1,5 @@
 #![cfg_attr(all(not(debug_assertions), target_os = "windows"), windows_subsystem = "windows")]
-#![allow(clippy::items_after_statements, clippy::wildcard_imports, clippy::unused_async)]
+#![allow(clippy::wildcard_imports, clippy::unused_async)]
 #![forbid(unsafe_code)]
 
 mod bot_management;
@@ -20,6 +20,7 @@ use crate::{
     commands::*,
     config_handles::*,
     settings::{BotFolders, ConsoleTextUpdate, GameTickPacket, StoryConfig, StoryState},
+    stories::cmaps::StoryModeConfig,
 };
 use once_cell::sync::Lazy;
 use os_pipe::{pipe, PipeWriter};
@@ -29,7 +30,7 @@ use std::{
     env,
     error::Error as StdError,
     ffi::OsStr,
-    fs::{File, OpenOptions, create_dir_all},
+    fs::{create_dir_all, File, OpenOptions},
     io::{Read, Result as IoResult, Write},
     path::PathBuf,
     process::{Child, ChildStdin, Command, Stdio},
@@ -57,20 +58,19 @@ static CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
 static PYTHON_PATH: RwLock<String> = RwLock::new(String::new());
 static BOT_FOLDER_SETTINGS: RwLock<Option<BotFolders>> = RwLock::new(None);
 
-static BOTS_BASE: Lazy<AsyncRwLock<Option<JsonMap>>> = Lazy::new(|| AsyncRwLock::new(None));
-static STORIES_CACHE: Lazy<AsyncRwLock<HashMap<StoryConfig, JsonMap>>> = Lazy::new(|| AsyncRwLock::new(HashMap::new()));
+static STORIES_CACHE: Lazy<AsyncRwLock<HashMap<StoryConfig, StoryModeConfig>>> = Lazy::new(|| AsyncRwLock::new(HashMap::new()));
 
 #[cfg(windows)]
 fn auto_detect_python() -> Option<(String, bool)> {
     let content_folder = get_content_folder();
 
     let new_python = content_folder.join("Python37\\python.exe");
-    if new_python.exists() {
+    if get_command_status(&new_python, ["--version"]) {
         return Some((new_python.to_string_lossy().to_string(), true));
     }
 
     let old_python = content_folder.join("venv\\Scripts\\python.exe");
-    if old_python.exists() {
+    if get_command_status(&old_python, ["--version"]) {
         return Some((old_python.to_string_lossy().to_string(), true));
     }
 
@@ -115,7 +115,7 @@ fn get_python_from_pip(pip: &str) -> Result<String, WindowsPipLocateError> {
             .parent()
             .ok_or_else(|| WindowsPipLocateError::NoParentError(first_line.to_owned()))?
             .join("python.exe");
-        if python_path.exists() {
+        if get_command_status(&python_path, ["--version"]) {
             return Ok(python_path.to_string_lossy().to_string());
         }
     }
@@ -136,9 +136,13 @@ fn auto_detect_python() -> Option<(String, bool)> {
 
 #[cfg(target_os = "linux")]
 fn auto_detect_python() -> Option<(String, bool)> {
-    let path = get_content_folder().join("env/bin/python");
-    if path.exists() {
-        return Some((path.to_string_lossy().to_string(), true));
+    let content_folder = get_content_folder();
+    let rlbot_venv_paths = [content_folder.join("venv/bin/python"), content_folder.join("env/bin/python")];
+
+    for path in rlbot_venv_paths.iter() {
+        if get_command_status(path, ["--version"]) {
+            return Some((path.to_string_lossy().to_string(), true));
+        }
     }
 
     for python in ["python3.7", "python3.8", "python3.9", "python3.6", "python3"] {
@@ -182,6 +186,18 @@ pub fn ccprintln<T: AsRef<str>>(window: &Window, text: T) {
     emit_text(window, text, false);
 }
 
+/// A more convenient way to emit text to the console
+/// Similar to the function, but automatically adds calls format!() on the arguments
+#[macro_export]
+macro_rules! ccprintln {
+    ($window:expr) => {
+        $crate::ccprintln($window, "")
+    };
+    ($window:expr, $($arg:tt)*) => {
+        $crate::ccprintln($window, format!($($arg)*))
+    };
+}
+
 /// Emits text to the console, replacing the previous line
 /// Also calls println!() to print to the console
 ///
@@ -191,6 +207,18 @@ pub fn ccprintln<T: AsRef<str>>(window: &Window, text: T) {
 /// * `text` - The text to emit
 pub fn ccprintlnr<T: AsRef<str>>(window: &Window, text: T) {
     emit_text(window, text, true);
+}
+
+/// A more convenient way to emit text to the console
+/// Similar to the function, but automatically adds calls format!() on the arguments
+#[macro_export]
+macro_rules! ccprintlnr {
+    ($window:expr) => {
+        $crate::ccprintlnr($window, "")
+    };
+    ($window:expr, $($arg:tt)*) => {
+        $crate::ccprintlnr($window, format!($($arg)*))
+    };
 }
 
 #[cfg(windows)]
@@ -339,12 +367,12 @@ fn get_content_folder() -> PathBuf {
 
 #[cfg(target_os = "macos")]
 fn get_content_folder() -> PathBuf {
-    PathBuf::from(format!("{}/Library/Application Support/rlbotgui", env::var("HOME").unwrap()))
+    get_home_folder().join("Library/Application Support/rlbotgui")
 }
 
 #[cfg(target_os = "linux")]
 fn get_content_folder() -> PathBuf {
-    PathBuf::from(format!("{}/.RLBotGUI", env::var("HOME").unwrap()))
+    get_home_folder().0.join(".RLBotGUI")
 }
 
 #[cfg(windows)]
@@ -440,7 +468,7 @@ fn try_emit_text<T: AsRef<str>>(window: &Window, text: T, replace_last: bool) ->
         let gtp: GameTickPacket = serde_json::from_str(&text).unwrap();
         try_emit_signal(window, "gtp", gtp)
     } else if text.starts_with("-|-*|STORY_RESULT ") && text.ends_with("|*-|-") {
-        println!("GOT STORY RESULT");
+        println!("GOT STORY RESULT {text}");
         let text = text.replace("-|-*|STORY_RESULT ", "").replace("|*-|-", "");
         let save_state: StoryState = serde_json::from_str(&text).unwrap();
         save_state.save(window);
@@ -453,7 +481,7 @@ fn try_emit_text<T: AsRef<str>>(window: &Window, text: T, replace_last: bool) ->
 fn emit_text<T: AsRef<str>>(window: &Window, text: T, replace_last: bool) {
     let (signal, error) = try_emit_text(window, text, replace_last);
     if let Some(e) = error {
-        ccprintln(window, format!("Error emitting {signal}: {e}"));
+        ccprintln!(window, "Error emitting {signal}: {e}");
     }
 }
 
@@ -592,6 +620,7 @@ fn main() {
             is_debug_build,
             run_command,
             upload_log,
+            create_python_venv,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
