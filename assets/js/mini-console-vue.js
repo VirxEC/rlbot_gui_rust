@@ -30,20 +30,23 @@ export default {
 		return {
 			consoleTexts: [],
 			texts: 0,
-			newTextListener: listen('new-console-text', event => {
-				let update = event.payload;
-				if (update.replace_last) {
-					this.consoleTexts.pop();
-				}
+			newTextListener: listen('new-console-texts', event => {
+				event.payload.forEach(update => {
+					if (update.replace_last) {
+						this.consoleTexts.pop();
+					}
 
-				this.consoleTexts.push({ 'id': this.texts, 'content': update.content });
-				this.texts++;
-				
-				if (this.consoleTexts.length > 420) {
-					this.consoleTexts.shift();
-				}
+					this.consoleTexts.push({ 'id': this.texts, 'content': update.content });
+					this.texts++;
+					
+					if (this.consoleTexts.length > 420) {
+						this.consoleTexts.shift();
+					}
+				})
 
-				this.$refs.scroller.scrollToBottom();
+				try {
+					this.$refs.scroller.scrollToBottom();
+				} catch (e) {} // ignore the error, it randomly happens sometimes but it still works
 			})
 		}
 	},

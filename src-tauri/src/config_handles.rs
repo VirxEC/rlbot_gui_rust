@@ -13,7 +13,7 @@ use crate::{
     settings::*,
     stories::{
         bots_base,
-        cmaps::{Bot, City, Script, StoryModeConfig, Settings},
+        cmaps::{Bot, City, Script, Settings, StoryModeConfig},
     },
     *,
 };
