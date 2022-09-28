@@ -1920,6 +1920,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e82dad04139b71a90c080c8463fe0dc7902db5192d939bd0950f074d014339e1"
 
 [[package]]
+name = "online"
+version = "4.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "92f3da77f57f551a8f50567bf3c2b2883716d7b1ded55ee3f5e0d1ad549df56b"
+dependencies = [
+ "tokio",
+]
+
+[[package]]
 name = "open"
 version = "3.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2574,6 +2583,7 @@ dependencies = [
  "imghdr",
  "indexmap",
  "once_cell",
+ "online",
  "open",
  "os_pipe",
  "rand 0.8.5",
@@ -3423,7 +3433,19 @@ dependencies = [
  "num_cpus",
  "pin-project-lite",
  "socket2",
+ "tokio-macros",
  "winapi",
+]
+
+[[package]]
+name = "tokio-macros"
+version = "1.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9724f9a975fb987ef7a3cd9be0350edcbe130698af5b8f7a631e23d42d052484"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

@@ -6,7 +6,6 @@ mod bot_management;
 mod commands;
 mod config_handles;
 mod custom_maps;
-mod is_online;
 mod rlbot;
 mod settings;
 mod stories;
