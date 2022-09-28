@@ -202,7 +202,7 @@ pub async fn install_requirements(window: Window, config_path: String) -> Result
 pub async fn install_basic_packages(window: Window) -> Result<PackageResult, String> {
     let packages = PACKAGES.iter().map(|s| s.to_string()).collect::<Vec<String>>();
 
-    if !is_online::check().await {
+    if matches!(online::tokio::check(None).await, Err(_)) {
         ccprintln(
             &window,
             "Error connecting to the internet to install/update basic packages. Please check your internet connection and try again.",

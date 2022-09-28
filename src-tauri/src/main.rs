@@ -6,7 +6,6 @@ mod bot_management;
 mod commands;
 mod config_handles;
 mod custom_maps;
-mod is_online;
 mod rlbot;
 mod settings;
 mod stories;
@@ -22,6 +21,7 @@ use crate::{
     settings::{BotFolders, ConsoleTextUpdate, GameTickPacket, StoryConfig, StoryState},
     stories::cmaps::StoryModeConfig,
 };
+use crossbeam_channel::{unbounded, SendError, Sender};
 use once_cell::sync::Lazy;
 use os_pipe::{pipe, PipeWriter};
 use serde::Serialize;
@@ -50,14 +50,15 @@ const BOTPACK_REPO_NAME: &str = "RLBotPack";
 const MAX_CONSOLE_LINES: usize = 840;
 
 static CONSOLE_TEXT: Mutex<Vec<String>> = Mutex::new(Vec::new());
-static CONSOLE_TEXT_OUT_QUEUE: Mutex<Vec<String>> = Mutex::new(Vec::new());
 static CONSOLE_INPUT_COMMANDS: Mutex<Vec<String>> = Mutex::new(Vec::new());
+static CONSOLE_TEXT_EMIT_QUEUE: RwLock<Option<Sender<ConsoleTextUpdate>>> = RwLock::new(None);
+static CONSOLE_TEXT_OUT_QUEUE: RwLock<Option<Sender<String>>> = RwLock::new(None);
+
 static MATCH_HANDLER_STDIN: Mutex<Option<ChildStdin>> = Mutex::new(None);
 static CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
 
 static PYTHON_PATH: RwLock<String> = RwLock::new(String::new());
 static BOT_FOLDER_SETTINGS: RwLock<Option<BotFolders>> = RwLock::new(None);
-
 static STORIES_CACHE: Lazy<AsyncRwLock<HashMap<StoryConfig, StoryModeConfig>>> = Lazy::new(|| AsyncRwLock::new(HashMap::new()));
 
 #[cfg(windows)]
@@ -391,25 +392,25 @@ enum InternalConsoleError {
     Poisoned(String),
     #[error("Could not complete I/O operation: {0}")]
     Io(#[from] std::io::Error),
+    #[error(transparent)]
+    AnsiToHTML(#[from] ansi_to_html::Error),
+    #[error(transparent)]
+    Tauri(#[from] TauriError),
+    #[error("{0} was None")]
+    None(String),
+    #[error(transparent)]
+    ConsoleUpdateSender(#[from] SendError<ConsoleTextUpdate>),
+    #[error(transparent)]
+    ConsoleWriterSender(#[from] SendError<String>),
 }
 
-fn write_console_text_out_queue_to_file() -> Result<(), InternalConsoleError> {
-    let mut queue = CONSOLE_TEXT_OUT_QUEUE
-        .lock()
-        .map_err(|_| InternalConsoleError::Poisoned("CONSOLE_TEXT_OUT_QUEUE".to_owned()))?;
-
-    if queue.is_empty() {
-        return Ok(());
-    }
-
-    let to_write_out = queue.drain(..).collect::<Vec<_>>();
-    drop(queue);
-
+fn write_console_text_out_queue_to_file(window: &Window, to_write_out: Vec<String>) -> Result<(), InternalConsoleError> {
     let mut file = OpenOptions::new().write(true).append(true).open(get_log_path())?;
-
-    for line in to_write_out {
-        writeln!(file, "{line}")?;
-    }
+    to_write_out.iter().for_each(|line| {
+        if let Err(e) = writeln!(file, "{}", line) {
+            ccprintln!(window, "Error writing to log file: {e}");
+        }
+    });
 
     Ok(())
 }
@@ -432,27 +433,45 @@ fn try_emit_signal<S: Serialize + Clone>(window: &Window, signal: &str, payload:
     (signal.to_owned(), window.emit(signal, payload).err())
 }
 
-fn issue_console_update(window: &Window, text: String, replace_last: bool) -> (String, Option<TauriError>) {
+fn emit_console_text_emit_queue(window: &Window, mut updates: Vec<ConsoleTextUpdate>) -> Result<(), InternalConsoleError> {
+    // If an update is replace_last, then remove the previous update.
+    let mut i = 1;
+    while i < updates.len() {
+        if updates[i].replace_last {
+            updates[i].replace_last = updates[i - 1].replace_last;
+            updates.remove(i - 1);
+        } else {
+            i += 1;
+        }
+    }
+
+    window.emit("new-console-texts", updates)?;
+
+    Ok(())
+}
+
+fn issue_console_update(text: String, replace_last: bool) -> Result<(), InternalConsoleError> {
     println!("{}", text);
 
-    match CONSOLE_TEXT_OUT_QUEUE.lock() {
-        Ok(mut ctoq) => ctoq.push(text.clone()),
-        Err(_) => ccprintln(window, "Error: Mutex CONSOLE_TEXT_OUT_QUEUE is poisoned"),
-    }
+    let converted_and_escaped = ansi_to_html::convert_escaped(&text)?;
+    let update = ConsoleTextUpdate::from(converted_and_escaped, replace_last);
+    update_internal_console(&update)?;
 
-    match ansi_to_html::convert_escaped(&text) {
-        Ok(converted_and_escaped) => {
-            let update = ConsoleTextUpdate::from(converted_and_escaped, replace_last);
-            if let Err(e) = update_internal_console(&update) {
-                ccprintln(window, e.to_string());
-            }
-            try_emit_signal(window, "new-console-text", update)
-        }
-        Err(e) => {
-            ccprintln(window, e.to_string());
-            Default::default()
-        }
-    }
+    CONSOLE_TEXT_EMIT_QUEUE
+        .read()
+        .map_err(|_| InternalConsoleError::Poisoned("CONSOLE_TEXT_EMIT_QUEUE".to_owned()))?
+        .as_ref()
+        .ok_or_else(|| InternalConsoleError::None("CONSOLE_TEXT_EMIT_QUEUE".to_owned()))?
+        .send(update)?;
+
+    CONSOLE_TEXT_OUT_QUEUE
+        .read()
+        .map_err(|_| InternalConsoleError::Poisoned("CONSOLE_TEXT_OUT_QUEUE".to_owned()))?
+        .as_ref()
+        .ok_or_else(|| InternalConsoleError::None("CONSOLE_TEXT_OUT_QUEUE".to_owned()))?
+        .send(text)?;
+
+    Ok(())
 }
 
 fn try_emit_text<T: AsRef<str>>(window: &Window, text: T, replace_last: bool) -> (String, Option<TauriError>) {
@@ -474,7 +493,11 @@ fn try_emit_text<T: AsRef<str>>(window: &Window, text: T, replace_last: bool) ->
         save_state.save(window);
         try_emit_signal(window, "load_updated_save_state", save_state)
     } else {
-        issue_console_update(window, text.to_owned(), replace_last)
+        if let Err(e) = issue_console_update(text.to_owned(), replace_last) {
+            ccprintln(window, e.to_string());
+        }
+
+        Default::default()
     }
 }
 
@@ -496,6 +519,36 @@ fn gui_setup(app: &mut App) -> Result<(), Box<dyn StdError>> {
     const MAIN_WINDOW_NAME: &str = "main";
     let window = app.get_window(MAIN_WINDOW_NAME).ok_or(format!("Cannot find window '{MAIN_WINDOW_NAME}'"))?;
     let window2 = window.clone();
+    let window3 = window.clone();
+    let window4 = window.clone();
+
+    let (emit_sender, emit_receiver) = unbounded();
+    CONSOLE_TEXT_EMIT_QUEUE
+        .write()
+        .map_err(|_| InternalConsoleError::Poisoned("CONSOLE_TEXT_EMIT_QUEUE".to_owned()))?
+        .replace(emit_sender);
+
+    thread::spawn(move || loop {
+        thread::sleep(Duration::from_secs_f32(1. / 60.));
+        let updates = emit_receiver.try_iter().collect();
+        if let Err(e) = emit_console_text_emit_queue(&window3, updates) {
+            ccprintln(&window3, e.to_string());
+        }
+    });
+
+    let (file_write_sender, file_write_receiver) = unbounded();
+    CONSOLE_TEXT_OUT_QUEUE
+        .write()
+        .map_err(|_| InternalConsoleError::Poisoned("CONSOLE_TEXT_OUT_QUEUE".to_owned()))?
+        .replace(file_write_sender);
+
+    thread::spawn(move || loop {
+        thread::sleep(Duration::from_secs_f32(1. / 3.));
+        let to_write_out = file_write_receiver.try_iter().collect();
+        if let Err(e) = write_console_text_out_queue_to_file(&window4, to_write_out) {
+            ccprintln(&window2, e.to_string());
+        }
+    });
 
     clear_log_file()?;
     gui_setup_load_config(&window)?;
@@ -533,13 +586,6 @@ fn gui_setup(app: &mut App) -> Result<(), Box<dyn StdError>> {
             }
 
             emit_text(&window, text, will_replace_last);
-        }
-    });
-
-    thread::spawn(move || loop {
-        thread::sleep(Duration::from_secs_f32(1. / 5.));
-        if let Err(e) = write_console_text_out_queue_to_file() {
-            ccprintln(&window2, e.to_string());
         }
     });
 

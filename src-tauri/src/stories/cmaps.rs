@@ -14,7 +14,6 @@ pub struct StoryModeConfig {
     pub scripts: HashMap<String, Script>,
 }
 
-
 #[derive(Default, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Settings {

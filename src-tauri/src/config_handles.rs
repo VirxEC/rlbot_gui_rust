@@ -13,7 +13,7 @@ use crate::{
     settings::*,
     stories::{
         bots_base,
-        cmaps::{Bot, City, Script, StoryModeConfig, Settings},
+        cmaps::{Bot, City, Script, Settings, StoryModeConfig},
     },
     *,
 };
@@ -26,7 +26,7 @@ use std::{
     process::Command,
 };
 use tauri::{api::dialog::FileDialogBuilder, Window};
-use tokio::fs::read_to_string as read_to_string_async;
+use tokio::fs as async_fs;
 
 fn set_gui_config_to_default(conf: &mut Ini) {
     conf.set("bot_folder_settings", "files", Some("{}".to_owned()));
@@ -57,11 +57,18 @@ pub async fn load_gui_config(window: &Window) -> Ini {
 
         set_gui_config_to_default(&mut conf);
 
-        if let Err(e) = conf.write_async(&config_path).await {
+        if let Err(e) = async_fs::write(config_path, conf.writes()).await {
             ccprintln!(window, "Error writing config file: {e}");
         }
-    } else if let Err(e) = conf.load_async(config_path).await {
-        ccprintln!(window, "Error loading config: {e}");
+    } else {
+        match async_fs::read_to_string(config_path).await {
+            Ok(s) => {
+                if let Err(e) = conf.read(s) {
+                    ccprintln!(window, "Error reading config file: {e}");
+                }
+            }
+            Err(e) => ccprintln!(window, "Error reading config file: {e}"),
+        }
     }
 
     conf
@@ -503,7 +510,7 @@ async fn get_custom_story_json(story_settings: &StoryConfig) -> Option<StoryMode
         return Some(json.clone());
     }
 
-    let story_config: StoryModeConfig = serde_json::from_str(&read_to_string_async(&story_settings.custom_config.story_path).await.ok()?).ok()?;
+    let story_config: StoryModeConfig = serde_json::from_str(&async_fs::read_to_string(&story_settings.custom_config.story_path).await.ok()?).ok()?;
     STORIES_CACHE.write().await.insert(story_settings.clone(), story_config.clone());
     Some(story_config)
 }

@@ -64,25 +64,28 @@ export default {
 			texts: 0,
 			userChoseLock: false,
 			scrollLock: true,
-			newTextListener: listen('new-console-text', event => {
-				const update = event.payload;
-				if (update.replace_last) {
-					this.consoleTexts.pop();
-				}
+			newTextListener: listen('new-console-texts', event => {
+				event.payload.forEach(update => {
+					if (update.replace_last) {
+						this.consoleTexts.pop();
+					}
 
-				this.consoleTexts.push({ 'id': this.texts, 'content': update.content });
-				this.texts++;
+					this.consoleTexts.push({ 'id': this.texts, 'content': update.content });
+					this.texts++;
 
-				if (this.consoleTexts.length > MAX_LINES) {
-					this.consoleTexts.shift();
-				}
+					if (this.consoleTexts.length > MAX_LINES) {
+						this.consoleTexts.shift();
+					}
+				});
 
 				if (this.scrollLock) {
 					if (this.consoleTexts.length >= MAX_LINES && !this.userChoseLock) {
 						this.scrollLock = false;
 					}
 
-					this.$refs.scroller.scrollToBottom();
+					try {
+						this.$refs.scroller.scrollToBottom();
+					} catch (e) {} // ignore the error, it randomly happens sometimes but it still works
 				}
 			})
 		}
