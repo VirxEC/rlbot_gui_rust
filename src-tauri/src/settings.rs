@@ -13,6 +13,7 @@ use core::fmt;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug, str::FromStr};
 use tauri::Window;
+use tokio::fs as async_fs;
 
 use serde_repr::{Deserialize_repr, Serialize_repr};
 
@@ -320,7 +321,7 @@ impl MatchConfig {
         let mut conf = load_gui_config(window).await;
         self.save_to_config(&mut conf);
 
-        if let Err(e) = conf.write_async(get_config_path()).await {
+        if let Err(e) = async_fs::write(get_config_path(), conf.writes()).await {
             ccprintln!(window, "Error writing config file: {e}");
         }
     }
@@ -445,7 +446,7 @@ impl LauncherConfig {
         config.set("launcher_settings", "use_login_tricks", Some(self.use_login_tricks.to_string()));
         config.set("launcher_settings", "rocket_league_exe_path", self.rocket_league_exe_path);
 
-        if let Err(e) = config.write_async(get_config_path()).await {
+        if let Err(e) = async_fs::write(get_config_path(), config.writes()).await {
             ccprintln!(window, "Error writing config file: {e}");
         }
     }
