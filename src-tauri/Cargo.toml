@@ -1,6 +1,6 @@
 [package]
 name = "rl-bot-gui"
-version = "1.0.28"
+version = "1.0.29"
 description = "The RLBot GUI ported to Rust"
 authors = ["VirxEC"]
 license = "MIT"
@@ -18,7 +18,7 @@ strip = true
 opt-level = "z"
 
 [build-dependencies]
-tauri-build = { version = "1.1", features = [] }
+tauri-build = "1.1"
 
 [dependencies]
 sanitize-filename = "0.4"
