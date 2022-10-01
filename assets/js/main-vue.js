@@ -1057,7 +1057,8 @@ export default {
 								this.showProgressSpinner = false;
 
 								this.$bvModal.hide("mini-console");
-
+								
+								invoke("is_botpack_up_to_date").then(this.botpackUpdateChecked);
 								this.startup_inner()
 							});
 						} else {
@@ -1082,7 +1083,6 @@ export default {
 			invoke("get_match_settings").then(this.matchSettingsReceived);
 			invoke("get_recommendations").then(this.recommendationsReceived);
 			invoke("get_python_path").then(path => this.python_path = path);
-			invoke("is_botpack_up_to_date").then(this.botpackUpdateChecked);
 
 			this.init = true;
 		}

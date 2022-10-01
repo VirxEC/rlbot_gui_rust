@@ -667,6 +667,8 @@ fn main() {
             run_command,
             upload_log,
             create_python_venv,
+            get_selected_tab,
+            set_selected_tab,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

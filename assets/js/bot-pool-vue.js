@@ -3,6 +3,8 @@ import ScriptCard from './script-card-vue.js'
 import ScriptDependencies from './script-dependencies-vue.js'
 import categories from './categories.js';
 
+const invoke = window.__TAURI__.invoke;
+
 export default {
 	name: 'bot-pool',
 	components: {
@@ -20,6 +22,7 @@ export default {
 					button-variant="outline-primary"
 					size="sm"
 					class="categories-radio-group"
+					@change="onPrimaryCategoryChange"
 				/>
 				<b-form-radio-group buttons
 					v-if="primaryCategorySelected.categories.length > 1"
@@ -28,6 +31,7 @@ export default {
 					button-variant="outline-primary"
 					size="sm"
 					class="categories-radio-group"
+					@change="onSecondaryCategoryChange"
 				/>
 				<b-form-input id="filter-text-input" v-model="botNameFilter" placeholder="Search..." size="sm" type="search"/>
 			</b-form>
@@ -60,7 +64,14 @@ export default {
 				ctg.selected = ctg.categories[0];
 				return {text: ctg.name, value: ctg};
 			}),
-			primaryCategorySelected: categories.all,
+			primaryCategorySelected: (() => {
+				invoke('get_selected_tab').then(({ primary, secondary }) => {
+					this.primaryCategorySelected = categories[primary];
+					this.primaryCategorySelected.selected = this.primaryCategorySelected.categories[secondary];
+				});
+
+				return categories.all;
+			})(),
 		};
 	},
 	methods: {
@@ -96,10 +107,29 @@ export default {
 			}
 			return false;
 		},
+		getCategoryName: function(category) {
+			return Object.entries(categories).find(([_, value]) => value == category)[0];
+		},
+		getSecondaryCategoryIndex: function(category) {
+			const index = this.primaryCategorySelected.categories.indexOf(category);
+
+			if (index == -1) {
+				return 0;
+			}
+
+			return index;
+		},
 		setDefaultCategory: function() {
 			this.primaryCategorySelected = this.categories.standard;
 			this.primaryCategorySelected.selected = this.primaryCategorySelected.categories[0];
+			this.onPrimaryCategoryChange(this.primaryCategorySelected);
 		},
+		onPrimaryCategoryChange: function(value) {
+			invoke("set_selected_tab", { primary: this.getCategoryName(value), secondary: this.getSecondaryCategoryIndex(value.selected) });
+		},
+		onSecondaryCategoryChange: function(value) {
+			invoke("set_selected_tab", { primary: this.getCategoryName(this.primaryCategorySelected), secondary: this.getSecondaryCategoryIndex(value) });
+		}
 	},
 	computed: {
 		secondaryCategorySelected: function() {

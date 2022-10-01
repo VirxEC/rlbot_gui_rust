@@ -33,6 +33,7 @@ recruit teammates and purchase upgrades for your car!
 - Prints get dumped asyncronously to log.txt in content folder
 - "Upload GUI log for help" button in Menu (top right) which uploads the log.txt file to HasteBin
 - DotNet runtime detection for C# bots to display warning message
+- The selected bot tab persists between launches
 
 ### Unique to this version
 
