@@ -19,6 +19,7 @@ use crate::{
 };
 use configparser::ini::Ini;
 use glob::glob;
+use serde::Deserialize;
 use std::{
     collections::HashMap,
     fs::{create_dir_all, read_to_string},
@@ -38,6 +39,7 @@ fn set_gui_config_to_default(conf: &mut Ini) {
     conf.set("launcher_settings", "use_login_tricks", Some("true".to_owned()));
     conf.set("launcher_settings", "rocket_league_exe_path", None);
     conf.set("story_mode", "save_state", None);
+    GuiTabCategory::default().save_to_config(conf);
 }
 
 /// Loads the GUI config, creating it if it doesn't exist.
@@ -567,4 +569,65 @@ pub async fn get_all_script_configs(story_settings: &StoryConfig) -> HashMap<Str
 #[tauri::command]
 pub async fn get_bots_configs(story_settings: StoryConfig) -> HashMap<String, Bot> {
     get_all_bot_configs(&story_settings).await
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PrimaryCategories {
+    #[default]
+    All,
+    Standard,
+    Extra,
+    Special,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct GuiTabCategory {
+    primary: PrimaryCategories,
+    secondary: usize,
+}
+
+impl GuiTabCategory {
+    pub fn new(primary: PrimaryCategories, secondary: usize) -> Self {
+        Self { primary, secondary }
+    }
+    
+    async fn load_primary(window: &Window) -> Option<PrimaryCategories> {
+        serde_json::from_str(&load_gui_config(window).await.get("gui_state", "selected_tab")?).ok()
+    }
+
+    async fn load_seconary(window: &Window) -> Option<usize> {
+        serde_json::from_str(&load_gui_config(window).await.get("gui_state", "selected_tab_secondary")?).ok()
+    }
+
+    pub async fn load(window: &Window) -> Self {
+        Self {
+            primary: Self::load_primary(window).await.unwrap_or_default(),
+            secondary: Self::load_seconary(window).await.unwrap_or_default(),
+        }
+    }
+
+    pub fn save_to_config(&self, conf: &mut Ini) {
+        conf.set("gui_state", "selected_tab", Some(serde_json::to_string(&self.primary).unwrap()));
+        conf.set("gui_state", "selected_tab_secondary", Some(serde_json::to_string(&self.secondary).unwrap()));
+    }
+
+    pub async fn save(&self, window: &Window) {
+        let mut conf = load_gui_config(window).await;
+        self.save_to_config(&mut conf);
+
+        if let Err(e) = conf.write(get_config_path()) {
+            ccprintln!(window, "Error writing config: {e}");
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn get_selected_tab(window: Window) -> GuiTabCategory {
+    GuiTabCategory::load(&window).await
+}
+
+#[tauri::command]
+pub async fn set_selected_tab(window: Window, primary: PrimaryCategories, secondary: usize) {
+    GuiTabCategory::new(primary, secondary).save(&window).await;
 }
