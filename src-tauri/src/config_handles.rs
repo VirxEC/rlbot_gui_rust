@@ -591,7 +591,7 @@ impl GuiTabCategory {
     pub fn new(primary: PrimaryCategories, secondary: usize) -> Self {
         Self { primary, secondary }
     }
-    
+
     async fn load_primary(window: &Window) -> Option<PrimaryCategories> {
         serde_json::from_str(&load_gui_config(window).await.get("gui_state", "selected_tab")?).ok()
     }

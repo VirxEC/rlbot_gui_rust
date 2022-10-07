@@ -1,6 +1,4 @@
-#![cfg_attr(all(not(debug_assertions), target_os = "windows"), windows_subsystem = "windows")]
 #![allow(clippy::wildcard_imports, clippy::unused_async)]
-#![forbid(unsafe_code)]
 
 mod bot_management;
 mod commands;
@@ -34,13 +32,18 @@ use std::{
     io::{Read, Result as IoResult, Write},
     path::PathBuf,
     process::{Child, ChildStdin, Command, Stdio},
-    sync::{Mutex, RwLock},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Mutex, RwLock,
+    },
     thread,
     time::Duration,
 };
 use tauri::{App, Error as TauriError, Manager, Window};
 use thiserror::Error;
 use tokio::sync::RwLock as AsyncRwLock;
+
+static USE_PIPE: AtomicBool = AtomicBool::new(true);
 
 const BOTPACK_FOLDER: &str = "RLBotPackDeletable";
 const MAPPACK_FOLDER: &str = "RLBotMapPackDeletable";
@@ -300,20 +303,51 @@ pub enum CommandError {
 /// * `args` - The arguments to pass to the executable
 pub fn get_capture_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(program: S, args: I) -> Result<Command, CommandError> {
     let mut command = Command::new(program);
+    command.args(args).current_dir(get_content_folder());
 
     #[cfg(windows)]
     {
         // disable window creation
         command.creation_flags(0x08000000);
-    };
+    }
 
     let pipe = CAPTURE_PIPE_WRITER.lock().map_err(|_| CommandError::Poisoned("CAPTURE_PIPE_WRITER".to_owned()))?;
     let out_pipe = pipe.as_ref().ok_or(CommandError::ClosedPipe)?.try_clone()?;
     let err_pipe = pipe.as_ref().ok_or(CommandError::ClosedPipe)?.try_clone()?;
 
-    command.args(args).current_dir(get_content_folder()).stdout(out_pipe).stderr(err_pipe);
+    command.stdout(out_pipe).stderr(err_pipe);
 
     Ok(command)
+}
+
+/// Returns a Command that won't have it's output redirected. Will also tell Windows to not spawn a new console window, and will set the working directory correctly.
+///
+/// # Errors
+///
+/// Returns an error when either `CAPTURE_PIPE_WRITER`'s lock is poisoned, or when the capture pipes couldn't be connected.
+///
+/// # Arguments
+///
+/// * `program` - The executable to run
+/// * `args` - The arguments to pass to the executable
+pub fn get_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(program: S, args: I) -> Command {
+    let mut command = Command::new(program);
+    command.args(args).current_dir(get_content_folder());
+
+    #[cfg(windows)]
+    {
+        // disable window creation
+        command.creation_flags(0x08000000);
+    }
+
+    command
+}
+
+pub fn get_maybe_capture_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(program: S, args: I, use_pipe: bool) -> Result<Command, CommandError> {
+    match use_pipe {
+        true => get_capture_command(program, args),
+        false => Ok(get_command(program, args)),
+    }
 }
 
 /// Spawns a process that will have it's output captured and sent to the GUI console.
@@ -598,6 +632,17 @@ fn is_debug_build() -> bool {
 }
 
 fn main() {
+    let use_pipe = !std::env::args().any(|arg| arg == "--no-pipe");
+    dbg!(use_pipe);
+    USE_PIPE.store(use_pipe, Ordering::Relaxed);
+
+    #[cfg(all(not(debug_assertions), windows))]
+    if use_pipe {
+        unsafe {
+            winapi::um::wincon::FreeConsole();
+        }
+    }
+
     println!("Config path: {}", get_config_path().display());
 
     tauri::Builder::default()
