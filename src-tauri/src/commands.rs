@@ -245,7 +245,7 @@ pub async fn run_command(window: Window, input: String) -> Result<(), String> {
     #[cfg(windows)]
     const RLPY: &str = "%rlpy%";
     #[cfg(windows)]
-    const RLPY_ESC: &str = "\\%rlpy\\%";
+    const RLPY_ESC: &str = "\\%rlpy%";
 
     #[cfg(not(windows))]
     const RLPY: &str = "$rlpy";
