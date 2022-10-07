@@ -240,6 +240,8 @@ pub async fn get_console_input_commands() -> Result<Vec<String>, String> {
 
 #[tauri::command]
 pub async fn run_command(window: Window, input: String) -> Result<(), String> {
+    CONSOLE_INPUT_COMMANDS.lock().map_err(|err| err.to_string())?.push(input.clone());
+
     #[cfg(windows)]
     const RLPY: &str = "%rlpy%";
     #[cfg(windows)]
@@ -250,17 +252,14 @@ pub async fn run_command(window: Window, input: String) -> Result<(), String> {
     #[cfg(not(windows))]
     const RLPY_ESC: &str = "\\$rlpy";
 
+    let python_path_lock = PYTHON_PATH.read().map_err(|err| err.to_string())?;
     let (program, original_program) = match input.split_whitespace().next().ok_or_else(|| "No command given".to_string())? {
-        RLPY_ESC => (input.to_string(), RLPY_ESC),
-        RLPY => (PYTHON_PATH.read().map_err(|err| err.to_string())?.to_owned(), RLPY),
-        input => (input.to_string(), input),
+        RLPY_ESC => (RLPY_ESC, RLPY_ESC),
+        RLPY => (python_path_lock.as_ref(), RLPY),
+        input => (input, input),
     };
 
-    CONSOLE_INPUT_COMMANDS.lock().map_err(|err| err.to_string())?.push(input.clone());
-
-    let args = dbg!(input.strip_prefix(&original_program)).and_then(shlex::split).unwrap_or_default();
-    dbg!(&args);
-
+    let args = input.strip_prefix(&original_program).and_then(shlex::split).unwrap_or_default();
     spawn_capture_process(program, args).map_err(|err| {
         let e = err.to_string();
         ccprintln(&window, &e);
@@ -729,15 +728,17 @@ async fn start_match_helper(window: &Window, bot_list: Vec<TeamBotBundle>, match
 
 #[tauri::command]
 pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_settings: MiniMatchConfig) -> Result<(), String> {
-    start_match_helper(&window, bot_list, match_settings, USE_PIPE.load(Ordering::Relaxed)).await.map_err(|error| {
-        if let Err(e) = window.emit("match-start-failed", ()) {
-            ccprintln!(&window, "Failed to emit match-start-failed: {e}");
-        }
+    start_match_helper(&window, bot_list, match_settings, USE_PIPE.load(Ordering::Relaxed))
+        .await
+        .map_err(|error| {
+            if let Err(e) = window.emit("match-start-failed", ()) {
+                ccprintln!(&window, "Failed to emit match-start-failed: {e}");
+            }
 
-        ccprintln(&window, &error);
+            ccprintln(&window, &error);
 
-        error
-    })
+            error
+        })
 }
 
 #[tauri::command]
@@ -758,7 +759,11 @@ pub async fn fetch_game_tick_packet_json(window: Window) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn set_state(window: Window, state: HashMap<String, serde_json::Value>) -> Result<(), String> {
-    issue_match_handler_command(&window, &["set_state".to_owned(), serde_json::to_string(&state).map_err(|e| e.to_string())?], CreateHandler::No)
+    issue_match_handler_command(
+        &window,
+        &["set_state".to_owned(), serde_json::to_string(&state).map_err(|e| e.to_string())?],
+        CreateHandler::No,
+    )
 }
 
 #[tauri::command]
