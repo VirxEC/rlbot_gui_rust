@@ -240,11 +240,25 @@ pub async fn get_console_input_commands() -> Result<Vec<String>, String> {
 
 #[tauri::command]
 pub async fn run_command(window: Window, input: String) -> Result<(), String> {
-    let program = input.split_whitespace().next().ok_or_else(|| "No command given".to_string())?;
+    #[cfg(windows)]
+    const RLPY: &str = "%rlpy%";
+    #[cfg(windows)]
+    const RLPY_ESC: &str = "\\%rlpy\\%";
+
+    #[cfg(not(windows))]
+    const RLPY: &str = "$rlpy";
+    #[cfg(not(windows))]
+    const RLPY_ESC: &str = "\\$rlpy";
+
+    let (program, original_program) = match input.split_whitespace().next().ok_or_else(|| "No command given".to_string())? {
+        RLPY_ESC => (input.to_string(), RLPY_ESC),
+        RLPY => (PYTHON_PATH.read().map_err(|err| err.to_string())?.to_owned(), RLPY),
+        input => (input.to_string(), input),
+    };
 
     CONSOLE_INPUT_COMMANDS.lock().map_err(|err| err.to_string())?.push(input.clone());
 
-    let args = input.strip_prefix(program).and_then(shlex::split).unwrap_or_default();
+    let args = dbg!(input.strip_prefix(&original_program)).and_then(shlex::split).unwrap_or_default();
     dbg!(&args);
 
     spawn_capture_process(program, args).map_err(|err| {
