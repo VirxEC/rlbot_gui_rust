@@ -1,4 +1,4 @@
-pub mod bots_base;
-pub mod cmaps;
-pub mod default;
-pub mod easy;
+pub(crate) mod bots_base;
+pub(crate) mod cmaps;
+pub(crate) mod default;
+pub(crate) mod easy;

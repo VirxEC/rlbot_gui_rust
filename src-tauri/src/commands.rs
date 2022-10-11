@@ -240,13 +240,26 @@ pub async fn get_console_input_commands() -> Result<Vec<String>, String> {
 
 #[tauri::command]
 pub async fn run_command(window: Window, input: String) -> Result<(), String> {
-    let program = input.split_whitespace().next().ok_or_else(|| "No command given".to_string())?;
-
     CONSOLE_INPUT_COMMANDS.lock().map_err(|err| err.to_string())?.push(input.clone());
 
-    let args = input.strip_prefix(program).and_then(shlex::split).unwrap_or_default();
-    dbg!(&args);
+    #[cfg(windows)]
+    const RLPY: &str = "%rlpy%";
+    #[cfg(windows)]
+    const RLPY_ESC: &str = "\\%rlpy%";
 
+    #[cfg(not(windows))]
+    const RLPY: &str = "$rlpy";
+    #[cfg(not(windows))]
+    const RLPY_ESC: &str = "\\$rlpy";
+
+    let python_path_lock = PYTHON_PATH.read().map_err(|err| err.to_string())?;
+    let (program, original_program) = match input.split_whitespace().next().ok_or_else(|| "No command given".to_string())? {
+        RLPY_ESC => (RLPY_ESC, RLPY_ESC),
+        RLPY => (python_path_lock.as_ref(), RLPY),
+        input => (input, input),
+    };
+
+    let args = input.strip_prefix(&original_program).and_then(shlex::split).unwrap_or_default();
     spawn_capture_process(program, args).map_err(|err| {
         let e = err.to_string();
         ccprintln(&window, &e);
@@ -592,8 +605,8 @@ pub async fn save_launcher_settings(window: Window, settings: LauncherConfig) {
 /// # Arguments
 ///
 /// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
-fn create_match_handler(window: &Window) -> Option<ChildStdin> {
-    match get_capture_command(&*PYTHON_PATH.read().ok()?, ["-c", "from rlbot_smh.match_handler import listen; listen()"])
+fn create_match_handler(window: &Window, use_pipe: bool) -> Option<ChildStdin> {
+    match get_maybe_capture_command(&*PYTHON_PATH.read().ok()?, ["-c", "from rlbot_smh.match_handler import listen; listen()"], use_pipe)
         .ok()?
         .stdin(Stdio::piped())
         .spawn()
@@ -606,6 +619,12 @@ fn create_match_handler(window: &Window) -> Option<ChildStdin> {
     }
 }
 
+enum CreateHandler {
+    /// The bool is whether is not a pipe should be attached to the process
+    Yes(bool),
+    No,
+}
+
 /// Send a command to the match handler
 ///
 /// # Arguments
@@ -613,14 +632,14 @@ fn create_match_handler(window: &Window) -> Option<ChildStdin> {
 /// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
 /// * `command` - The command to send to the match handler - can be in multiple parts, for passing arguments
 /// * `create_handler` - If the match handler should be started if it's down
-pub fn issue_match_handler_command(window: &Window, command_parts: &[String], mut create_handler: bool) -> Result<(), String> {
+fn issue_match_handler_command(window: &Window, command_parts: &[String], mut create_handler: CreateHandler) -> Result<(), String> {
     let mut match_handler_stdin = MATCH_HANDLER_STDIN.lock().map_err(|err| err.to_string())?;
 
     if match_handler_stdin.is_none() {
-        if create_handler {
+        if let CreateHandler::Yes(use_pipe) = create_handler {
             ccprintln(window, "Starting match handler!");
-            *match_handler_stdin = create_match_handler(window);
-            create_handler = false;
+            *match_handler_stdin = create_match_handler(window, use_pipe);
+            create_handler = CreateHandler::No;
         } else {
             ccprintln(window, "Not issuing command to handler as it's down and I was told to not start it");
             return Ok(());
@@ -632,9 +651,9 @@ pub fn issue_match_handler_command(window: &Window, command_parts: &[String], mu
 
     if stdin.write_all(command.as_bytes()).is_err() {
         drop(match_handler_stdin.take());
-        if create_handler {
+        if matches!(create_handler, CreateHandler::Yes(_)) {
             ccprintln(window, "Failed to write to match handler, trying to restart...");
-            issue_match_handler_command(window, command_parts, true)
+            issue_match_handler_command(window, command_parts, create_handler)
         } else {
             Err("Failed to write to match handler".to_owned())
         }
@@ -659,7 +678,7 @@ async fn pre_start_match(window: &Window) -> Result<(), String> {
 
     if port.is_some() {
         // kill the current bots if they're running
-        kill_bots(window.clone()).await?;
+        kill_bots().await?;
 
         // kill RLBot if it's running but Rocket League isn't
         if !rl_is_running {
@@ -677,7 +696,7 @@ async fn pre_start_match(window: &Window) -> Result<(), String> {
 /// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
 /// * `bot_list` - A list of bots and their settings to use in the match
 /// * `match_settings` - The various match settings to use in the match, including scripts (only the path), mutators, game map, etc.
-async fn start_match_helper(window: &Window, bot_list: Vec<TeamBotBundle>, match_settings: MiniMatchConfig) -> Result<(), String> {
+async fn start_match_helper(window: &Window, bot_list: Vec<TeamBotBundle>, match_settings: MiniMatchConfig, use_pipe: bool) -> Result<(), String> {
     pre_start_match(window).await?;
 
     let launcher_settings = LauncherConfig::load(window).await;
@@ -702,34 +721,31 @@ async fn start_match_helper(window: &Window, bot_list: Vec<TeamBotBundle>, match
 
     println!("Issuing command: {} | ", args.join(" | "));
 
-    issue_match_handler_command(window, &args, true)?;
+    issue_match_handler_command(window, &args, CreateHandler::Yes(use_pipe))?;
 
     Ok(())
 }
 
 #[tauri::command]
 pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_settings: MiniMatchConfig) -> Result<(), String> {
-    start_match_helper(&window, bot_list, match_settings).await.map_err(|error| {
-        if let Err(e) = window.emit("match-start-failed", ()) {
-            ccprintln!(&window, "Failed to emit match-start-failed: {e}");
-        }
+    start_match_helper(&window, bot_list, match_settings, USE_PIPE.load(Ordering::Relaxed))
+        .await
+        .map_err(|error| {
+            if let Err(e) = window.emit("match-start-failed", ()) {
+                ccprintln!(&window, "Failed to emit match-start-failed: {e}");
+            }
 
-        ccprintln(&window, &error);
+            ccprintln(&window, &error);
 
-        error
-    })
+            error
+        })
 }
 
 #[tauri::command]
-pub async fn kill_bots(window: Window) -> Result<(), String> {
-    issue_match_handler_command(&window, &["shut_down".to_owned()], false)?;
-
-    let mut match_handler_stdin = MATCH_HANDLER_STDIN.lock().map_err(|err| err.to_string())?;
-    if match_handler_stdin.is_some() {
-        // take out the stdin, leaving None in it's place and then drop it
-        // when dropped, the stdin pipe will close
-        // the match handler will notice this and close itself down
-        drop(match_handler_stdin.take());
+pub async fn kill_bots() -> Result<(), String> {
+    if let Some(mut stdin) = MATCH_HANDLER_STDIN.lock().map_err(|err| err.to_string())?.take() {
+        const KILL_BOTS_COMMAND: &[u8] = "kill_bots | \n".as_bytes();
+        stdin.write_all(KILL_BOTS_COMMAND).map_err(|err| err.to_string())?;
     }
 
     Ok(())
@@ -737,13 +753,17 @@ pub async fn kill_bots(window: Window) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn fetch_game_tick_packet_json(window: Window) -> Result<(), String> {
-    issue_match_handler_command(&window, &["fetch-gtp".to_owned()], false)?;
+    issue_match_handler_command(&window, &["fetch-gtp".to_owned()], CreateHandler::No)?;
     Ok(())
 }
 
 #[tauri::command]
 pub async fn set_state(window: Window, state: HashMap<String, serde_json::Value>) -> Result<(), String> {
-    issue_match_handler_command(&window, &["set_state".to_owned(), serde_json::to_string(&state).map_err(|e| e.to_string())?], false)
+    issue_match_handler_command(
+        &window,
+        &["set_state".to_owned(), serde_json::to_string(&state).map_err(|e| e.to_string())?],
+        CreateHandler::No,
+    )
 }
 
 #[tauri::command]
@@ -761,7 +781,7 @@ pub async fn spawn_car_for_viewing(window: Window, config: BotLooksConfig, team:
         launcher_settings.rocket_league_exe_path.unwrap_or_default(),
     ];
 
-    issue_match_handler_command(&window, &args, true)
+    issue_match_handler_command(&window, &args, CreateHandler::Yes(true))
 }
 
 #[tauri::command]
@@ -1017,7 +1037,7 @@ async fn run_challenge(window: &Window, save_state: &StoryState, challenge_id: S
 
     println!("Issuing command: {} | ", args.join(" | "));
 
-    issue_match_handler_command(window, &args, true)?;
+    issue_match_handler_command(window, &args, CreateHandler::Yes(true))?;
 
     Ok(())
 }

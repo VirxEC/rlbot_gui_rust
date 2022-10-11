@@ -1,7 +1,5 @@
 # RLBotGUI
 
-[![unsafe forbidden](https://img.shields.io/badge/unsafe-forbidden-success.svg)](https://github.com/rust-secure-code/safety-dance/)
-
 ## About
 
 RLBotGUI is a streamlined user interface that helps you run custom
@@ -44,6 +42,7 @@ recruit teammates and purchase upgrades for your car!
 - Real-time non-blocking subprocess stdout & stderr capture redirected to built-in GUI console for debugging purposes
 - In-GUI completely isolated Python installation for Windows users
 - Mini-console for quick & easy user status updates (installing packages, etc.)
+- (**USEFUL FOR RLBOT DEVS**) Running with `--no-pipe` will not pipe RLBot-related output to the GUI console, but instead directly to the inherited console
 
 ## User Installation
 
