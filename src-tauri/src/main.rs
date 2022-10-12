@@ -340,8 +340,8 @@ pub fn get_maybe_capture_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterat
     match use_pipe {
         true => get_capture_command(program, args),
         false => {
-            let mut command = get_command(program, args);
-            command.stdout(Stdio::inherit()).stderr(Stdio::inherit());
+            let mut command = Command::new(program);
+            command.args(args).current_dir(get_content_folder());
             Ok(command)
         },
     }
