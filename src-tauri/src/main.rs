@@ -336,6 +336,16 @@ pub fn get_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(
     command
 }
 
+/// Returns a Command that may or may not have it's output redirected. Will also tell Windows to not spawn a new console window (if needed), and will set the working directory correctly.
+///
+/// # Errors
+///
+/// Returns an error when either `CAPTURE_PIPE_WRITER`'s lock is poisoned, or when the capture pipes couldn't be connected.
+///
+/// # Arguments
+///
+/// * `program` - The executable to run
+/// * `args` - The arguments to pass to the executable
 pub fn get_maybe_capture_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(program: S, args: I, use_pipe: bool) -> Result<Command, CommandError> {
     match use_pipe {
         true => get_capture_command(program, args),
