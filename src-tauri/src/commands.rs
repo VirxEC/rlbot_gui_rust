@@ -148,13 +148,7 @@ const PACKAGES: [&str; 9] = [
 
 /// Apply version constraints to the given package name.
 fn get_package_name(package_name: &str) -> &str {
-    for package in PACKAGES {
-        if package.contains(package_name) {
-            return package;
-        }
-    }
-
-    package_name
+    PACKAGES.into_iter().find(|package| package.contains(package_name)).unwrap_or(package_name)
 }
 
 #[tauri::command]
