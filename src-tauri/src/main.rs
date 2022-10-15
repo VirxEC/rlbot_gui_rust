@@ -57,7 +57,7 @@ static CONSOLE_INPUT_COMMANDS: Mutex<Vec<String>> = Mutex::new(Vec::new());
 static CONSOLE_TEXT_EMIT_QUEUE: RwLock<Option<Sender<ConsoleTextUpdate>>> = RwLock::new(None);
 static CONSOLE_TEXT_OUT_QUEUE: RwLock<Option<Sender<String>>> = RwLock::new(None);
 
-static MATCH_HANDLER_STDIN: Mutex<Option<ChildStdin>> = Mutex::new(None);
+static MATCH_HANDLER_STDIN: Mutex<(String, Option<ChildStdin>)> = Mutex::new((String::new(), None));
 static CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
 
 static PYTHON_PATH: RwLock<String> = RwLock::new(String::new());
@@ -353,7 +353,7 @@ pub fn get_maybe_capture_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterat
             let mut command = Command::new(program);
             command.args(args).current_dir(get_content_folder());
             Ok(command)
-        },
+        }
     }
 }
 

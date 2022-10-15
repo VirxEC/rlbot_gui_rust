@@ -25,6 +25,7 @@ use std::{
     error::Error,
     fs::{create_dir_all, File},
     io::{copy, Cursor, Write},
+    ops::DerefMut,
     path::Path,
     time::Instant,
 };
@@ -143,7 +144,7 @@ const PACKAGES: [&str; 9] = [
     "numba<0.56",
     "selenium",
     "rlbot==1.*",
-    "rlbot-smh==1.*",
+    "rlbot_smh==1.*",
 ];
 
 /// Apply version constraints to the given package name.
@@ -599,13 +600,14 @@ pub async fn save_launcher_settings(window: Window, settings: LauncherConfig) {
 /// # Arguments
 ///
 /// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
-fn create_match_handler(window: &Window, use_pipe: bool) -> Option<ChildStdin> {
-    match get_maybe_capture_command(&*PYTHON_PATH.read().ok()?, ["-c", "from rlbot_smh.match_handler import listen; listen()"], use_pipe)
+fn create_match_handler(window: &Window, use_pipe: bool) -> Option<(String, ChildStdin)> {
+    let python_path = &*PYTHON_PATH.read().ok()?;
+    match get_maybe_capture_command(python_path, ["-c", "from rlbot_smh.match_handler import listen; listen()"], use_pipe)
         .ok()?
         .stdin(Stdio::piped())
         .spawn()
     {
-        Ok(mut child) => child.stdin.take(),
+        Ok(mut child) => child.stdin.take().map(|stdin| (python_path.clone(), stdin)),
         Err(err) => {
             ccprintln!(window, "Error starting match handler: {err}");
             None
@@ -627,13 +629,19 @@ enum CreateHandler {
 /// * `command` - The command to send to the match handler - can be in multiple parts, for passing arguments
 /// * `create_handler` - If the match handler should be started if it's down
 fn issue_match_handler_command(window: &Window, command_parts: &[String], mut create_handler: CreateHandler) -> Result<(), String> {
-    let mut match_handler_stdin = MATCH_HANDLER_STDIN.lock().map_err(|err| err.to_string())?;
+    let mut command_lock = MATCH_HANDLER_STDIN.lock().map_err(|err| err.to_string())?;
+    let (used_py_path, match_handler_stdin) = command_lock.deref_mut();
 
     if match_handler_stdin.is_none() {
         if let CreateHandler::Yes(use_pipe) = create_handler {
             ccprintln(window, "Starting match handler!");
-            *match_handler_stdin = create_match_handler(window, use_pipe);
-            create_handler = CreateHandler::No;
+            if let Some((py_path, stdin)) = create_match_handler(window, use_pipe) {
+                *match_handler_stdin = Some(stdin);
+                *used_py_path = py_path;
+                create_handler = CreateHandler::No;
+            } else {
+                return Err("Couldn't start match handler".to_owned());
+            }
         } else {
             ccprintln(window, "Not issuing command to handler as it's down and I was told to not start it");
             return Ok(());
@@ -737,7 +745,7 @@ pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_set
 
 #[tauri::command]
 pub async fn kill_bots() -> Result<(), String> {
-    if let Some(mut stdin) = MATCH_HANDLER_STDIN.lock().map_err(|err| err.to_string())?.take() {
+    if let (_, Some(stdin)) = &mut *MATCH_HANDLER_STDIN.lock().map_err(|err| err.to_string())? {
         const KILL_BOTS_COMMAND: &[u8] = "kill_bots | \n".as_bytes();
         stdin.write_all(KILL_BOTS_COMMAND).map_err(|err| err.to_string())?;
     }
@@ -747,7 +755,7 @@ pub async fn kill_bots() -> Result<(), String> {
 
 #[tauri::command]
 pub async fn fetch_game_tick_packet_json(window: Window) -> Result<(), String> {
-    issue_match_handler_command(&window, &["fetch-gtp".to_owned()], CreateHandler::No)?;
+    issue_match_handler_command(&window, &["fetch_gtp".to_owned()], CreateHandler::No)?;
     Ok(())
 }
 
