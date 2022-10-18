@@ -43,6 +43,7 @@ use tauri::{App, Error as TauriError, Manager, Window};
 use thiserror::Error;
 use tokio::sync::RwLock as AsyncRwLock;
 
+static NO_CONSOLE_WINDOWS: AtomicBool = AtomicBool::new(true);
 static USE_PIPE: AtomicBool = AtomicBool::new(true);
 
 const BOTPACK_FOLDER: &str = "RLBotPackDeletable";
@@ -642,9 +643,14 @@ fn main() {
     let use_pipe = !std::env::args().any(|arg| arg == "--no-pipe");
     dbg!(use_pipe);
     USE_PIPE.store(use_pipe, Ordering::Relaxed);
+    
+    let no_console_windows = !std::env::args().any(|arg| arg == "--console");
+    dbg!(no_console_windows);
+    NO_CONSOLE_WINDOWS.store(no_console_windows, Ordering::Relaxed);
 
+    dbg!(use_pipe && no_console_windows);
     #[cfg(all(not(debug_assertions), windows))]
-    if use_pipe {
+    if use_pipe && no_console_windows {
         unsafe {
             winapi::um::wincon::FreeConsole();
         }
