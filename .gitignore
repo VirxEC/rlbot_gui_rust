@@ -203,4 +203,5 @@ WixTools
 /rlbot_gui/
 .tauri/
 package.json
+package-lock.json
 yarn.lock
