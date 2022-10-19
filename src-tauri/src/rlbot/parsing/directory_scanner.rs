@@ -21,7 +21,7 @@ pub async fn scan_directory_for_script_configs(window: &Window, root_dir: &str) 
 
 /// Scan `root_dir` for and run func on each item found, filtering items that returned errors.
 /// func must be async and return a `Result<T, RLBotCfgParError>`.
-/// func will be ran on all items found in the directory at the same time (via join_all).
+/// func will be ran on all items found in the directory at the same time (via `join_all`).
 async fn scan_directory_for_item<T, R, F>(window: &Window, root_dir: &str, func: F) -> Vec<T>
 where
     T: Sized,
@@ -31,7 +31,7 @@ where
     join_all(glob(&format!("{root_dir}/**/*.cfg")).unwrap().flatten().map(func))
         .await
         .into_iter()
-        .flat_map(|bundle| match bundle {
+        .filter_map(|bundle| match bundle {
             Ok(bundle) => Some(bundle),
             Err(err) => {
                 if let RLBotCfgParseError::NoPythonFile(_) = err {

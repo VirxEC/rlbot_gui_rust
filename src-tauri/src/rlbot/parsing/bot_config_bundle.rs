@@ -2,16 +2,16 @@
 use std::os::windows::process::CommandExt;
 
 use crate::{
-    bot_management::cfg_helper::{load_cfg, load_cfg_sync, CfgHelperError},
+    bot_management::cfg_helper::{load_cfg, load_cfg_sync, Error},
     ccprintln, get_command_status,
     rlbot::agents::{base_script::SCRIPT_FILE_KEY, runnable::Runnable},
-    PYTHON_PATH,
 };
 use configparser::ini::Ini;
 use imghdr::Type;
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::ToOwned,
+    ffi::OsStr,
     fs,
     io::Read,
     path::Path,
@@ -133,7 +133,7 @@ pub trait Clean {
 #[derive(Debug, Error)]
 pub enum RLBotCfgParseError {
     #[error(transparent)]
-    CfgLoad(#[from] CfgHelperError),
+    CfgLoad(#[from] Error),
     #[error("No name found in config file {0}")]
     NoName(String),
     #[error("No looks config found in config file {0}")]
@@ -169,14 +169,14 @@ pub struct BotConfigBundle {
 impl BotConfigBundle {
     pub async fn minimal_from_path<T: AsRef<Path>>(config_path: T) -> Result<Self, RLBotCfgParseError> {
         let config_path = config_path.as_ref();
-        Self::minimal_from_conf(config_path, load_cfg(config_path).await?)
+        Self::minimal_from_conf(config_path, &load_cfg(config_path).await?)
     }
 
     pub fn minimal_from_path_sync(config_path: &Path) -> Result<Self, RLBotCfgParseError> {
-        Self::minimal_from_conf(config_path, load_cfg_sync(config_path)?)
+        Self::minimal_from_conf(config_path, &load_cfg_sync(config_path)?)
     }
 
-    fn minimal_from_conf(config_path: &Path, conf: Ini) -> Result<Self, RLBotCfgParseError> {
+    fn minimal_from_conf(config_path: &Path, conf: &Ini) -> Result<Self, RLBotCfgParseError> {
         let path = config_path.to_string_lossy().to_string();
         let config_path_str = config_path.display().to_string();
         // the follow unwrap calls will probably never fail because the config file was loaded successfully, already
@@ -217,7 +217,7 @@ impl BotConfigBundle {
 
         let logo = None;
 
-        let info = Some(DevInfo::from_config(&conf));
+        let info = Some(DevInfo::from_config(conf));
 
         let runnable_type = String::from("rlbot");
         let warn = None;
@@ -312,16 +312,10 @@ impl Runnable for BotConfigBundle {
         self.supports_standalone && self.use_virtual_environment
     }
 
-    fn get_missing_packages(&self, window: &Window) -> Vec<String> {
+    fn get_missing_packages<S: AsRef<OsStr>>(&self, window: &Window, python: S) -> Vec<String> {
         if self.use_virtual_environment() {
             return Vec::new();
         }
-
-        let python = if let Ok(path) = PYTHON_PATH.read() {
-            path.to_owned()
-        } else {
-            return Vec::new();
-        };
 
         if let Some(req_file) = self.get_requirements_file() {
             let mut args: Vec<&str> = vec!["-c", "from rlbot_smh.get_missing_packages import run; run()"];
@@ -339,7 +333,7 @@ impl Runnable for BotConfigBundle {
             #[cfg(windows)]
             {
                 // disable window creation
-                command.creation_flags(0x08000000);
+                command.creation_flags(0x0800_0000);
             };
 
             match command.args(args).stdin(Stdio::null()).output() {
@@ -490,16 +484,10 @@ impl Runnable for ScriptConfigBundle {
         self.use_virtual_environment
     }
 
-    fn get_missing_packages(&self, window: &Window) -> Vec<String> {
+    fn get_missing_packages<S: AsRef<OsStr>>(&self, window: &Window, python: S) -> Vec<String> {
         if self.use_virtual_environment() {
             return Vec::new();
         }
-
-        let python = if let Ok(path) = PYTHON_PATH.read() {
-            path.to_owned()
-        } else {
-            return Vec::new();
-        };
 
         if let Some(req_file) = self.get_requirements_file() {
             let mut args: Vec<&str> = vec!["-c", "from rlbot_smh.get_missing_packages import run; run()"];
@@ -517,7 +505,7 @@ impl Runnable for ScriptConfigBundle {
             #[cfg(windows)]
             {
                 // disable window creation
-                command.creation_flags(0x08000000);
+                command.creation_flags(0x0800_0000);
             };
 
             match command.args(args).stdin(Stdio::null()).output() {

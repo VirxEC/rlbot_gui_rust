@@ -1,4 +1,5 @@
 use crate::{
+    bot_management::cfg_helper::save_cfg,
     ccprintln,
     config_handles::{load_gui_config, load_gui_config_sync},
     custom_maps::convert_to_path,
@@ -58,7 +59,7 @@ impl BotFolders {
         conf.set("bot_folder_settings", "files", serde_json::to_string(&self.files).ok());
         conf.set("bot_folder_settings", "folders", serde_json::to_string(&self.folders).ok());
 
-        if let Err(e) = conf.write(&get_config_path()) {
+        if let Err(e) = conf.write(get_config_path()) {
             ccprintln!(window, "Error writing config file: {e}");
         }
     }
@@ -593,11 +594,20 @@ impl StoryState {
         }
     }
 
-    pub fn save(&self, window: &Window) {
+    pub fn save_sync(&self, window: &Window) {
         let mut conf = load_gui_config_sync(window);
         conf.set("story_mode", "save_state", serde_json::to_string(self).ok());
 
         if let Err(e) = conf.write(get_config_path()) {
+            ccprintln!(window, "Error writing config: {e}");
+        }
+    }
+
+    pub async fn save(&self, window: &Window) {
+        let mut conf = load_gui_config(window).await;
+        conf.set("story_mode", "save_state", serde_json::to_string(self).ok());
+
+        if let Err(e) = save_cfg(&conf, get_config_path()).await {
             ccprintln!(window, "Error writing config: {e}");
         }
     }

@@ -1,5 +1,5 @@
 use crate::{
-    bot_management::cfg_helper::{load_cfg, CfgHelperError},
+    bot_management::cfg_helper::{load_cfg, save_cfg, Error},
     ccprintln,
 };
 use configparser::ini::Ini;
@@ -39,7 +39,7 @@ pub struct BotTeamLooksConfig {
 }
 
 impl BotTeamLooksConfig {
-    pub async fn from_path(loadout_header: &str, paint_header: &str, path: &str) -> Result<Self, CfgHelperError> {
+    pub async fn from_path(loadout_header: &str, paint_header: &str, path: &str) -> Result<Self, Error> {
         let conf = load_cfg(path).await?;
 
         let team_color_id = conf.get(loadout_header, "team_color_id").unwrap_or_default();
@@ -128,20 +128,20 @@ pub struct BotLooksConfig {
 }
 
 impl BotLooksConfig {
-    pub async fn from_path(path: &str) -> Result<Self, CfgHelperError> {
+    pub async fn from_path(path: &str) -> Result<Self, Error> {
         Ok(Self {
             blue: BotTeamLooksConfig::from_path(BOT_CONFIG_LOADOUT_HEADER, BOT_CONFIG_LOADOUT_PAINT_BLUE_HEADER, path).await?,
             orange: BotTeamLooksConfig::from_path(BOT_CONFIG_LOADOUT_ORANGE_HEADER, BOT_CONFIG_LOADOUT_PAINT_ORANGE_HEADER, path).await?,
         })
     }
 
-    pub fn save_to_path(&self, window: &Window, path: &str) {
+    pub async fn save_to_path(&self, window: &Window, path: &str) {
         let mut config = Ini::new();
         self.blue.save_to_config(&mut config, BOT_CONFIG_LOADOUT_HEADER, BOT_CONFIG_LOADOUT_PAINT_BLUE_HEADER);
         self.orange
             .save_to_config(&mut config, BOT_CONFIG_LOADOUT_ORANGE_HEADER, BOT_CONFIG_LOADOUT_PAINT_ORANGE_HEADER);
 
-        if let Err(e) = config.write(path) {
+        if let Err(e) = save_cfg(&config, path).await {
             ccprintln!(window, "Error saving bot config to {path}: {e}");
         }
     }
