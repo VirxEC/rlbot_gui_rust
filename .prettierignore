@@ -4,6 +4,7 @@ icons
 node_modules
 screenshots
 src-tauri
-README.md
+*.md
 .eslintrc.json
 *.min.*
+package-lock.json
