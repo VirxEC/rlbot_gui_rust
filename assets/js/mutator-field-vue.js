@@ -1,6 +1,6 @@
 export default {
-  name: 'mutator-field',
-  props: ['label', 'options', 'value'],
+  name: "mutator-field",
+  props: ["label", "options", "value"],
   template: `
   <b-form-group :label="label">
     <b-form-select v-model="model" :id="id"v-on:change="$emit('input', $event)"
@@ -13,12 +13,12 @@ export default {
   data: function () {
     return {
       id: Math.floor(Math.random() * 1000000000).toString(),
-      model: this.value
-    }
+      model: this.value,
+    };
   },
   watch: {
     value: function (newVal, oldVal) {
-      this.model = newVal
-    }
-  }
-}
+      this.model = newVal;
+    },
+  },
+};

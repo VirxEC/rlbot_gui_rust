@@ -1,70 +1,73 @@
-import StoryUpgrades from './story-upgrades.js'
-import StoryPickTeam from './story-pick-team.js'
-import StoryRecruitList from './story-recruit-list.js'
+import StoryUpgrades from "./story-upgrades.js";
+import StoryPickTeam from "./story-pick-team.js";
+import StoryRecruitList from "./story-recruit-list.js";
 
-const invoke = window.__TAURI__.invoke
-const listen = window.__TAURI__.event.listen
+const invoke = window.__TAURI__.invoke;
+const listen = window.__TAURI__.event.listen;
 
-const DEBUG = false
+const DEBUG = false;
 
 const CITY_STATE = {
   LOCKED: 0,
   OPEN: 1,
-  DONE: 2
-}
+  DONE: 2,
+};
 
 const CITY_ICON_MAP = [
-  'imgs/story/lock-100px.png', // LOCKED
-  '',
-  'imgs/story/checkmark-100px.png' // DONE
-]
+  "imgs/story/lock-100px.png", // LOCKED
+  "",
+  "imgs/story/checkmark-100px.png", // DONE
+];
 
 // clickArea's generated using https://www.image-map.net/
 const CITY_MAP_INFO = {
   INTRO: {
     displayName: "Beginner's Park",
     overlayLocation: [229, 92],
-    clickArea: '45,181,53,319,79,347,97,329,141,335,144,277,121,183,70,169'
+    clickArea: "45,181,53,319,79,347,97,329,141,335,144,277,121,183,70,169",
   },
   TRYHARD: {
-    displayName: 'City-State of Tryhard',
+    displayName: "City-State of Tryhard",
     overlayLocation: [205, 225],
-    clickArea: '124,182,146,335,281,321,289,237,241,172,149,126,115,147'
+    clickArea: "124,182,146,335,281,321,289,237,241,172,149,126,115,147",
   },
   PBOOST: {
-    displayName: 'Principality of Boost',
+    displayName: "Principality of Boost",
     overlayLocation: [367, 209],
-    clickArea: '74,346,61,381,83,461,137,532,266,526,328,455,286,392,255,349,254,323,152,338,98,332'
+    clickArea:
+      "74,346,61,381,83,461,137,532,266,526,328,455,286,392,255,349,254,323,152,338,98,332",
   },
   WASTELAND: {
-    displayName: 'Demolishing Wastelands',
+    displayName: "Demolishing Wastelands",
     overlayLocation: [123, 616],
-    clickArea: '582,71,558,291,666,296,726,251,812,266,754,85'
+    clickArea: "582,71,558,291,666,296,726,251,812,266,754,85",
   },
   CAMPANDSNIPE: {
-    displayName: 'Commonwealth of Campandsnipe',
+    displayName: "Commonwealth of Campandsnipe",
     overlayLocation: [369, 724],
-    clickArea: '556,297,537,377,673,412,749,391,821,332,820,261,725,253,665,301'
+    clickArea:
+      "556,297,537,377,673,412,749,391,821,332,820,261,725,253,665,301",
   },
   CHAMPIONSIAN: {
-    displayName: 'Championsian Federation',
+    displayName: "Championsian Federation",
     overlayLocation: [193, 520],
-    clickArea: '227,160,293,237,284,317,267,355,280,377,425,336,487,321,557,232,559,160,417,106,222,113'
-  }
-}
+    clickArea:
+      "227,160,293,237,284,317,267,355,280,377,425,336,487,321,557,232,559,160,417,106,222,113",
+  },
+};
 
 export default {
-  name: 'story-challenges',
+  name: "story-challenges",
   props: {
     saveState: Object,
-    debugMode: Boolean
+    debugMode: Boolean,
   },
   components: {
-    'story-upgrades': StoryUpgrades,
-    'story-pick-team': StoryPickTeam,
-    'story-recruit-list': StoryRecruitList
+    "story-upgrades": StoryUpgrades,
+    "story-pick-team": StoryPickTeam,
+    "story-recruit-list": StoryRecruitList,
   },
-  template: /* html */`
+  template: /* html */ `
   <div class="pt-2" v-if="challenges">
     <story-pick-team
       ref="pickTeamPopup"
@@ -235,157 +238,163 @@ export default {
     </b-overlay>
   </div>
   `,
-  data () {
+  data() {
     return {
       bots_config: {},
       game_in_progress: {},
       cityDisplayInfo: {},
       challenges: null,
-      selectedCityId: 'INTRO',
-      matchStartFailed: listen('match-start-failed', _ => {
-        this.game_in_progress = {}
-        this.snackbarContent = 'Error starting the match! See the console for more details.'
-        this.showSnackbar = true
-      })
-    }
+      selectedCityId: "INTRO",
+      matchStartFailed: listen("match-start-failed", (_) => {
+        this.game_in_progress = {};
+        this.snackbarContent =
+          "Error starting the match! See the console for more details.";
+        this.showSnackbar = true;
+      }),
+    };
   },
   computed: {
     all_challenges_done: function () {
       for (const city of Object.keys(this.challenges)) {
         for (const challenge of this.challenges[city]) {
-          console.log(challenge.id)
+          console.log(challenge.id);
           if (!this.challengeCompleted(challenge.id)) {
-            return false
+            return false;
           }
         }
       }
-      return true
+      return true;
     },
     game_completed: function () {
       // True if a recent on going match finished
-      let result = {}
+      let result = {};
       if (this.game_in_progress.name) {
-        const name = this.game_in_progress.name
-        const status = this.saveState.challenges_attempts[name]
+        const name = this.game_in_progress.name;
+        const status = this.saveState.challenges_attempts[name];
         if (status && status.length === this.game_in_progress.target_count) {
-          const results = status[this.game_in_progress.target_count - 1]
+          const results = status[this.game_in_progress.target_count - 1];
           result = {
             name,
-            completed: results.challenge_completed
-          }
-          this.$bvModal.show('game_completed_popup')
+            completed: results.challenge_completed,
+          };
+          this.$bvModal.show("game_completed_popup");
         }
       }
-      return result
+      return result;
     },
     recruit_list: function () {
-      const recruits = {}
+      const recruits = {};
 
       for (const city of Object.keys(this.challenges)) {
         if (this.getCityState(city) !== CITY_STATE.DONE) {
-          continue
+          continue;
         }
         for (const challenge of this.challenges[city]) {
           // This challenge was completed so opponents are available
-          const botIds = challenge.opponentBots
+          const botIds = challenge.opponentBots;
           for (const botId of botIds) {
-            const bot = Object.assign({}, this.bots_config[botId])
-            bot.recruited = this.saveState.teammates.includes(botId)
-            bot.id = botId
-            recruits[botId] = bot
+            const bot = Object.assign({}, this.bots_config[botId]);
+            bot.recruited = this.saveState.teammates.includes(botId);
+            bot.id = botId;
+            recruits[botId] = bot;
           }
         }
       }
-      return Object.values(recruits)
-    }
+      return Object.values(recruits);
+    },
   },
   methods: {
     closeGameCompletedPopup: function () {
-      this.game_in_progress = {}
-      this.switchSelectedCityToBest()
+      this.game_in_progress = {};
+      this.switchSelectedCityToBest();
     },
     switchSelectedCityToBest: function () {
-      const cur = this.selectedCityId
-      if (this.getCityState(cur) === CITY_STATE.OPEN || this.all_challenges_done) {
+      const cur = this.selectedCityId;
+      if (
+        this.getCityState(cur) === CITY_STATE.OPEN ||
+        this.all_challenges_done
+      ) {
         // current city is stll open, that's fine
-
       } else {
-        const openCities = Object.keys(
-          this.cityDisplayInfo).filter((city) =>
-          this.getCityState(city) === CITY_STATE.OPEN)
+        const openCities = Object.keys(this.cityDisplayInfo).filter(
+          (city) => this.getCityState(city) === CITY_STATE.OPEN
+        );
 
-        const random = openCities[Math.floor(Math.random() * openCities.length)]
-        console.log(random)
-        this.selectedCityId = random
+        const random =
+          openCities[Math.floor(Math.random() * openCities.length)];
+        console.log(random);
+        this.selectedCityId = random;
       }
     },
     challengeCompleted: function (id) {
-      return this.saveState.challenges_completed[id] !== undefined
+      return this.saveState.challenges_completed[id] !== undefined;
     },
     getCityStateTooltip: function (city) {
-      const state = this.getCityState(city)
-      const displayName = this.cityDisplayInfo[city].displayName
+      const state = this.getCityState(city);
+      const displayName = this.cityDisplayInfo[city].displayName;
 
       const suffix = [
-        'is still locked.',
-        'is open to challenge!',
-        'has been completed!'
-      ]
-      return displayName + ' ' + suffix[state]
+        "is still locked.",
+        "is open to challenge!",
+        "has been completed!",
+      ];
+      return displayName + " " + suffix[state];
     },
     handleCityClick: function (city) {
       if (this.getCityState(city) !== CITY_STATE.LOCKED || this.debugMode) {
-        this.selectedCityId = city
+        this.selectedCityId = city;
       }
     },
     showIntroPopup: function () {
-      return !this.challengeCompleted('INTRO-1')
+      return !this.challengeCompleted("INTRO-1");
     },
     getCityState: function (city) {
-      let state = CITY_STATE.LOCKED
+      let state = CITY_STATE.LOCKED;
 
-      const prereqs = this.cityDisplayInfo[city].prereqs
-      if (prereqs.every(c => (this.getCityState(c) === CITY_STATE.DONE))) {
-        state = CITY_STATE.OPEN
+      const prereqs = this.cityDisplayInfo[city].prereqs;
+      if (prereqs.every((c) => this.getCityState(c) === CITY_STATE.DONE)) {
+        state = CITY_STATE.OPEN;
 
         // only need to check completion of challenges if we are open
-        const cityChallenges = this.challenges[city]
-        if (cityChallenges.every(c => this.challengeCompleted(c.id))) {
-          state = CITY_STATE.DONE
+        const cityChallenges = this.challenges[city];
+        if (cityChallenges.every((c) => this.challengeCompleted(c.id))) {
+          state = CITY_STATE.DONE;
         }
       }
-      return state
+      return state;
     },
     getOverlayForCity: function (city) {
-      return CITY_ICON_MAP[this.getCityState(city)]
+      return CITY_ICON_MAP[this.getCityState(city)];
     },
     launchChallenge: function (challengeId, pickedTeammates = []) {
-      const attempts = this.saveState.challenges_attempts[challengeId]
+      const attempts = this.saveState.challenges_attempts[challengeId];
       this.game_in_progress = {
         name: challengeId,
-        target_count: (attempts ? attempts.length : 0) + 1
-      }
-      this.$emit('launch_challenge', { id: challengeId, pickedTeammates })
-      console.log(this.game_in_progress)
-    }
+        target_count: (attempts ? attempts.length : 0) + 1,
+      };
+      this.$emit("launch_challenge", { id: challengeId, pickedTeammates });
+      console.log(this.game_in_progress);
+    },
   },
   created: async function () {
-    console.log(this.saveState)
-    invoke('get_cities_json', { storySettings: this.saveState.story_settings }).then(cities => {
-      invoke('get_bots_configs', { storySettings: this.saveState.story_settings }).then(bots => {
-        this.bots_config = bots
-      })
+    console.log(this.saveState);
+    invoke("get_cities_json", {
+      storySettings: this.saveState.story_settings,
+    }).then((cities) => {
+      invoke("get_bots_configs", {
+        storySettings: this.saveState.story_settings,
+      }).then((bots) => {
+        this.bots_config = bots;
+      });
 
-      this.challenges = {}
+      this.challenges = {};
       for (const city of Object.keys(cities)) {
-        this.challenges[city] = cities[city].challenges
-        this.cityDisplayInfo[city] = cities[city].description
-        Object.assign(this.cityDisplayInfo[city], CITY_MAP_INFO[city])
+        this.challenges[city] = cities[city].challenges;
+        this.cityDisplayInfo[city] = cities[city].description;
+        Object.assign(this.cityDisplayInfo[city], CITY_MAP_INFO[city]);
       }
-      this.switchSelectedCityToBest()
-    })
+      this.switchSelectedCityToBest();
+    });
   },
-  watch: {
-
-  }
-}
+  watch: {},
+};

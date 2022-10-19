@@ -1,10 +1,10 @@
-const invoke = window.__TAURI__.invoke
-const listen = window.__TAURI__.event.listen
-const MAX_LINES = 840
+const invoke = window.__TAURI__.invoke;
+const listen = window.__TAURI__.event.listen;
+const MAX_LINES = 840;
 
 export default {
-  name: 'console',
-  template: /* html */`
+  name: "console",
+  template: /* html */ `
   <div class="overflow-hidden flex-grow-1">
   <b-navbar class="navbar">
     <b-navbar-brand>
@@ -54,110 +54,112 @@ export default {
   </div>
   `,
   components: {},
-  data () {
+  data() {
     return {
-      inputCommand: '',
-      savedInputCommand: '',
+      inputCommand: "",
+      savedInputCommand: "",
       previousCommands: [],
       commandsIndex: -1,
       consoleTexts: [],
       texts: 0,
       userChoseLock: false,
       scrollLock: true,
-      newTextListener: listen('new-console-texts', event => {
-        event.payload.forEach(update => {
+      newTextListener: listen("new-console-texts", (event) => {
+        event.payload.forEach((update) => {
           if (update.replace_last) {
-            this.consoleTexts.pop()
+            this.consoleTexts.pop();
           }
 
-          this.consoleTexts.push({ id: this.texts, content: update.content })
-          this.texts++
+          this.consoleTexts.push({ id: this.texts, content: update.content });
+          this.texts++;
 
           if (this.consoleTexts.length > MAX_LINES) {
-            this.consoleTexts.shift()
+            this.consoleTexts.shift();
           }
-        })
+        });
 
         if (this.scrollLock) {
           if (this.consoleTexts.length >= MAX_LINES && !this.userChoseLock) {
-            this.scrollLock = false
+            this.scrollLock = false;
           }
 
           try {
-            this.$refs.scroller.scrollToBottom()
+            this.$refs.scroller.scrollToBottom();
           } catch (e) {} // ignore the error, it randomly happens sometimes but it still works
         }
-      })
-    }
+      }),
+    };
   },
   methods: {
     toggleScrollLock: function () {
-      this.userChoseLock = true
-      this.scrollLock = !this.scrollLock
+      this.userChoseLock = true;
+      this.scrollLock = !this.scrollLock;
       if (this.scrollLock) {
-        this.$refs.scroller.scrollToBottom()
+        this.$refs.scroller.scrollToBottom();
       }
     },
     onUp: function (event) {
       if (this.commandsIndex < this.previousCommands.length - 1) {
         if (this.commandsIndex === -1) {
-          this.savedInputCommand = this.inputCommand
+          this.savedInputCommand = this.inputCommand;
         }
 
-        this.commandsIndex += 1
-        this.inputCommand = this.previousCommands[this.commandsIndex]
+        this.commandsIndex += 1;
+        this.inputCommand = this.previousCommands[this.commandsIndex];
       }
     },
     onDown: function (event) {
       if (this.commandsIndex > -1) {
-        this.commandsIndex -= 1
+        this.commandsIndex -= 1;
 
         if (this.commandsIndex === -1) {
-          this.inputCommand = this.savedInputCommand
+          this.inputCommand = this.savedInputCommand;
         } else {
-          this.inputCommand = this.previousCommands[this.commandsIndex]
+          this.inputCommand = this.previousCommands[this.commandsIndex];
         }
       }
     },
     onSubmit: function (e) {
-      e.preventDefault()
+      e.preventDefault();
       if (this.inputCommand.length === 0) {
-        return
+        return;
       }
 
       if (this.previousCommands[0] !== this.inputCommand) {
-        this.previousCommands.unshift(this.inputCommand)
+        this.previousCommands.unshift(this.inputCommand);
       }
 
-      invoke('run_command', { input: this.inputCommand }).catch(error => console.error(error))
+      invoke("run_command", { input: this.inputCommand }).catch((error) =>
+        console.error(error)
+      );
 
-      this.inputCommand = ''
-      this.savedInputCommand = ''
-      this.commandsIndex = -1
+      this.inputCommand = "";
+      this.savedInputCommand = "";
+      this.commandsIndex = -1;
     },
     startup: function () {
-      if (this.$route.path === '/console') {
-        invoke('get_console_texts').then(texts => {
-          texts.forEach(content => {
-            this.consoleTexts.push({ id: this.texts, content })
-            this.texts++
-          })
+      if (this.$route.path === "/console") {
+        invoke("get_console_texts").then((texts) => {
+          texts.forEach((content) => {
+            this.consoleTexts.push({ id: this.texts, content });
+            this.texts++;
+          });
 
-          this.$refs.scroller.scrollToBottom()
-        })
+          this.$refs.scroller.scrollToBottom();
+        });
 
-        invoke('get_console_input_commands').then(commands => {
-          this.previousCommands = commands
-        })
+        invoke("get_console_input_commands").then((commands) => {
+          this.previousCommands = commands;
+        });
       }
-    }
+    },
   },
   computed: {},
   created: function () {
-    this.startup()
+    this.startup();
   },
   watch: {
     // call again the method if the route changes
-    $route: 'startup'
-  }
-}
+    $route: "startup",
+  },
+};

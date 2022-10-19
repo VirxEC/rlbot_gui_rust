@@ -1,8 +1,8 @@
 export default {
-  name: 'story-recruit-list',
+  name: "story-recruit-list",
   props: {
     recruitables: Array,
-    currency: 0
+    currency: 0,
   },
   template: /* html */ `
   <b-list-group>
@@ -19,5 +19,5 @@ export default {
       </b-button>
     </b-list-group-item>
   </b-list-group>
-  `
-}
+  `,
+};

@@ -1,7 +1,7 @@
-const invoke = window.__TAURI__.invoke
+const invoke = window.__TAURI__.invoke;
 
 export default {
-  name: 'alter-save-state',
+  name: "alter-save-state",
   props: { value: Object },
   template: `
   <div>
@@ -18,17 +18,17 @@ export default {
   </div>
   `,
   data: {
-    text: ''
+    text: "",
   },
   methods: {
     handleInput: function (event) {
-      this.text = event.target.value
+      this.text = event.target.value;
     },
     sendJSON: function () {
-      const state = JSON.parse(this.text)
-      console.log(state)
-      this.$emit('input', state)
-      invoke('story_save_state', { storyState: state })
-    }
-  }
-}
+      const state = JSON.parse(this.text);
+      console.log(state);
+      this.$emit("input", state);
+      invoke("story_save_state", { storyState: state });
+    },
+  },
+};

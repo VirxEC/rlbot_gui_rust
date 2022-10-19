@@ -1,12 +1,12 @@
 export default {
-  name: 'runnable-card',
+  name: "runnable-card",
   props: {
     runnable: Object,
     disabled: Boolean,
     removable: Boolean,
-    hidewarning: Boolean
+    hidewarning: Boolean,
   },
-  template: /* html */`
+  template: /* html */ `
     <b-card class="bot-card" @click="disabled || $emit('click')" :class="{disabled: disabled}">
 
       <slot>
@@ -35,5 +35,5 @@ export default {
       </b-button>
 
     </b-card>
-  `
-}
+  `,
+};

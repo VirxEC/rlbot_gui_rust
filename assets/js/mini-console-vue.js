@@ -1,8 +1,8 @@
-const listen = window.__TAURI__.event.listen
+const listen = window.__TAURI__.event.listen;
 
 export default {
-  name: 'mini-console',
-  template: /* html */`
+  name: "mini-console",
+  template: /* html */ `
   <b-card no-body class="console-text-pool p-1" style="max-height: 80vh">
     <DynamicScroller
       ref="scroller"
@@ -26,28 +26,28 @@ export default {
     </DynamicScroller>
   </b-card>
   `,
-  data () {
+  data() {
     return {
       consoleTexts: [],
       texts: 0,
-      newTextListener: listen('new-console-texts', event => {
-        event.payload.forEach(update => {
+      newTextListener: listen("new-console-texts", (event) => {
+        event.payload.forEach((update) => {
           if (update.replace_last) {
-            this.consoleTexts.pop()
+            this.consoleTexts.pop();
           }
 
-          this.consoleTexts.push({ id: this.texts, content: update.content })
-          this.texts++
+          this.consoleTexts.push({ id: this.texts, content: update.content });
+          this.texts++;
 
           if (this.consoleTexts.length > 420) {
-            this.consoleTexts.shift()
+            this.consoleTexts.shift();
           }
-        })
+        });
 
         try {
-          this.$refs.scroller.scrollToBottom()
+          this.$refs.scroller.scrollToBottom();
         } catch (e) {} // ignore the error, it randomly happens sometimes but it still works
-      })
-    }
-  }
-}
+      }),
+    };
+  },
+};

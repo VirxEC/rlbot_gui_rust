@@ -1,10 +1,10 @@
-import RunnableCard from './runnable-card-vue.js'
+import RunnableCard from "./runnable-card-vue.js";
 
 export default {
-  name: 'script-card',
-  props: ['script', 'disabled'],
+  name: "script-card",
+  props: ["script", "disabled"],
   components: {
-    'runnable-card': RunnableCard
+    "runnable-card": RunnableCard,
   },
   template: `
     <runnable-card :runnable="script" class="script-card" :disabled="disabled">
@@ -18,5 +18,5 @@ export default {
         </b-form-checkbox>
       </b-form>
     </runnable-card>
-  `
-}
+  `,
+};

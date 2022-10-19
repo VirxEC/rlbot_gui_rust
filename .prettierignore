@@ -1,0 +1,9 @@
+.vscode
+.github
+icons
+node_modules
+screenshots
+src-tauri
+README.md
+.eslintrc.json
+*.min.*

@@ -1,15 +1,15 @@
-import ItemField from './item-field-vue.js'
-import Colorpicker from './colorpicker-vue.js'
+import ItemField from "./item-field-vue.js";
+import Colorpicker from "./colorpicker-vue.js";
 
-const invoke = window.__TAURI__.invoke
+const invoke = window.__TAURI__.invoke;
 
 export default {
-  name: 'appearance-editor',
+  name: "appearance-editor",
   components: {
-    'item-field': ItemField,
-    colorpicker: Colorpicker
+    "item-field": ItemField,
+    colorpicker: Colorpicker,
   },
-  props: ['path', 'activeBot', 'map'],
+  props: ["path", "activeBot", "map"],
   template: `
   <b-modal id="appearance-editor-dialog" size="xl" v-model="appearanceModalActive" hide-footer centered>
     <template v-slot:modal-title>
@@ -75,109 +75,171 @@ export default {
     </div>
   </b-modal>
   `,
-  data () {
+  data() {
     return {
       appearanceModalActive: false,
       config: {
         blue: {},
-        orange: {}
+        orange: {},
       },
       items: {},
       itemTypes: [
-        { name: 'Body', category: 'Body', itemKey: 'car_id', paintKey: 'car_paint_id' },
-        { name: 'Decal', category: 'Skin', itemKey: 'decal_id', paintKey: 'decal_paint_id' },
-        { name: 'Wheels', category: 'Wheels', itemKey: 'wheels_id', paintKey: 'wheels_paint_id' },
-        { name: 'Boost', category: 'Boost', itemKey: 'boost_id', paintKey: 'boost_paint_id' },
-        { name: 'Antenna', category: 'Antenna', itemKey: 'antenna_id', paintKey: 'antenna_paint_id' },
-        { name: 'Topper', category: 'Hat', itemKey: 'hat_id', paintKey: 'hat_paint_id' },
-        { name: 'Primary Finish', category: 'PaintFinish', itemKey: 'paint_finish_id', paintKey: null },
-        { name: 'Accent Finish', category: 'PaintFinish', itemKey: 'custom_finish_id', paintKey: null },
-        { name: 'Engine Audio', category: 'EngineAudio', itemKey: 'engine_audio_id', paintKey: null },
-        { name: 'Trail', category: 'SupersonicTrail', itemKey: 'trails_id', paintKey: 'trails_paint_id' },
-        { name: 'Goal Explosion', category: 'GoalExplosion', itemKey: 'goal_explosion_id', paintKey: 'goal_explosion_paint_id' }
+        {
+          name: "Body",
+          category: "Body",
+          itemKey: "car_id",
+          paintKey: "car_paint_id",
+        },
+        {
+          name: "Decal",
+          category: "Skin",
+          itemKey: "decal_id",
+          paintKey: "decal_paint_id",
+        },
+        {
+          name: "Wheels",
+          category: "Wheels",
+          itemKey: "wheels_id",
+          paintKey: "wheels_paint_id",
+        },
+        {
+          name: "Boost",
+          category: "Boost",
+          itemKey: "boost_id",
+          paintKey: "boost_paint_id",
+        },
+        {
+          name: "Antenna",
+          category: "Antenna",
+          itemKey: "antenna_id",
+          paintKey: "antenna_paint_id",
+        },
+        {
+          name: "Topper",
+          category: "Hat",
+          itemKey: "hat_id",
+          paintKey: "hat_paint_id",
+        },
+        {
+          name: "Primary Finish",
+          category: "PaintFinish",
+          itemKey: "paint_finish_id",
+          paintKey: null,
+        },
+        {
+          name: "Accent Finish",
+          category: "PaintFinish",
+          itemKey: "custom_finish_id",
+          paintKey: null,
+        },
+        {
+          name: "Engine Audio",
+          category: "EngineAudio",
+          itemKey: "engine_audio_id",
+          paintKey: null,
+        },
+        {
+          name: "Trail",
+          category: "SupersonicTrail",
+          itemKey: "trails_id",
+          paintKey: "trails_paint_id",
+        },
+        {
+          name: "Goal Explosion",
+          category: "GoalExplosion",
+          itemKey: "goal_explosion_id",
+          paintKey: "goal_explosion_paint_id",
+        },
       ],
-      teams: ['blue', 'orange'],
+      teams: ["blue", "orange"],
       showcaseTypes: [
-        { id: 'back-center-kickoff', name: 'Static (Back-center kickoff)' },
-        { id: 'static', name: 'Static (Center)' },
-        { id: 'throttle', name: 'Drive around center' },
-        { id: 'boost', name: 'Boost around center' },
-        { id: 'goal-explosion', name: 'Goal explosion' }
+        { id: "back-center-kickoff", name: "Static (Back-center kickoff)" },
+        { id: "static", name: "Static (Center)" },
+        { id: "throttle", name: "Drive around center" },
+        { id: "boost", name: "Boost around center" },
+        { id: "goal-explosion", name: "Goal explosion" },
       ],
-      selectedShowcaseType: 'boost'
-    }
+      selectedShowcaseType: "boost",
+    };
   },
 
   methods: {
     getAndParseItems: async function () {
-      const response = await fetch('csv/items.csv')
-      const csv = await response.text()
-      const lines = csv.split(/\r?\n/)
+      const response = await fetch("csv/items.csv");
+      const csv = await response.text();
+      const lines = csv.split(/\r?\n/);
 
-      const items = {}
+      const items = {};
       for (const key in this.itemTypes) {
-        const category = this.itemTypes[key].category
-        items[category] = []
+        const category = this.itemTypes[key].category;
+        items[category] = [];
       }
 
       for (const line of lines) {
-        const columns = line.split(',')
-        const category = columns[1]
+        const columns = line.split(",");
+        const category = columns[1];
 
-        if (items[category]) { items[category].push({ id: columns[0], name: columns[3] }) }
+        if (items[category]) {
+          items[category].push({ id: columns[0], name: columns[3] });
+        }
       }
 
       // rename duplicate item names (append them with (2), (3), ...)
       for (const category in items) {
-        const nameCounts = {}
+        const nameCounts = {};
         for (const item of items[category]) {
           if (nameCounts[item.name]) {
-            nameCounts[item.name]++
-            item.name = `${item.name} (${nameCounts[item.name]})`
+            nameCounts[item.name]++;
+            item.name = `${item.name} (${nameCounts[item.name]})`;
           } else {
-            nameCounts[item.name] = 1
+            nameCounts[item.name] = 1;
           }
         }
       }
 
-      this.items = items
+      this.items = items;
     },
     saveAppearance: function () {
-      console.log(this.config)
-      invoke('save_looks', { path: this.path, config: this.config })
-      this.$bvModal.hide('appearance-editor-dialog')
-      this.config = {} // prevents a memory leak from not un-loading configs when the dialog is closed
+      console.log(this.config);
+      invoke("save_looks", { path: this.path, config: this.config });
+      this.$bvModal.hide("appearance-editor-dialog");
+      this.config = {}; // prevents a memory leak from not un-loading configs when the dialog is closed
     },
     spawnCarForViewing: function (team) {
-      invoke('spawn_car_for_viewing', { config: this.config, team, showcaseType: this.selectedShowcaseType, map: this.map })
+      invoke("spawn_car_for_viewing", {
+        config: this.config,
+        team,
+        showcaseType: this.selectedShowcaseType,
+        map: this.map,
+      });
     },
     loadLooks: async function (path) {
-      invoke('get_looks', { path }).then((config) => {
-        this.config = config
-      })
+      invoke("get_looks", { path }).then((config) => {
+        this.config = config;
+      });
     },
     randomizeTeamLoadout: function (team) {
-      this.config[team].team_color_id = Math.floor(Math.random() * 70)
-      this.config[team].custom_color_id = Math.floor(Math.random() * 105)
+      this.config[team].team_color_id = Math.floor(Math.random() * 70);
+      this.config[team].custom_color_id = Math.floor(Math.random() * 105);
 
       for (const itemField of this.$refs[team]) {
-        itemField.selectRandomItem()
-        itemField.selectRandomPaintColor()
+        itemField.selectRandomItem();
+        itemField.selectRandomPaintColor();
       }
-    }
+    },
   },
 
   created: function () {
-    this.getAndParseItems()
+    this.getAndParseItems();
   },
 
   watch: {
     appearanceModalActive: {
       handler: function (val) {
         if (val && this.path) {
-          this.loadLooks(this.path)
+          this.loadLooks(this.path);
         }
-      }
-    }
-  }
-}
+      },
+    },
+  },
+};

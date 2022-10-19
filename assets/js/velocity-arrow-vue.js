@@ -1,8 +1,8 @@
-const VELOCITY_SCALE = 30
+const VELOCITY_SCALE = 30;
 
 export default {
-  name: 'velocity-arrow',
-  props: ['object', 'color', 'maxradius'],
+  name: "velocity-arrow",
+  props: ["object", "color", "maxradius"],
   template: `
     <v-group>
       <v-line :config="lineConfig"></v-line>
@@ -15,7 +15,7 @@ export default {
         points: [0, 0, 0, 0],
         stroke: this.color,
         strokeWidth: 5,
-        lineCap: 'round'
+        lineCap: "round",
       },
       wedgeConfig: {
         x: 0,
@@ -27,71 +27,72 @@ export default {
         fill: this.color,
         offset: {
           x: 14,
-          y: 7.7
-        }
-      }
-    }
+          y: 7.7,
+        },
+      },
+    };
   },
   methods: {
     onDragStart: function (evt) {
-      this.$emit('dragstart', evt)
+      this.$emit("dragstart", evt);
     },
     onDragEnd: function (evt) {
-      this.$emit('dragend', this.object)
+      this.$emit("dragend", this.object);
     },
     onDragMove: function (evt) {
-      const pos = this.dragBounds({ x: evt.target.x(), y: evt.target.y() })
-      this.wedgeConfig.x = pos.x
-      this.wedgeConfig.y = pos.y
-      const dx = this.object.x - this.wedgeConfig.x
-      const dy = this.object.y - this.wedgeConfig.y
-      this.object.vx = dx * VELOCITY_SCALE
-      this.object.vy = dy * VELOCITY_SCALE
-      this.object.rotation = Math.atan2(dy, dx) * 180 / Math.PI
+      const pos = this.dragBounds({ x: evt.target.x(), y: evt.target.y() });
+      this.wedgeConfig.x = pos.x;
+      this.wedgeConfig.y = pos.y;
+      const dx = this.object.x - this.wedgeConfig.x;
+      const dy = this.object.y - this.wedgeConfig.y;
+      this.object.vx = dx * VELOCITY_SCALE;
+      this.object.vy = dy * VELOCITY_SCALE;
+      this.object.rotation = (Math.atan2(dy, dx) * 180) / Math.PI;
 
-      this.update(this.object)
+      this.update(this.object);
     },
     dragBounds: function (pos) {
-      const dx = pos.x - this.object.x
-      const dy = pos.y - this.object.y
-      const distance = Math.hypot(dx, dy) * VELOCITY_SCALE
+      const dx = pos.x - this.object.x;
+      const dy = pos.y - this.object.y;
+      const distance = Math.hypot(dx, dy) * VELOCITY_SCALE;
       if (distance > this.maxradius) {
         return {
-          x: this.object.x + dx * this.maxradius / distance,
-          y: this.object.y + dy * this.maxradius / distance
-        }
+          x: this.object.x + (dx * this.maxradius) / distance,
+          y: this.object.y + (dy * this.maxradius) / distance,
+        };
       } else {
-        return pos
+        return pos;
       }
     },
     update: function (object) {
-      const x = object.x
-      const y = object.y
-      const vx = object.vx
-      const vy = object.vy
+      const x = object.x;
+      const y = object.y;
+      const vx = object.vx;
+      const vy = object.vy;
 
-      this.lineConfig.points[0] = x
-      this.lineConfig.points[1] = y
+      this.lineConfig.points[0] = x;
+      this.lineConfig.points[1] = y;
 
-      this.wedgeConfig.x = x - vx / VELOCITY_SCALE
-      this.wedgeConfig.y = y - vy / VELOCITY_SCALE
+      this.wedgeConfig.x = x - vx / VELOCITY_SCALE;
+      this.wedgeConfig.y = y - vy / VELOCITY_SCALE;
 
-      this.lineConfig.points[2] = this.wedgeConfig.x
-      this.lineConfig.points[3] = this.wedgeConfig.y
+      this.lineConfig.points[2] = this.wedgeConfig.x;
+      this.lineConfig.points[3] = this.wedgeConfig.y;
 
       if (Math.hypot(vx, vy) < 1 && this.object.rotation) {
-        this.wedgeConfig.rotation = this.object.rotation - 30
+        this.wedgeConfig.rotation = this.object.rotation - 30;
       } else {
-        this.wedgeConfig.rotation = Math.atan2(-vy, -vx) * 180 / Math.PI + 150
+        this.wedgeConfig.rotation =
+          (Math.atan2(-vy, -vx) * 180) / Math.PI + 150;
       }
-    }
+    },
   },
   watch: {
     object: {
       deep: true,
       handler: function (newVal) {
-        this.update(newVal)
-      }
-    }
-  }
-}
+        this.update(newVal);
+      },
+    },
+  },
+};

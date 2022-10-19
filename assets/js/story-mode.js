@@ -1,21 +1,21 @@
-import StoryStart from './story-mode-start.js'
-import StoryChallenges from './story-challenges.js'
+import StoryStart from "./story-mode-start.js";
+import StoryChallenges from "./story-challenges.js";
 
-import AlterSaveState from './story-alter-save-state.js'
+import AlterSaveState from "./story-alter-save-state.js";
 
-const invoke = window.__TAURI__.invoke
-const listen = window.__TAURI__.event.listen
+const invoke = window.__TAURI__.invoke;
+const listen = window.__TAURI__.event.listen;
 
 const UI_STATES = {
   LOAD_SAVE: 0,
   START_SCREEN: 1,
   VALIDATE_PRECONDITIONS: 2,
-  STORY_CHALLENGES: 3
-}
+  STORY_CHALLENGES: 3,
+};
 
 export default {
-  name: 'story',
-  template: /* html */`
+  name: "story",
+  template: /* html */ `
   <div>
   <b-navbar class="navbar">
     <b-navbar-brand>
@@ -84,167 +84,179 @@ export default {
   </div>
   `,
   components: {
-    'story-start': StoryStart,
-    'story-challenges': StoryChallenges,
-    'alter-save-state': AlterSaveState
+    "story-start": StoryStart,
+    "story-challenges": StoryChallenges,
+    "alter-save-state": AlterSaveState,
   },
-  data () {
+  data() {
     return {
       ui_state: UI_STATES.LOAD_SAVE,
       saveState: null,
       validationState: {
         mapPack: {
           downloadNeeded: false,
-          updateNeeded: false
+          updateNeeded: false,
         },
         botPack: {
-          downloadNeeded: false
-        }
+          downloadNeeded: false,
+        },
       },
       debugMode: false,
-      debugStateHelper: '',
+      debugStateHelper: "",
       download_in_progress: false,
-      loadUpdatedSaveState: listen('load_updated_save_state', event => {
-        const saveState = event.payload
-        console.log(saveState)
-        this.saveState = saveState
+      loadUpdatedSaveState: listen("load_updated_save_state", (event) => {
+        const saveState = event.payload;
+        console.log(saveState);
+        this.saveState = saveState;
       }),
       showSnackbar: false,
-      snackbarContent: null
-    }
+      snackbarContent: null,
+    };
   },
   methods: {
-    toggleDebugMode () {
-      this.debugMode = !this.debugMode
+    toggleDebugMode() {
+      this.debugMode = !this.debugMode;
     },
-    storyStateMachine (targetState) {
-      console.log(`Going from ${this.ui_state} to ${targetState}`)
-      this.ui_state = targetState
+    storyStateMachine(targetState) {
+      console.log(`Going from ${this.ui_state} to ${targetState}`);
+      this.ui_state = targetState;
     },
     startStory: async function (event) {
       const teamSettings = {
         name: event.teamname,
-        color: event.teamcolor
-      }
+        color: event.teamcolor,
+      };
       const storySettings = {
         story_id: event.story_id,
         custom_config: event.custom_story,
-        use_custom_maps: event.use_custom_maps
-      }
+        use_custom_maps: event.use_custom_maps,
+      };
 
-      invoke('story_new_save', { teamSettings, storySettings }).then(state => {
-        this.saveState = state
-        this.run_validation()
-      })
+      invoke("story_new_save", { teamSettings, storySettings }).then(
+        (state) => {
+          this.saveState = state;
+          this.run_validation();
+        }
+      );
     },
     run_validation: function () {
       // check things like map pack and bot pack are downloaded
-      invoke('get_story_settings', { storySettings: this.saveState.story_settings }).then(settings => {
+      invoke("get_story_settings", {
+        storySettings: this.saveState.story_settings,
+      }).then((settings) => {
         // check min map pack version
-        const minVersion = settings.min_map_pack_revision
+        const minVersion = settings.min_map_pack_revision;
 
-        invoke('get_map_pack_revision').then(currentVersion => {
-          const mapsRequired = (minVersion != null)
+        invoke("get_map_pack_revision").then((currentVersion) => {
+          const mapsRequired = minVersion != null;
 
-          let needMapsDownload = false
-          let needMapsUpdate = false
+          let needMapsDownload = false;
+          let needMapsUpdate = false;
           if (mapsRequired) {
-            needMapsDownload = (minVersion && !currentVersion)
-            needMapsUpdate = (minVersion > currentVersion)
+            needMapsDownload = minVersion && !currentVersion;
+            needMapsUpdate = minVersion > currentVersion;
           }
 
           // check botpack condition
           // we could do version checks with "release tag" but whatever
           // just doing existence checks
-          invoke('get_downloaded_botpack_commit_id').then(commitID => {
-            const needBotsDownload = (commitID == null)
+          invoke("get_downloaded_botpack_commit_id").then((commitID) => {
+            const needBotsDownload = commitID == null;
 
-            this.validationState.mapPack.downloadNeeded = needMapsDownload
-            this.validationState.mapPack.updateNeeded = needMapsUpdate
-            this.validationState.botPack.downloadNeeded = needBotsDownload
+            this.validationState.mapPack.downloadNeeded = needMapsDownload;
+            this.validationState.mapPack.updateNeeded = needMapsUpdate;
+            this.validationState.botPack.downloadNeeded = needBotsDownload;
 
             if (needMapsDownload || needMapsUpdate || needBotsDownload) {
-              this.storyStateMachine(UI_STATES.VALIDATE_PRECONDITIONS)
+              this.storyStateMachine(UI_STATES.VALIDATE_PRECONDITIONS);
             } else {
-              this.storyStateMachine(UI_STATES.STORY_CHALLENGES)
+              this.storyStateMachine(UI_STATES.STORY_CHALLENGES);
             }
-          })
-        })
-      })
+          });
+        });
+      });
     },
     validationUIHelper: function () {
-      const mapPack = this.validationState.mapPack
-      const botPack = this.validationState.botPack
+      const mapPack = this.validationState.mapPack;
+      const botPack = this.validationState.botPack;
       const downloadButtonsHelper = [
         {
           condition: mapPack.downloadNeeded,
-          text: 'Download Map Pack',
-          handler: this.downloadMapPack
+          text: "Download Map Pack",
+          handler: this.downloadMapPack,
         },
         {
           condition: !mapPack.downloadNeeded && mapPack.updateNeeded,
-          text: 'Update Map Pack',
-          handler: this.downloadMapPack
+          text: "Update Map Pack",
+          handler: this.downloadMapPack,
         },
         {
           condition: botPack.downloadNeeded,
-          text: 'Download Bot Pack',
-          handler: this.downloadBotPack
-        }
-      ]
-      return downloadButtonsHelper
+          text: "Download Bot Pack",
+          handler: this.downloadBotPack,
+        },
+      ];
+      return downloadButtonsHelper;
     },
     downloadBotPack: function () {
-      this.download_in_progress = true
-      invoke('download_bot_pack').then(this.handle_download_updates)
+      this.download_in_progress = true;
+      invoke("download_bot_pack").then(this.handle_download_updates);
     },
     downloadMapPack: function () {
-      this.download_in_progress = true
-      invoke('download_bot_pack').then(this.handle_download_updates)
+      this.download_in_progress = true;
+      invoke("download_bot_pack").then(this.handle_download_updates);
     },
     handle_download_updates: function (finished) {
-      this.download_in_progress = false
-      this.run_validation()
+      this.download_in_progress = false;
+      this.run_validation();
     },
     deleteSave: function () {
-      invoke('story_delete_save').then(() => {
-        this.saveState = null
-        this.storyStateMachine(UI_STATES.START_SCREEN)
-      })
+      invoke("story_delete_save").then(() => {
+        this.saveState = null;
+        this.storyStateMachine(UI_STATES.START_SCREEN);
+      });
     },
     launchChallenge: function ({ id, pickedTeammates }) {
-      console.log('Starting match', id)
-      invoke('launch_challenge', { saveState: this.saveState, challengeId: id, pickedTeammates }).catch(error => {
-        this.showSnackbar = true
-        this.snackbarContent = error
-      })
+      console.log("Starting match", id);
+      invoke("launch_challenge", {
+        saveState: this.saveState,
+        challengeId: id,
+        pickedTeammates,
+      }).catch((error) => {
+        this.showSnackbar = true;
+        this.snackbarContent = error;
+      });
     },
     purchaseUpgrade: function ({ id, cost }) {
       // Send eel a message to add id to purchases and reduce currency
-      console.log('Will purchase: ', id)
-      invoke('purchase_upgrade', { saveState: this.saveState, upgradeId: id, cost }).then(saveState => {
+      console.log("Will purchase: ", id);
+      invoke("purchase_upgrade", {
+        saveState: this.saveState,
+        upgradeId: id,
+        cost,
+      }).then((saveState) => {
         if (saveState != null) {
-          this.saveState = saveState
+          this.saveState = saveState;
         }
-      })
+      });
     },
     recruit: function ({ id }) {
-      console.log('Will recruit ', id)
-      invoke('recruit', { saveState: this.saveState, id }).then(saveState => {
+      console.log("Will recruit ", id);
+      invoke("recruit", { saveState: this.saveState, id }).then((saveState) => {
         if (saveState != null) {
-          this.saveState = saveState
+          this.saveState = saveState;
         }
-      })
-    }
+      });
+    },
   },
   created: async function () {
-    invoke('story_load_save').then(state => {
+    invoke("story_load_save").then((state) => {
       if (!state) {
-        this.storyStateMachine(UI_STATES.START_SCREEN)
+        this.storyStateMachine(UI_STATES.START_SCREEN);
       } else {
-        this.saveState = state
-        this.run_validation()
+        this.saveState = state;
+        this.run_validation();
       }
-    })
-  }
-}
+    });
+  },
+};

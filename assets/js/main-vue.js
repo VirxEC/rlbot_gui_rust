@@ -1,26 +1,46 @@
-import AppearanceEditor from './appearance-editor-vue.js'
-import BotCard from './bot-card-vue.js'
-import BotPool from './bot-pool-vue.js'
-import LauncherPreferenceModal from './launcher-preference-vue.js'
-import MiniConsole from './mini-console-vue.js'
-import MutatorField from './mutator-field-vue.js'
-import ScriptCard from './script-card-vue.js'
-import TeamCard from './team-card-vue.js'
+import AppearanceEditor from "./appearance-editor-vue.js";
+import BotCard from "./bot-card-vue.js";
+import BotPool from "./bot-pool-vue.js";
+import LauncherPreferenceModal from "./launcher-preference-vue.js";
+import MiniConsole from "./mini-console-vue.js";
+import MutatorField from "./mutator-field-vue.js";
+import ScriptCard from "./script-card-vue.js";
+import TeamCard from "./team-card-vue.js";
 
-const invoke = window.__TAURI__.invoke
-const listen = window.__TAURI__.event.listen
+const invoke = window.__TAURI__.invoke;
+const listen = window.__TAURI__.event.listen;
 
-const HUMAN = { name: 'Human', runnable_type: 'human', skill: null, image: 'imgs/human.png' }
+const HUMAN = {
+  name: "Human",
+  runnable_type: "human",
+  skill: null,
+  image: "imgs/human.png",
+};
 const STARTING_BOT_POOL = [
   HUMAN,
-  { name: 'Psyonix Allstar', runnable_type: 'psyonix', skill: 1, image: 'imgs/psyonix.png' },
-  { name: 'Psyonix Pro', runnable_type: 'psyonix', skill: 0.5, image: 'imgs/psyonix.png' },
-  { name: 'Psyonix Rookie', runnable_type: 'psyonix', skill: 0, image: 'imgs/psyonix.png' }
-]
+  {
+    name: "Psyonix Allstar",
+    runnable_type: "psyonix",
+    skill: 1,
+    image: "imgs/psyonix.png",
+  },
+  {
+    name: "Psyonix Pro",
+    runnable_type: "psyonix",
+    skill: 0.5,
+    image: "imgs/psyonix.png",
+  },
+  {
+    name: "Psyonix Rookie",
+    runnable_type: "psyonix",
+    skill: 0,
+    image: "imgs/psyonix.png",
+  },
+];
 
 export default {
-  name: 'match-setup',
-  template: /* html */`
+  name: "match-setup",
+  template: /* html */ `
   <div class="noscroll-flex flex-grow-1">
   <b-navbar class="navbar">
     <b-navbar-brand>
@@ -436,22 +456,22 @@ export default {
   </div>
   `,
   components: {
-    'appearance-editor': AppearanceEditor,
-    'mutator-field': MutatorField,
-    'bot-card': BotCard,
-    'script-card': ScriptCard,
-    'bot-pool': BotPool,
-    'team-card': TeamCard,
-    'launcher-preference-modal': LauncherPreferenceModal,
-    'mini-console': MiniConsole
+    "appearance-editor": AppearanceEditor,
+    "mutator-field": MutatorField,
+    "bot-card": BotCard,
+    "script-card": ScriptCard,
+    "bot-pool": BotPool,
+    "team-card": TeamCard,
+    "launcher-preference-modal": LauncherPreferenceModal,
+    "mini-console": MiniConsole,
   },
-  data () {
+  data() {
     return {
       botPool: STARTING_BOT_POOL,
       scriptPool: [],
       blueTeam: [HUMAN],
       orangeTeam: [],
-      teamSelection: 'orange',
+      teamSelection: "orange",
       matchOptions: null,
       matchSettings: {
         map: null,
@@ -476,13 +496,13 @@ export default {
           boost_strength: null,
           gravity: null,
           demolish: null,
-          respawn_time: null
+          respawn_time: null,
         },
         randomize_map: false,
         enable_rendering: false,
         enable_state_setting: false,
         auto_save_replay: false,
-        scripts: []
+        scripts: [],
       },
       randomMapPool: [],
       packageString: null,
@@ -492,422 +512,520 @@ export default {
       gameAlreadyLaunched: false,
       matchStarting: false,
       languageSupport: null,
-      newBotName: '',
-      newBotLanguageChoice: 'python',
+      newBotName: "",
+      newBotLanguageChoice: "python",
       folderSettings: {
         files: {},
-        folders: {}
+        folders: {},
       },
       downloadProgressPercent: 0,
-      downloadStatus: '',
+      downloadStatus: "",
       showBotpackUpdateSnackbar: false,
-      appearancePath: '',
+      appearancePath: "",
       recommendations: null,
-      downloadModalTitle: 'Downloading Bot Pack',
-      python_path: '',
+      downloadModalTitle: "Downloading Bot Pack",
+      python_path: "",
       rec_python: null,
       init: false,
-      miniConsoleTitle: '',
+      miniConsoleTitle: "",
       allowMiniConsoleClose: false,
-      errorStartingMatchContent: '',
-      logUploadUrl: '',
-      updateDownloadProgressPercent: listen('update-download-progress', event => {
-        this.downloadProgressPercent = event.payload.percent
-        this.downloadStatus = event.payload.status
+      errorStartingMatchContent: "",
+      logUploadUrl: "",
+      updateDownloadProgressPercent: listen(
+        "update-download-progress",
+        (event) => {
+          this.downloadProgressPercent = event.payload.percent;
+          this.downloadStatus = event.payload.status;
+        }
+      ),
+      matchStarted: listen("match-started", (_) => {
+        this.$bvModal.hide("mini-console");
+        this.matchStarting = false;
+        this.gameAlreadyLaunched = true;
       }),
-      matchStarted: listen('match-started', _ => {
-        this.$bvModal.hide('mini-console')
-        this.matchStarting = false
-        this.gameAlreadyLaunched = true
+      matchStartFailed: listen("match-start-failed", (_) => {
+        this.matchStarting = false;
+        this.snackbarContent =
+          "Error starting the match! See the console for more details.";
+        this.showSnackbar = true;
       }),
-      matchStartFailed: listen('match-start-failed', _ => {
-        this.matchStarting = false
-        this.snackbarContent = 'Error starting the match! See the console for more details.'
-        this.showSnackbar = true
+      setAppearanceFile: listen("set-appearance-file", (event) => {
+        this.$store.commit("setActiveBot", null);
+        const path = event.payload;
+        if (path) this.showAppearanceEditor(path);
       }),
-      setAppearanceFile: listen('set-appearance-file', event => {
-        this.$store.commit('setActiveBot', null)
-        const path = event.payload
-        if (path) this.showAppearanceEditor(path)
-      })
-    }
+    };
   },
 
   methods: {
     uploadLog: function (event) {
-      this.miniConsoleTitle = 'Uploading full log to hastebin'
-      this.allowMiniConsoleClose = false
-      this.$bvModal.show('mini-console')
+      this.miniConsoleTitle = "Uploading full log to hastebin";
+      this.allowMiniConsoleClose = false;
+      this.$bvModal.show("mini-console");
 
       setTimeout(() => {
-        invoke('upload_log').then(logUploadUrl => {
-          this.allowMiniConsoleClose = true
-          this.logUploadUrl = logUploadUrl
-          this.$bvModal.hide('mini-console')
-          this.$bvModal.show('log-upload-successful')
-        }).catch(error => {
-          console.error(error)
-          this.allowMiniConsoleClose = true
-        })
-      }, 500)
+        invoke("upload_log")
+          .then((logUploadUrl) => {
+            this.allowMiniConsoleClose = true;
+            this.logUploadUrl = logUploadUrl;
+            this.$bvModal.hide("mini-console");
+            this.$bvModal.show("log-upload-successful");
+          })
+          .catch((error) => {
+            console.error(error);
+            this.allowMiniConsoleClose = true;
+          });
+      }, 500);
     },
     pythonSetup: function (event) {
-      invoke('get_detected_python_path').then(info => {
-        this.rec_python = info[0]
-      })
-      this.$bvModal.show('python-setup')
+      invoke("get_detected_python_path").then((info) => {
+        this.rec_python = info[0];
+      });
+      this.$bvModal.show("python-setup");
     },
     quickReloadWarnings: function () {
-      invoke('check_rlbot_python').then(support => {
-        const noPython = !support.python
-        const hasRLBot = support.rlbotpython
+      invoke("check_rlbot_python").then((support) => {
+        const noPython = !support.python;
+        const hasRLBot = support.rlbotpython;
 
         if (noPython || !hasRLBot) {
-          this.init = false
-          this.$router.replace('/python-config')
+          this.init = false;
+          this.$router.replace("/python-config");
         }
-      })
+      });
 
       for (let i = STARTING_BOT_POOL.length; i < this.botPool.length; i++) {
-        this.botPool[i].missing_python_packages = null
+        this.botPool[i].missing_python_packages = null;
       }
 
-      invoke('get_missing_bot_packages', { bots: this.botPool.slice(STARTING_BOT_POOL.length) }).then(bots => {
-        bots.forEach(packageInfo => {
-          const index = packageInfo.index + STARTING_BOT_POOL.length
-          this.botPool[index].warn = packageInfo.warn
-          this.botPool[index].missing_python_packages = packageInfo.missing_packages
-        })
-      })
+      invoke("get_missing_bot_packages", {
+        bots: this.botPool.slice(STARTING_BOT_POOL.length),
+      }).then((bots) => {
+        bots.forEach((packageInfo) => {
+          const index = packageInfo.index + STARTING_BOT_POOL.length;
+          this.botPool[index].warn = packageInfo.warn;
+          this.botPool[index].missing_python_packages =
+            packageInfo.missing_packages;
+        });
+      });
 
-      this.blueTeam.forEach(bot => {
-        bot.missing_python_packages = null
-      })
+      this.blueTeam.forEach((bot) => {
+        bot.missing_python_packages = null;
+      });
 
-      invoke('get_missing_bot_packages', { bots: this.blueTeam }).then(bots => {
-        bots.forEach(packageInfo => {
-          this.blueTeam[packageInfo.index].warn = packageInfo.warn
-          this.blueTeam[packageInfo.index].missing_python_packages = packageInfo.missing_packages
-        })
-      })
+      invoke("get_missing_bot_packages", { bots: this.blueTeam }).then(
+        (bots) => {
+          bots.forEach((packageInfo) => {
+            this.blueTeam[packageInfo.index].warn = packageInfo.warn;
+            this.blueTeam[packageInfo.index].missing_python_packages =
+              packageInfo.missing_packages;
+          });
+        }
+      );
 
-      this.orangeTeam.forEach(bot => {
-        bot.missing_python_packages = null
-      })
+      this.orangeTeam.forEach((bot) => {
+        bot.missing_python_packages = null;
+      });
 
-      invoke('get_missing_bot_packages', { bots: this.orangeTeam }).then(bots => {
-        bots.forEach(packageInfo => {
-          this.orangeTeam[packageInfo.index].warn = packageInfo.warn
-          this.orangeTeam[packageInfo.index].missing_python_packages = packageInfo.missing_packages
-        })
-      })
+      invoke("get_missing_bot_packages", { bots: this.orangeTeam }).then(
+        (bots) => {
+          bots.forEach((packageInfo) => {
+            this.orangeTeam[packageInfo.index].warn = packageInfo.warn;
+            this.orangeTeam[packageInfo.index].missing_python_packages =
+              packageInfo.missing_packages;
+          });
+        }
+      );
 
-      this.scriptPool.forEach(bot => {
-        bot.missing_python_packages = null
-      })
+      this.scriptPool.forEach((bot) => {
+        bot.missing_python_packages = null;
+      });
 
-      invoke('get_missing_script_packages', { scripts: this.scriptPool }).then(scripts => {
-        scripts.forEach(packageInfo => {
-          this.scriptPool[packageInfo.index].warn = packageInfo.warn
-          this.scriptPool[packageInfo.index].missing_python_packages = packageInfo.missing_packages
-        })
-      })
+      invoke("get_missing_script_packages", { scripts: this.scriptPool }).then(
+        (scripts) => {
+          scripts.forEach((packageInfo) => {
+            this.scriptPool[packageInfo.index].warn = packageInfo.warn;
+            this.scriptPool[packageInfo.index].missing_python_packages =
+              packageInfo.missing_packages;
+          });
+        }
+      );
     },
     applyPythonSetup: function () {
-      this.showProgressSpinner = true
-      invoke('set_python_path', { path: this.python_path }).then(() => {
-        this.$bvModal.hide('python-setup')
-        invoke('install_basic_packages').then((result) => {
-          let message = result.exit_code === 0 ? 'Successfully installed ' : 'Failed to install '
-          message += result.packages.join(', ')
+      this.showProgressSpinner = true;
+      invoke("set_python_path", { path: this.python_path }).then(() => {
+        this.$bvModal.hide("python-setup");
+        invoke("install_basic_packages").then((result) => {
+          let message =
+            result.exit_code === 0
+              ? "Successfully installed "
+              : "Failed to install ";
+          message += result.packages.join(", ");
           if (result.exit_code !== 0) {
-            message += ' with exit code ' + result.exit_code
+            message += " with exit code " + result.exit_code;
           }
-          this.snackbarContent = message
-          this.showSnackbar = true
-          this.showProgressSpinner = false
+          this.snackbarContent = message;
+          this.showSnackbar = true;
+          this.showProgressSpinner = false;
 
-          this.quickReloadWarnings()
-        })
-      })
+          this.quickReloadWarnings();
+        });
+      });
     },
     partialPythonSetup: function () {
-      invoke('set_python_path', { path: this.python_path }).then(() => {
-        this.$bvModal.hide('python-setup')
-        this.quickReloadWarnings()
-      })
+      invoke("set_python_path", { path: this.python_path }).then(() => {
+        this.$bvModal.hide("python-setup");
+        this.quickReloadWarnings();
+      });
     },
     startMatch: async function (event) {
-      this.matchStarting = true
-      this.miniConsoleTitle = 'Starting Match'
-      this.allowMiniConsoleClose = true
-      this.$bvModal.show('mini-console')
+      this.matchStarting = true;
+      this.miniConsoleTitle = "Starting Match";
+      this.allowMiniConsoleClose = true;
+      this.$bvModal.show("mini-console");
 
-      if (this.matchSettings.randomize_map) await this.setRandomMap()
+      if (this.matchSettings.randomize_map) await this.setRandomMap();
 
-      this.matchSettings.scripts = this.scriptPool.filter((val) => { return val.enabled })
-      invoke('save_match_settings', { settings: this.matchSettings }).then(() => {
-        invoke('save_team_settings', { blueTeam: this.blueTeam, orangeTeam: this.orangeTeam })
-      })
+      this.matchSettings.scripts = this.scriptPool.filter((val) => {
+        return val.enabled;
+      });
+      invoke("save_match_settings", { settings: this.matchSettings }).then(
+        () => {
+          invoke("save_team_settings", {
+            blueTeam: this.blueTeam,
+            orangeTeam: this.orangeTeam,
+          });
+        }
+      );
 
-      const blueBots = this.blueTeam.map((bot) => { return { name: bot.name, team: 0, runnable_type: bot.runnable_type, skill: bot.skill ? bot.skill : 1, path: bot.path } })
-      const orangeBots = this.orangeTeam.map((bot) => { return { name: bot.name, team: 1, runnable_type: bot.runnable_type, skill: bot.skill ? bot.skill : 1, path: bot.path } })
+      const blueBots = this.blueTeam.map((bot) => {
+        return {
+          name: bot.name,
+          team: 0,
+          runnable_type: bot.runnable_type,
+          skill: bot.skill ? bot.skill : 1,
+          path: bot.path,
+        };
+      });
+      const orangeBots = this.orangeTeam.map((bot) => {
+        return {
+          name: bot.name,
+          team: 1,
+          runnable_type: bot.runnable_type,
+          skill: bot.skill ? bot.skill : 1,
+          path: bot.path,
+        };
+      });
 
-      invoke('start_match', { botList: blueBots.concat(orangeBots), matchSettings: this.matchSettings }).catch(errMsg => {
-        this.errorStartingMatchContent = errMsg
-        this.$bvModal.show('no-rlbot-flag-modal')
-        this.matchStarting = false
-      })
+      invoke("start_match", {
+        botList: blueBots.concat(orangeBots),
+        matchSettings: this.matchSettings,
+      }).catch((errMsg) => {
+        this.errorStartingMatchContent = errMsg;
+        this.$bvModal.show("no-rlbot-flag-modal");
+        this.matchStarting = false;
+      });
     },
     killBots: function (event) {
-      invoke('kill_bots')
-      this.$bvModal.hide('mini-console')
-      this.matchStarting = false
+      invoke("kill_bots");
+      this.$bvModal.hide("mini-console");
+      this.matchStarting = false;
     },
     pickBotFolder: function (event) {
-      invoke('pick_bot_folder').then(() => {
-        invoke('get_folder_settings').then(this.folderSettingsReceived)
-      })
+      invoke("pick_bot_folder").then(() => {
+        invoke("get_folder_settings").then(this.folderSettingsReceived);
+      });
     },
     pickBotConfig: function (event) {
-      invoke('pick_bot_config').then(() => {
-        invoke('get_folder_settings').then(this.folderSettingsReceived)
-      })
+      invoke("pick_bot_config").then(() => {
+        invoke("get_folder_settings").then(this.folderSettingsReceived);
+      });
     },
     addToTeam: function (bot, team) {
-      if (team === 'orange') {
-        this.orangeTeam.push(bot)
+      if (team === "orange") {
+        this.orangeTeam.push(bot);
       } else {
-        this.blueTeam.push(bot)
+        this.blueTeam.push(bot);
       }
-      this.handleBotAddedToTeam(bot)
+      this.handleBotAddedToTeam(bot);
     },
     handleBotAddedToTeam: function (bot) {
       if (bot.warn) {
-        this.$store.commit('setActiveBot', bot)
-        this.$bvModal.show('language-warning-modal')
+        this.$store.commit("setActiveBot", bot);
+        this.$bvModal.show("language-warning-modal");
       }
     },
     setRandomMap: async function () {
       if (this.randomMapPool.length === 0) {
-        const response = await fetch('json/standard-maps.json')
-        this.randomMapPool = await response.json()
+        const response = await fetch("json/standard-maps.json");
+        this.randomMapPool = await response.json();
       }
 
-      const randomMapIndex = Math.floor(Math.random() * this.randomMapPool.length)
-      this.matchSettings.map = this.randomMapPool.splice(randomMapIndex, 1)[0]
-      this.updateBGImage(this.matchSettings.map)
+      const randomMapIndex = Math.floor(
+        Math.random() * this.randomMapPool.length
+      );
+      this.matchSettings.map = this.randomMapPool.splice(randomMapIndex, 1)[0];
+      this.updateBGImage(this.matchSettings.map);
     },
     resetMutatorsToDefault: function () {
-      const self = this
+      const self = this;
       Object.keys(this.matchOptions.mutators).forEach(function (mutator) {
-        const mutatorName = mutator.replace('_types', '')
-        self.matchSettings.mutators[mutatorName] = self.matchOptions.mutators[mutator][0]
-      })
+        const mutatorName = mutator.replace("_types", "");
+        self.matchSettings.mutators[mutatorName] =
+          self.matchOptions.mutators[mutator][0];
+      });
     },
     resetMatchSettingsToDefault: function () {
-      this.matchSettings.map = this.matchOptions.map_types[0]
-      this.matchSettings.game_mode = this.matchOptions.game_modes[0]
-      this.matchSettings.match_behavior = this.matchOptions.match_behaviours[0]
-      this.matchSettings.skip_replays = false
-      this.matchSettings.instant_start = false
-      this.matchSettings.enable_lockstep = false
-      this.matchSettings.randomize_map = false
-      this.matchSettings.enable_rendering = false
-      this.matchSettings.enable_state_setting = true
-      this.matchSettings.auto_save_replay = false
-      this.matchSettings.scripts = []
-      this.resetMutatorsToDefault()
+      this.matchSettings.map = this.matchOptions.map_types[0];
+      this.matchSettings.game_mode = this.matchOptions.game_modes[0];
+      this.matchSettings.match_behavior = this.matchOptions.match_behaviours[0];
+      this.matchSettings.skip_replays = false;
+      this.matchSettings.instant_start = false;
+      this.matchSettings.enable_lockstep = false;
+      this.matchSettings.randomize_map = false;
+      this.matchSettings.enable_rendering = false;
+      this.matchSettings.enable_state_setting = true;
+      this.matchSettings.auto_save_replay = false;
+      this.matchSettings.scripts = [];
+      this.resetMutatorsToDefault();
 
-      this.updateBGImage(this.matchSettings.map)
+      this.updateBGImage(this.matchSettings.map);
     },
     updateBGImage: function (mapName) {
-      const bodyStyle = { backgroundImage: 'url(../imgs/arenas/' + mapName + '.jpg), url(../imgs/arenas/UtopiaRetro.jpg)' }
-      this.$emit('background-change', bodyStyle)
+      const bodyStyle = {
+        backgroundImage:
+          "url(../imgs/arenas/" +
+          mapName +
+          ".jpg), url(../imgs/arenas/UtopiaRetro.jpg)",
+      };
+      this.$emit("background-change", bodyStyle);
     },
     downloadBotPack: function () {
-      this.showBotpackUpdateSnackbar = false
-      this.downloadModalTitle = 'Downloading Bot Pack'
-      this.$bvModal.show('download-modal')
-      this.downloadStatus = 'Starting'
-      this.downloadProgressPercent = 0
-      invoke('download_bot_pack').then(this.botPackUpdated)
+      this.showBotpackUpdateSnackbar = false;
+      this.downloadModalTitle = "Downloading Bot Pack";
+      this.$bvModal.show("download-modal");
+      this.downloadStatus = "Starting";
+      this.downloadProgressPercent = 0;
+      invoke("download_bot_pack").then(this.botPackUpdated);
     },
     updateBotPack: function () {
-      this.showBotpackUpdateSnackbar = false
-      this.downloadModalTitle = 'Updating Bot Pack'
-      this.$bvModal.show('download-modal')
-      this.downloadStatus = 'Starting'
-      this.downloadProgressPercent = 0
-      invoke('update_bot_pack').then(this.botPackUpdated)
+      this.showBotpackUpdateSnackbar = false;
+      this.downloadModalTitle = "Updating Bot Pack";
+      this.$bvModal.show("download-modal");
+      this.downloadStatus = "Starting";
+      this.downloadProgressPercent = 0;
+      invoke("update_bot_pack").then(this.botPackUpdated);
     },
     updateMapPack: function () {
-      this.showBotpackUpdateSnackbar = false
-      this.downloadModalTitle = 'Downloading Custom Maps'
-      this.$bvModal.show('download-modal')
-      this.downloadStatus = 'Starting'
-      this.downloadProgressPercent = 0
-      invoke('update_map_pack').then(this.botPackUpdated)
+      this.showBotpackUpdateSnackbar = false;
+      this.downloadModalTitle = "Downloading Custom Maps";
+      this.$bvModal.show("download-modal");
+      this.downloadStatus = "Starting";
+      this.downloadProgressPercent = 0;
+      invoke("update_map_pack").then(this.botPackUpdated);
     },
     showAppearanceEditor: function (looksPath) {
-      this.appearancePath = looksPath
-      this.appearancePath = looksPath
-      this.$bvModal.show('appearance-editor-dialog')
+      this.appearancePath = looksPath;
+      this.appearancePath = looksPath;
+      this.$bvModal.show("appearance-editor-dialog");
     },
     pickAndEditAppearanceFile: function () {
-      invoke('pick_appearance_file')
+      invoke("pick_appearance_file");
     },
     showPathInExplorer: function (path) {
-      invoke('show_path_in_explorer', { path })
+      invoke("show_path_in_explorer", { path });
     },
     beginNewBot: function (language, botName) {
       if (!botName) {
-        this.snackbarContent = 'Please choose a proper name!'
-        this.showSnackbar = true
-        return
+        this.snackbarContent = "Please choose a proper name!";
+        this.showSnackbar = true;
+        return;
       }
 
-      this.$bvModal.hide('new-bot-modal')
-      this.allowMiniConsoleClose = false
-      this.showProgressSpinner = true
-      if (language === 'python') {
-        this.miniConsoleTitle = 'Creating Python Bot'
-        this.$bvModal.show('mini-console')
-        invoke('begin_python_bot', { botName }).then(this.botLoadHandler).catch(this.newBotErrorHandler)
-      } else if (language === 'scratch') {
-        this.miniConsoleTitle = 'Creating Scratch Bot'
-        this.$bvModal.show('mini-console')
-        invoke('begin_scratch_bot', { botName }).then(this.botLoadHandler).catch(this.newBotErrorHandler)
-      } else if (language === 'python_hive') {
-        this.miniConsoleTitle = 'Creating Python Hivemind Bot'
-        this.$bvModal.show('mini-console')
-        invoke('begin_python_hivemind', { hiveName: botName }).then(this.botLoadHandler).catch(this.newBotErrorHandler)
-      } else if (language === 'rust') {
-        this.miniConsoleTitle = 'Creating Rust Bot'
-        this.$bvModal.show('mini-console')
-        invoke('begin_rust_bot', { botName }).then(this.botLoadHandler).catch(this.newBotErrorHandler)
+      this.$bvModal.hide("new-bot-modal");
+      this.allowMiniConsoleClose = false;
+      this.showProgressSpinner = true;
+      if (language === "python") {
+        this.miniConsoleTitle = "Creating Python Bot";
+        this.$bvModal.show("mini-console");
+        invoke("begin_python_bot", { botName })
+          .then(this.botLoadHandler)
+          .catch(this.newBotErrorHandler);
+      } else if (language === "scratch") {
+        this.miniConsoleTitle = "Creating Scratch Bot";
+        this.$bvModal.show("mini-console");
+        invoke("begin_scratch_bot", { botName })
+          .then(this.botLoadHandler)
+          .catch(this.newBotErrorHandler);
+      } else if (language === "python_hive") {
+        this.miniConsoleTitle = "Creating Python Hivemind Bot";
+        this.$bvModal.show("mini-console");
+        invoke("begin_python_hivemind", { hiveName: botName })
+          .then(this.botLoadHandler)
+          .catch(this.newBotErrorHandler);
+      } else if (language === "rust") {
+        this.miniConsoleTitle = "Creating Rust Bot";
+        this.$bvModal.show("mini-console");
+        invoke("begin_rust_bot", { botName })
+          .then(this.botLoadHandler)
+          .catch(this.newBotErrorHandler);
       } else {
-        this.showProgressSpinner = false
+        this.showProgressSpinner = false;
       }
     },
     prepareFolderSettingsDialog: function () {
-      invoke('get_folder_settings').then(this.folderSettingsReceived)
+      invoke("get_folder_settings").then(this.folderSettingsReceived);
     },
     applyFolderSettings: async function () {
-      invoke('save_folder_settings', { botFolderSettings: this.folderSettings }).then(() => {
-        this.botPool = STARTING_BOT_POOL
-        this.scriptPool = []
-        invoke('scan_for_bots').then(this.botsReceived)
-        invoke('scan_for_scripts').then(this.scriptsReceived)
-        invoke('get_recommendations').then(this.recommendationsReceived)
-      })
+      invoke("save_folder_settings", {
+        botFolderSettings: this.folderSettings,
+      }).then(() => {
+        this.botPool = STARTING_BOT_POOL;
+        this.scriptPool = [];
+        invoke("scan_for_bots").then(this.botsReceived);
+        invoke("scan_for_scripts").then(this.scriptsReceived);
+        invoke("get_recommendations").then(this.recommendationsReceived);
+      });
     },
     newBotErrorHandler: function (error) {
-      this.$bvModal.hide('mini-console')
-      this.showProgressSpinner = false
-      this.snackbarContent = error
-      this.showSnackbar = true
+      this.$bvModal.hide("mini-console");
+      this.showProgressSpinner = false;
+      this.snackbarContent = error;
+      this.showSnackbar = true;
     },
     botLoadHandler: function (bot) {
-      this.$bvModal.hide('mini-console')
-      this.showProgressSpinner = false
-      this.folderSettings.files[bot.name] = bot
-      this.botsReceived([bot])
+      this.$bvModal.hide("mini-console");
+      this.showProgressSpinner = false;
+      this.folderSettings.files[bot.name] = bot;
+      this.botsReceived([bot]);
     },
     botsReceived: function (bots) {
-      const freshBots = bots.filter((bot) =>
-        !this.botPool.find((element) => element.path === bot.path))
+      const freshBots = bots.filter(
+        (bot) => !this.botPool.find((element) => element.path === bot.path)
+      );
 
-      this.applyLanguageWarnings(freshBots)
-      let botPool = this.botPool.slice(STARTING_BOT_POOL.length).concat(freshBots)
-      botPool = botPool.sort((a, b) => a.name.localeCompare(b.name))
-      this.botPool = STARTING_BOT_POOL.concat(botPool)
-      this.distinguishDuplicateBots(this.botPool)
-      this.showProgressSpinner = false
+      this.applyLanguageWarnings(freshBots);
+      let botPool = this.botPool
+        .slice(STARTING_BOT_POOL.length)
+        .concat(freshBots);
+      botPool = botPool.sort((a, b) => a.name.localeCompare(b.name));
+      this.botPool = STARTING_BOT_POOL.concat(botPool);
+      this.distinguishDuplicateBots(this.botPool);
+      this.showProgressSpinner = false;
 
-      invoke('get_missing_bot_packages', { bots: this.botPool.slice(STARTING_BOT_POOL.length) }).then(botPackageInfos => {
-        botPackageInfos.forEach(botPackageInfo => {
-          const index = botPackageInfo.index + STARTING_BOT_POOL.length
-          this.botPool[index].warn = botPackageInfo.warn
-          this.botPool[index].missing_python_packages = botPackageInfo.missing_packages
-        })
-      })
+      invoke("get_missing_bot_packages", {
+        bots: this.botPool.slice(STARTING_BOT_POOL.length),
+      }).then((botPackageInfos) => {
+        botPackageInfos.forEach((botPackageInfo) => {
+          const index = botPackageInfo.index + STARTING_BOT_POOL.length;
+          this.botPool[index].warn = botPackageInfo.warn;
+          this.botPool[index].missing_python_packages =
+            botPackageInfo.missing_packages;
+        });
+      });
 
-      invoke('get_missing_bot_logos', { bots: this.botPool.slice(STARTING_BOT_POOL.length) }).then(botLogos => {
-        botLogos.forEach(botLogo => {
-          const index = botLogo.index + STARTING_BOT_POOL.length
-          this.botPool[index].logo = botLogo.logo
-        })
-      })
+      invoke("get_missing_bot_logos", {
+        bots: this.botPool.slice(STARTING_BOT_POOL.length),
+      }).then((botLogos) => {
+        botLogos.forEach((botLogo) => {
+          const index = botLogo.index + STARTING_BOT_POOL.length;
+          this.botPool[index].logo = botLogo.logo;
+        });
+      });
     },
 
     scriptsReceived: function (scripts) {
-      const freshScripts = scripts.filter((script) =>
-        !this.scriptPool.find((element) => element.path === script.path))
-      freshScripts.forEach((script) => { script.enabled = !!this.matchSettings.scripts.find((element) => element.path === script.path) })
+      const freshScripts = scripts.filter(
+        (script) =>
+          !this.scriptPool.find((element) => element.path === script.path)
+      );
+      freshScripts.forEach((script) => {
+        script.enabled = !!this.matchSettings.scripts.find(
+          (element) => element.path === script.path
+        );
+      });
 
-      this.applyLanguageWarnings(freshScripts)
-      this.scriptPool = this.scriptPool.concat(freshScripts).sort((a, b) => a.name.localeCompare(b.name))
-      this.distinguishDuplicateBots(this.scriptPool)
-      this.showProgressSpinner = false
+      this.applyLanguageWarnings(freshScripts);
+      this.scriptPool = this.scriptPool
+        .concat(freshScripts)
+        .sort((a, b) => a.name.localeCompare(b.name));
+      this.distinguishDuplicateBots(this.scriptPool);
+      this.showProgressSpinner = false;
 
-      invoke('get_missing_script_packages', { scripts: this.scriptPool }).then(scriptPackageInfos => {
-        scriptPackageInfos.forEach(scriptPackageInfo => {
-          this.scriptPool[scriptPackageInfo.index].warn = scriptPackageInfo.warn
-          this.scriptPool[scriptPackageInfo.index].missing_python_packages = scriptPackageInfo.missing_packages
-        })
-      })
+      invoke("get_missing_script_packages", { scripts: this.scriptPool }).then(
+        (scriptPackageInfos) => {
+          scriptPackageInfos.forEach((scriptPackageInfo) => {
+            this.scriptPool[scriptPackageInfo.index].warn =
+              scriptPackageInfo.warn;
+            this.scriptPool[scriptPackageInfo.index].missing_python_packages =
+              scriptPackageInfo.missing_packages;
+          });
+        }
+      );
 
-      invoke('get_missing_script_logos', { scripts: this.scriptPool }).then(scriptLogos => {
-        scriptLogos.forEach(scriptLogo => {
-          this.scriptPool[scriptLogo.index].logo = scriptLogo.logo
-        })
-      })
+      invoke("get_missing_script_logos", { scripts: this.scriptPool }).then(
+        (scriptLogos) => {
+          scriptLogos.forEach((scriptLogo) => {
+            this.scriptPool[scriptLogo.index].logo = scriptLogo.logo;
+          });
+        }
+      );
     },
     applyLanguageWarnings: function (bots) {
       if (this.languageSupport) {
         bots.forEach((bot) => {
           if (bot.info && bot.info.language) {
-            const language = bot.info.language.toLowerCase()
+            const language = bot.info.language.toLowerCase();
             if (language.match(/python/i)) {
               // Python is handled elsewhere
-              return
+              return;
             }
-            if (!this.languageSupport.node && language.match(/(java|type|coffee)( |_)?script|js|ts|node/i)) {
-              bot.warn = 'node'
+            if (
+              !this.languageSupport.node &&
+              language.match(/(java|type|coffee)( |_)?script|js|ts|node/i)
+            ) {
+              bot.warn = "node";
             }
-            if (!this.languageSupport.java && language.match(/java|kotlin|scala/i)) {
-              bot.warn = 'java'
+            if (
+              !this.languageSupport.java &&
+              language.match(/java|kotlin|scala/i)
+            ) {
+              bot.warn = "java";
             }
             if (!this.languageSupport.chrome && language.match(/scratch/i)) {
-              bot.warn = 'chrome'
+              bot.warn = "chrome";
             }
-            if (!this.languageSupport.dotnet && language.match(/c( |_)?(#|sharp|sharp)|(dot|\.)( |_)?net/i)) {
-              bot.warn = 'dotnet'
+            if (
+              !this.languageSupport.dotnet &&
+              language.match(/c( |_)?(#|sharp|sharp)|(dot|\.)( |_)?net/i)
+            ) {
+              bot.warn = "dotnet";
             }
           }
-        })
+        });
       }
     },
 
     distinguishDuplicateBots: function (pool) {
-      const uniqueNames = [...new Set(pool.filter(bot => bot.path).map(bot => bot.name))]
-      const splitPath = bot => bot.path.split(/[\\|/]/).reverse()
+      const uniqueNames = [
+        ...new Set(pool.filter((bot) => bot.path).map((bot) => bot.name)),
+      ];
+      const splitPath = (bot) => bot.path.split(/[\\|/]/).reverse();
 
       for (const name of uniqueNames) {
-        const bots = pool.filter(bot => bot.name === name)
+        const bots = pool.filter((bot) => bot.name === name);
         if (bots.length === 1) {
-          bots[0].uniquePathSegment = null
-          continue
+          bots[0].uniquePathSegment = null;
+          continue;
         }
         for (let i = 0; bots.length > 0 && i < 99; i++) {
-          const pathSegments = bots.map(b => splitPath(b)[i])
+          const pathSegments = bots.map((b) => splitPath(b)[i]);
           for (const bot of bots.slice()) {
-            const path = splitPath(bot)
-            const count = pathSegments.filter(s => s === path[i]).length
+            const path = splitPath(bot);
+            const count = pathSegments.filter((s) => s === path[i]).length;
             if (count === 1) {
-              bot.uniquePathSegment = path[i]
-              bots.splice(bots.indexOf(bot), 1)
+              bot.uniquePathSegment = path[i];
+              bots.splice(bots.indexOf(bot), 1);
             }
           }
         }
@@ -915,207 +1033,240 @@ export default {
     },
 
     matchOptionsReceived: function (matchOptions) {
-      this.matchOptions = matchOptions
+      this.matchOptions = matchOptions;
     },
 
     matchSettingsReceived: function (matchSettings) {
       if (matchSettings) {
-        Object.assign(this.matchSettings, matchSettings)
-        this.updateBGImage(this.matchSettings.map)
-        this.scriptPool.forEach((script) => { script.enabled = !!this.matchSettings.scripts.find((element) => element.path === script.path) })
+        Object.assign(this.matchSettings, matchSettings);
+        this.updateBGImage(this.matchSettings.map);
+        this.scriptPool.forEach((script) => {
+          script.enabled = !!this.matchSettings.scripts.find(
+            (element) => element.path === script.path
+          );
+        });
       } else {
-        this.resetMatchSettingsToDefault()
+        this.resetMatchSettingsToDefault();
       }
     },
     teamSettingsReceived: function (teamSettings) {
       if (teamSettings) {
-        this.blueTeam = teamSettings.blue_team
-        this.orangeTeam = teamSettings.orange_team
+        this.blueTeam = teamSettings.blue_team;
+        this.orangeTeam = teamSettings.orange_team;
       }
 
-      this.distinguishDuplicateBots(this.blueTeam.concat(this.orangeTeam))
+      this.distinguishDuplicateBots(this.blueTeam.concat(this.orangeTeam));
 
-      invoke('get_missing_bot_packages', { bots: this.blueTeam }).then(botPackageInfos => {
-        botPackageInfos.forEach(botPackageInfo => {
-          this.blueTeam[botPackageInfo.index].warn = botPackageInfo.warn
-          this.blueTeam[botPackageInfo.index].missing_python_packages = botPackageInfo.missing_packages
-        })
-      })
+      invoke("get_missing_bot_packages", { bots: this.blueTeam }).then(
+        (botPackageInfos) => {
+          botPackageInfos.forEach((botPackageInfo) => {
+            this.blueTeam[botPackageInfo.index].warn = botPackageInfo.warn;
+            this.blueTeam[botPackageInfo.index].missing_python_packages =
+              botPackageInfo.missing_packages;
+          });
+        }
+      );
 
-      invoke('get_missing_bot_packages', { bots: this.orangeTeam }).then(botPackageInfos => {
-        botPackageInfos.forEach(botPackageInfo => {
-          this.orangeTeam[botPackageInfo.index].warn = botPackageInfo.warn
-          this.orangeTeam[botPackageInfo.index].missing_python_packages = botPackageInfo.missing_packages
-        })
-      })
+      invoke("get_missing_bot_packages", { bots: this.orangeTeam }).then(
+        (botPackageInfos) => {
+          botPackageInfos.forEach((botPackageInfo) => {
+            this.orangeTeam[botPackageInfo.index].warn = botPackageInfo.warn;
+            this.orangeTeam[botPackageInfo.index].missing_python_packages =
+              botPackageInfo.missing_packages;
+          });
+        }
+      );
 
-      invoke('get_missing_bot_logos', { bots: this.blueTeam }).then(botLogos => {
-        botLogos.forEach(botLogo => {
-          this.blueTeam[botLogo.index].logo = botLogo.logo
-        })
-      })
+      invoke("get_missing_bot_logos", { bots: this.blueTeam }).then(
+        (botLogos) => {
+          botLogos.forEach((botLogo) => {
+            this.blueTeam[botLogo.index].logo = botLogo.logo;
+          });
+        }
+      );
 
-      invoke('get_missing_bot_logos', { bots: this.orangeTeam }).then(botLogos => {
-        botLogos.forEach(botLogo => {
-          this.orangeTeam[botLogo.index].logo = botLogo.logo
-        })
-      })
+      invoke("get_missing_bot_logos", { bots: this.orangeTeam }).then(
+        (botLogos) => {
+          botLogos.forEach((botLogo) => {
+            this.orangeTeam[botLogo.index].logo = botLogo.logo;
+          });
+        }
+      );
 
-      this.applyLanguageWarnings(this.blueTeam.concat(this.orangeTeam))
+      this.applyLanguageWarnings(this.blueTeam.concat(this.orangeTeam));
     },
 
     recommendationsReceived: function (recommendations) {
       if (recommendations) {
-        recommendations.recommendations.forEach(recommendation => this.applyLanguageWarnings(recommendation.bots))
-        this.recommendations = recommendations
+        recommendations.recommendations.forEach((recommendation) =>
+          this.applyLanguageWarnings(recommendation.bots)
+        );
+        this.recommendations = recommendations;
       }
     },
 
     folderSettingsReceived: function (folderSettings) {
-      this.folderSettings = folderSettings
-      invoke('scan_for_bots').then(this.botsReceived)
-      invoke('scan_for_scripts').then(this.scriptsReceived)
-      invoke('get_match_options').then(this.matchOptionsReceived)
+      this.folderSettings = folderSettings;
+      invoke("scan_for_bots").then(this.botsReceived);
+      invoke("scan_for_scripts").then(this.scriptsReceived);
+      invoke("get_match_options").then(this.matchOptionsReceived);
     },
 
     botpackUpdateChecked: function (isBotpackUpToDate) {
-      this.showBotpackUpdateSnackbar = !isBotpackUpToDate
+      this.showBotpackUpdateSnackbar = !isBotpackUpToDate;
     },
 
     botPackUpdated: function (message) {
-      this.snackbarContent = message
-      this.showSnackbar = true
-      this.$bvModal.hide('download-modal')
-      invoke('get_folder_settings').then(this.folderSettingsReceived)
-      this.$refs.botPool.setDefaultCategory()
+      this.snackbarContent = message;
+      this.showSnackbar = true;
+      this.$bvModal.hide("download-modal");
+      invoke("get_folder_settings").then(this.folderSettingsReceived);
+      this.$refs.botPool.setDefaultCategory();
     },
 
     onInstallationComplete: function (result) {
-      let message = result.exit_code === 0 ? 'Successfully installed ' : 'Failed to install '
-      message += result.packages.join(', ')
+      let message =
+        result.exit_code === 0
+          ? "Successfully installed "
+          : "Failed to install ";
+      message += result.packages.join(", ");
       if (result.exit_code !== 0) {
-        message += ' with exit code ' + result.exit_code
+        message += " with exit code " + result.exit_code;
       }
-      this.snackbarContent = message
-      this.showSnackbar = true
-      this.showProgressSpinner = false
+      this.snackbarContent = message;
+      this.showSnackbar = true;
+      this.showProgressSpinner = false;
 
       if (result.exit_code === 0) {
-        this.quickReloadWarnings()
+        this.quickReloadWarnings();
       }
 
-      this.packageString = ''
-      this.$bvModal.hide('mini-console')
+      this.packageString = "";
+      this.$bvModal.hide("mini-console");
     },
     installPackage: function () {
-      this.showProgressSpinner = true
-      this.miniConsoleTitle = 'Installing the package ' + this.packageString
-      this.allowMiniConsoleClose = false
-      this.$bvModal.show('mini-console')
-      invoke('install_package', { packageString: this.packageString }).then(this.onInstallationComplete)
+      this.showProgressSpinner = true;
+      this.miniConsoleTitle = "Installing the package " + this.packageString;
+      this.allowMiniConsoleClose = false;
+      this.$bvModal.show("mini-console");
+      invoke("install_package", { packageString: this.packageString }).then(
+        this.onInstallationComplete
+      );
     },
     installRequirements: function (configPath) {
-      this.showProgressSpinner = true
-      this.$bvModal.hide('language-warning-modal')
-      this.miniConsoleTitle = 'Installing all requirements for bot...'
-      this.allowMiniConsoleClose = false
-      this.$bvModal.show('mini-console')
-      invoke('install_requirements', { configPath }).then(this.onInstallationComplete)
+      this.showProgressSpinner = true;
+      this.$bvModal.hide("language-warning-modal");
+      this.miniConsoleTitle = "Installing all requirements for bot...";
+      this.allowMiniConsoleClose = false;
+      this.$bvModal.show("mini-console");
+      invoke("install_requirements", { configPath }).then(
+        this.onInstallationComplete
+      );
     },
     selectRecommendation: function (bots) {
-      this.blueTeam = [HUMAN]
-      this.orangeTeam = bots.slice()
-      bots.forEach(this.handleBotAddedToTeam)
-      this.$bvModal.hide('recommendations-modal')
+      this.blueTeam = [HUMAN];
+      this.orangeTeam = bots.slice();
+      bots.forEach(this.handleBotAddedToTeam);
+      this.$bvModal.hide("recommendations-modal");
     },
     startup: function () {
-      if (this.$route.path === '/console') {
-        return
+      if (this.$route.path === "/console") {
+        return;
       }
 
-      invoke('check_rlbot_python').then(support => {
-        const noPython = !support.python
-        const hasRLBot = support.rlbotpython
+      invoke("check_rlbot_python").then((support) => {
+        const noPython = !support.python;
+        const hasRLBot = support.rlbotpython;
 
         if (noPython || !hasRLBot) {
-          this.init = false
-          this.$router.replace('/python-config')
-          return
+          this.init = false;
+          this.$router.replace("/python-config");
+          return;
         }
 
-        if (this.$route.path !== '/') {
-          return
+        if (this.$route.path !== "/") {
+          return;
         }
 
         if (!this.init) {
-          invoke('is_debug_build').then(isDebugBuild => {
+          invoke("is_debug_build").then((isDebugBuild) => {
             if (!isDebugBuild && !this.$route.query.check_for_updates) {
-              this.showProgressSpinner = true
-              this.miniConsoleTitle = 'Checking for updated packages...'
-              this.allowMiniConsoleClose = false
-              this.$bvModal.show('mini-console')
-              invoke('install_basic_packages').then((result) => {
-                let message = result.exit_code === 0 ? 'Successfully checked for updates to ' : 'Failed to check for updates to '
-                message += result.packages.join(', ')
+              this.showProgressSpinner = true;
+              this.miniConsoleTitle = "Checking for updated packages...";
+              this.allowMiniConsoleClose = false;
+              this.$bvModal.show("mini-console");
+              invoke("install_basic_packages").then((result) => {
+                let message =
+                  result.exit_code === 0
+                    ? "Successfully checked for updates to "
+                    : "Failed to check for updates to ";
+                message += result.packages.join(", ");
                 if (result.exit_code !== 0) {
-                  message += ` with exit code ${result.exit_code}; See Console for details.`
+                  message += ` with exit code ${result.exit_code}; See Console for details.`;
                 }
-                this.snackbarContent = message
-                this.showSnackbar = true
-                this.showProgressSpinner = false
+                this.snackbarContent = message;
+                this.showSnackbar = true;
+                this.showProgressSpinner = false;
 
-                this.$bvModal.hide('mini-console')
+                this.$bvModal.hide("mini-console");
 
-                invoke('is_botpack_up_to_date').then(this.botpackUpdateChecked)
-                this.startup_inner()
-              })
+                invoke("is_botpack_up_to_date").then(this.botpackUpdateChecked);
+                this.startup_inner();
+              });
             } else {
               if (isDebugBuild) {
-                this.snackbarContent = "Not checking for updates because you're using a debug build"
-                this.showSnackbar = true
+                this.snackbarContent =
+                  "Not checking for updates because you're using a debug build";
+                this.showSnackbar = true;
               }
-              this.startup_inner()
+              this.startup_inner();
             }
-          })
+          });
         }
-      })
+      });
     },
     startup_inner: function () {
-      invoke('get_language_support').then(support => {
-        this.languageSupport = support
+      invoke("get_language_support").then((support) => {
+        this.languageSupport = support;
 
-        invoke('get_folder_settings').then(this.folderSettingsReceived)
-        invoke('get_team_settings').then(this.teamSettingsReceived)
-      })
+        invoke("get_folder_settings").then(this.folderSettingsReceived);
+        invoke("get_team_settings").then(this.teamSettingsReceived);
+      });
 
-      invoke('get_match_settings').then(this.matchSettingsReceived)
-      invoke('get_recommendations').then(this.recommendationsReceived)
-      invoke('get_python_path').then(path => {
-        this.python_path = path
-      })
+      invoke("get_match_settings").then(this.matchSettingsReceived);
+      invoke("get_recommendations").then(this.recommendationsReceived);
+      invoke("get_python_path").then((path) => {
+        this.python_path = path;
+      });
 
-      this.init = true
-    }
+      this.init = true;
+    },
   },
   computed: {
     activeMutatorCount: function () {
-      return Object.keys(this.matchSettings.mutators).map(key =>
-        this.matchSettings.mutators[key] !== this.matchOptions.mutators[key + '_types'][0]
-      ).filter(Boolean).length
+      return Object.keys(this.matchSettings.mutators)
+        .map(
+          (key) =>
+            this.matchSettings.mutators[key] !==
+            this.matchOptions.mutators[key + "_types"][0]
+        )
+        .filter(Boolean).length;
     },
     activeBot: function () {
-      return this.$store.state.activeBot
+      return this.$store.state.activeBot;
     },
     displayHumanInBotPool: function () {
       // only display Human when it's not on any of the teams
-      return !this.blueTeam.concat(this.orangeTeam).some(bot => bot.runnable_type === 'human')
-    }
+      return !this.blueTeam
+        .concat(this.orangeTeam)
+        .some((bot) => bot.runnable_type === "human");
+    },
   },
   created: function () {
-    this.startup()
+    this.startup();
   },
   watch: {
     // call again the method if the route changes
-    $route: 'startup'
-  }
-}
+    $route: "startup",
+  },
+};

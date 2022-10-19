@@ -1,19 +1,20 @@
-@import url('https://fonts.googleapis.com/css?family=Exo+2:300,300i,500,500i');
+@import url("https://fonts.googleapis.com/css?family=Exo+2:300,300i,500,500i");
 
 :root {
-  --hover: rgba(200,200,200,1);
-  --hover-controls: rgba(255,255,255,0.1);
+  --hover: rgba(200, 200, 200, 1);
+  --hover-controls: rgba(255, 255, 255, 0.1);
   --green-color: #3b7538;
   --orange-color: #f26522;
   --blue-color: #0054a6;
 }
 
-body, html {
+body,
+html {
   height: 100%;
 }
 
 #app {
-  font-family: 'Exo 2', sans-serif;
+  font-family: "Exo 2", sans-serif;
   font-weight: 300;
   font-size: 16px;
   margin: 0;
@@ -33,7 +34,8 @@ body, html {
   overflow: hidden;
 }
 
-.rlbot-main-config .card-body, .settings-card .card-body {
+.rlbot-main-config .card-body,
+.settings-card .card-body {
   padding: 5px;
 }
 
@@ -44,7 +46,7 @@ body, html {
 .control-bar {
   background-color: var(--green-color);
   height: 2.5rem;
-  filter: drop-shadow(0 0 0.5rem rgba(0,0,0,1.0));
+  filter: drop-shadow(0 0 0.5rem rgba(0, 0, 0, 1));
   margin-bottom: 30px;
 }
 
@@ -52,7 +54,7 @@ body, html {
   width: 3rem;
   margin-top: -30px;
   margin-bottom: -25px;
-  filter: drop-shadow(0 0 0.5rem rgba(0,0,0,0.6));
+  filter: drop-shadow(0 0 0.5rem rgba(0, 0, 0, 0.6));
 }
 
 .rlbot-brand {
@@ -114,7 +116,11 @@ body, html {
 }
 
 .script-card {
-  background: linear-gradient(90deg, rgb(255, 255, 255) 0%, rgba(255, 255, 255, 0.644) 50%)
+  background: linear-gradient(
+    90deg,
+    rgb(255, 255, 255) 0%,
+    rgba(255, 255, 255, 0.644) 50%
+  );
 }
 
 .bot-card.disabled {
@@ -166,10 +172,12 @@ body, html {
 }
 
 #teamSwitcher .md-switch-container:focus-within {
-  background-color: var(--hover)
+  background-color: var(--hover);
 }
 
-.card.bot-pool, .card.team-card, .card.settings-card {
+.card.bot-pool,
+.card.team-card,
+.card.settings-card {
   margin: 10px;
   color: #333333;
 }
@@ -178,7 +186,8 @@ body, html {
   padding: 5px;
 }
 
-#app .bot-pool, #app .settings-card {
+#app .bot-pool,
+#app .settings-card {
   background-color: #eee;
   padding: 2px 5px;
 }
@@ -213,11 +222,13 @@ body, html {
 }
 
 .org .bot-card img.darkened {
-  filter: brightness(0%) invert(50%) sepia(25%) saturate(7482%) hue-rotate(350deg) brightness(102%) contrast(90%);
+  filter: brightness(0%) invert(50%) sepia(25%) saturate(7482%)
+    hue-rotate(350deg) brightness(102%) contrast(90%);
 }
 
 .blu .bot-card img.darkened {
-  filter: brightness(0%) invert(17%) sepia(78%) saturate(3372%) hue-rotate(198deg) brightness(96%) contrast(101%);
+  filter: brightness(0%) invert(17%) sepia(78%) saturate(3372%)
+    hue-rotate(198deg) brightness(96%) contrast(101%);
 }
 
 .org .bot-card {
@@ -254,7 +265,8 @@ body, html {
   font-weight: bold;
 }
 
-#app .warning-icon, #app .warning-icon .md-icon {
+#app .warning-icon,
+#app .warning-icon .md-icon {
   color: #f5b700;
 }
 
@@ -275,7 +287,7 @@ button.icon-button {
 }
 
 .bot-logo {
-  float:right;
+  float: right;
   margin-left: 10px;
   margin-top: 15px;
   margin-bottom: 10px;
@@ -283,12 +295,12 @@ button.icon-button {
   max-height: 250px;
 }
 
-.md-dialog{
-  width:80%;
+.md-dialog {
+  width: 80%;
 }
 
 .arena-background {
-  background: url('/imgs/arena_diagram.png');
+  background: url("/imgs/arena_diagram.png");
   background-size: contain;
   background-repeat: no-repeat;
   margin: 10px;
@@ -302,7 +314,7 @@ button.icon-button {
 }
 
 .btn.btn-secondary:hover {
-  color:black;
+  color: black;
 }
 
 .btn.btn-primary {
@@ -345,7 +357,7 @@ button.icon-button {
 }
 
 .btn-dark .platform-icon {
-  filter: invert()
+  filter: invert();
 }
 
 .highlighted-mutator-field {
@@ -359,7 +371,7 @@ button.icon-button {
   overflow-y: auto;
   display: flex;
   line-height: normal;
-  font-family: 'Fira Code', 'Courier New', Courier, monospace;
+  font-family: "Fira Code", "Courier New", Courier, monospace;
 }
 
 .console-text-item {

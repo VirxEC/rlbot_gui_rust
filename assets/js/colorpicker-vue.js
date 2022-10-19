@@ -1,10 +1,10 @@
 export default {
-  name: 'colorpicker',
+  name: "colorpicker",
   props: {
     value: String,
     primary: Boolean,
     team: String,
-    text: String
+    text: String,
   },
   template: `
     <span v-if="colors">
@@ -29,33 +29,35 @@ export default {
       </b-dropdown>
     </span>
   `,
-  data () {
+  data() {
     return {
       colors: null,
       rows: 7,
-      columns: this.primary ? 10 : 15
-    }
+      columns: this.primary ? 10 : 15,
+    };
   },
 
   methods: {
     getColorStyle: function (colorID) {
-      const colors = this.primary ? this.colors[this.team] : this.colors.secondary
-      const rgb = colors[colorID]
-      return { 'background-color': `rgb(${rgb ? rgb.toString() : ''})` }
+      const colors = this.primary
+        ? this.colors[this.team]
+        : this.colors.secondary;
+      const rgb = colors[colorID];
+      return { "background-color": `rgb(${rgb ? rgb.toString() : ""})` };
     },
-    getColorID (row, column) {
-      return (row - 1) * this.columns + (column - 1)
-    }
+    getColorID(row, column) {
+      return (row - 1) * this.columns + (column - 1);
+    },
   },
 
   computed: {
     indicatorColorStyle: function () {
-      return this.getColorStyle(this.value)
-    }
+      return this.getColorStyle(this.value);
+    },
   },
 
   beforeMount: async function () {
-    const response = await fetch('json/colors.json')
-    this.colors = await response.json()
-  }
-}
+    const response = await fetch("json/colors.json");
+    this.colors = await response.json();
+  },
+};

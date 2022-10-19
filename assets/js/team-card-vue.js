@@ -1,11 +1,11 @@
-import RunnableCard from './runnable-card-vue.js'
+import RunnableCard from "./runnable-card-vue.js";
 
 export default {
-  name: 'team-card',
+  name: "team-card",
   components: {
-    'runnable-card': RunnableCard
+    "runnable-card": RunnableCard,
   },
-  props: ['value', 'team-class'],
+  props: ["value", "team-class"],
   template: `
     <b-card class="team-card md-elevation-8" :class="teamClass">
       <div class="team-label">
@@ -21,12 +21,12 @@ export default {
   `,
   computed: {
     team: {
-      get () {
-        return this.value
+      get() {
+        return this.value;
       },
-      set (val) {
-        this.$emit('input', val)
-      }
-    }
-  }
-}
+      set(val) {
+        this.$emit("input", val);
+      },
+    },
+  },
+};

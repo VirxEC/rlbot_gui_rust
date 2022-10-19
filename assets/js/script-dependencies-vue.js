@@ -1,19 +1,21 @@
-import BotCard from './bot-card-vue.js'
-import ScriptCard from './script-card-vue.js'
+import BotCard from "./bot-card-vue.js";
+import ScriptCard from "./script-card-vue.js";
 
-function prefixFilter (arr, prefix) {
+function prefixFilter(arr, prefix) {
   // cut prefix from strings and remove those which don't have the prefix
-  return arr.filter(str => str.startsWith(prefix)).map(str => str.substring(prefix.length))
+  return arr
+    .filter((str) => str.startsWith(prefix))
+    .map((str) => str.substring(prefix.length));
 }
 
 export default {
-  name: 'script-dependencies',
+  name: "script-dependencies",
   components: {
-    'bot-card': BotCard,
-    'script-card': ScriptCard
+    "bot-card": BotCard,
+    "script-card": ScriptCard,
   },
-  props: ['bots', 'scripts', 'nameFilter'],
-  template: /* html */`
+  props: ["bots", "scripts", "nameFilter"],
+  template: /* html */ `
     <div>
 
       <div class="scripts-header">Scripts</div>
@@ -52,31 +54,44 @@ export default {
   `,
   methods: {
     passesFilter: function (runnable) {
-      return runnable.name.toLowerCase().includes(this.nameFilter.toLowerCase())
-    }
+      return runnable.name
+        .toLowerCase()
+        .includes(this.nameFilter.toLowerCase());
+    },
   },
   computed: {
     dependencies: function () {
       // array of objects, which contain a script and bots/scripts that support/require it
-      return this.scripts.map(script => {
-        const enableTags = prefixFilter(script.info.tags, 'enables-')
-        const enableTagFilter = runnable => runnable.info && enableTags.some(tag =>
-          prefixFilter(runnable.info.tags, 'supports-').includes(tag) ||
-          prefixFilter(runnable.info.tags, 'requires-').includes(tag)
-        )
+      return this.scripts
+        .map((script) => {
+          const enableTags = prefixFilter(script.info.tags, "enables-");
+          const enableTagFilter = (runnable) =>
+            runnable.info &&
+            enableTags.some(
+              (tag) =>
+                prefixFilter(runnable.info.tags, "supports-").includes(tag) ||
+                prefixFilter(runnable.info.tags, "requires-").includes(tag)
+            );
 
-        const supportedBots = this.bots.filter(enableTagFilter)
-        const supportedScripts = this.scripts.filter(enableTagFilter)
-        const visible = [script, ...supportedBots, ...supportedScripts].some(this.passesFilter)
+          const supportedBots = this.bots.filter(enableTagFilter);
+          const supportedScripts = this.scripts.filter(enableTagFilter);
+          const visible = [script, ...supportedBots, ...supportedScripts].some(
+            this.passesFilter
+          );
 
-        return { script, supportedBots, supportedScripts, visible }
-      }).filter(d => d.supportedScripts.length + d.supportedBots.length > 0)
+          return { script, supportedBots, supportedScripts, visible };
+        })
+        .filter((d) => d.supportedScripts.length + d.supportedBots.length > 0);
     },
     uninvolvedScripts: function () {
       // scripts that don't require another script and arent supported/required by anything else
-      return this.scripts.filter(script => this.dependencies.every(
-        d => d.script !== script && !script.info.tags.some(tag => tag.startsWith('requires-'))
-      ))
-    }
-  }
-}
+      return this.scripts.filter((script) =>
+        this.dependencies.every(
+          (d) =>
+            d.script !== script &&
+            !script.info.tags.some((tag) => tag.startsWith("requires-"))
+        )
+      );
+    },
+  },
+};

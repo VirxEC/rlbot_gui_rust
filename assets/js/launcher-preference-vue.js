@@ -1,8 +1,8 @@
-const invoke = window.__TAURI__.invoke
+const invoke = window.__TAURI__.invoke;
 
 export default {
-  name: 'launcher-preference',
-  props: ['modalId'],
+  name: "launcher-preference",
+  props: ["modalId"],
   template: `
   <div>
     <div>
@@ -36,48 +36,57 @@ export default {
     <b-button variant="primary" class="mt-3" @click="saveLauncherSettings()" :disabled="exePathState === false">Save</b-button>
   </div>
   `,
-  data () {
+  data() {
     return {
       launcherSettings: {
-        preferred_launcher: 'epic',
+        preferred_launcher: "epic",
         use_login_tricks: true,
-        rocket_league_exe_path: ''
-      }
-    }
+        rocket_league_exe_path: "",
+      },
+    };
   },
   computed: {
     exePathState: function () {
-      if (this.launcherSettings.preferred_launcher === 'steam' || this.launcherSettings.rocket_league_exe_path === '') return null
-      return this.launcherSettings.rocket_league_exe_path && this.launcherSettings.rocket_league_exe_path.endsWith('RocketLeague.exe')
+      if (
+        this.launcherSettings.preferred_launcher === "steam" ||
+        this.launcherSettings.rocket_league_exe_path === ""
+      )
+        return null;
+      return (
+        this.launcherSettings.rocket_league_exe_path &&
+        this.launcherSettings.rocket_league_exe_path.endsWith(
+          "RocketLeague.exe"
+        )
+      );
     },
     correctedExePath: function () {
-      let path = this.launcherSettings.rocket_league_exe_path
-      if (!path) return
+      let path = this.launcherSettings.rocket_league_exe_path;
+      if (!path) return;
 
-      if (path.endsWith('rocketleague')) {
-        path += '\\Binaries'
+      if (path.endsWith("rocketleague")) {
+        path += "\\Binaries";
       }
-      if (path.endsWith('Binaries')) {
-        path += '\\Win64'
+      if (path.endsWith("Binaries")) {
+        path += "\\Win64";
       }
-      if (path.endsWith('Win64')) {
-        path += '\\RocketLeague.exe'
-        return path
+      if (path.endsWith("Win64")) {
+        path += "\\RocketLeague.exe";
+        return path;
       }
-    }
+    },
   },
   methods: {
     launcherSettingsReceived: function (launcherSettings) {
       if (launcherSettings) {
-        Object.assign(this.launcherSettings, launcherSettings)
+        Object.assign(this.launcherSettings, launcherSettings);
       }
     },
     saveLauncherSettings: function () {
-      invoke('save_launcher_settings', { settings: this.launcherSettings })
-      this.$bvModal.hide(this.modalId)
-    }
+      invoke("save_launcher_settings", { settings: this.launcherSettings });
+      this.$bvModal.hide(this.modalId);
+    },
   },
   created: function () {
-    invoke('get_launcher_settings').then(this.launcherSettingsReceived)
-  }
-}
+    invoke("get_launcher_settings").then(this.launcherSettingsReceived);
+  },
+};

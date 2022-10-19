@@ -1,11 +1,11 @@
-import MiniConsole from './mini-console-vue.js'
+import MiniConsole from "./mini-console-vue.js";
 
-const invoke = window.__TAURI__.invoke
-const listen = window.__TAURI__.event.listen
+const invoke = window.__TAURI__.invoke;
+const listen = window.__TAURI__.event.listen;
 
 export default {
-  name: 'console',
-  template: /* html */`
+  name: "console",
+  template: /* html */ `
   <div class="overflow-auto flex-grow-1">
   <b-navbar class="navbar">
     <b-navbar-brand>
@@ -78,158 +78,178 @@ export default {
   </div>
   `,
   components: {
-    'mini-console': MiniConsole
+    "mini-console": MiniConsole,
   },
-  data () {
+  data() {
     return {
       showSnackbar: false,
       snackbarContent: null,
       showProgressSpinner: false,
       noPython: false,
       hasRLBot: false,
-      python_path: '',
+      python_path: "",
       rec_python: null,
       is_windows: false,
       is_rec_isolated: false,
       advanced: false,
-      downloadModalTitle: '',
+      downloadModalTitle: "",
       downloadProgressPercent: 0,
-      downloadStatus: '',
-      updateDownloadProgressPercent: listen('update-download-progress', event => {
-        this.downloadProgressPercent = event.payload.percent
-        this.downloadStatus = event.payload.status
-      })
-    }
+      downloadStatus: "",
+      updateDownloadProgressPercent: listen(
+        "update-download-progress",
+        (event) => {
+          this.downloadProgressPercent = event.payload.percent;
+          this.downloadStatus = event.payload.status;
+        }
+      ),
+    };
   },
   methods: {
     createVenv: function () {
-      this.showProgressSpinner = true
-      this.snackbarContent = 'Creating isolated Python environment...'
-      this.showSnackbar = true
-      invoke('create_python_venv', { path: this.rec_python }).then(_ => {
-        this.snackbarContent = 'Successfully created Python virtual environment, installing required packages'
-        this.showSnackbar = true
+      this.showProgressSpinner = true;
+      this.snackbarContent = "Creating isolated Python environment...";
+      this.showSnackbar = true;
+      invoke("create_python_venv", { path: this.rec_python })
+        .then((_) => {
+          this.snackbarContent =
+            "Successfully created Python virtual environment, installing required packages";
+          this.showSnackbar = true;
 
-        this.$bvModal.show('install-console')
-        invoke('install_basic_packages').then((result) => {
-          let message = result.exit_code === 0 ? 'Successfully installed ' : 'Failed to install '
-          message += result.packages.join(', ')
-          if (result.exit_code !== 0) {
-            message += ' with exit code ' + result.exit_code
-          }
-          this.snackbarContent = message
-          this.showSnackbar = true
+          this.$bvModal.show("install-console");
+          invoke("install_basic_packages").then((result) => {
+            let message =
+              result.exit_code === 0
+                ? "Successfully installed "
+                : "Failed to install ";
+            message += result.packages.join(", ");
+            if (result.exit_code !== 0) {
+              message += " with exit code " + result.exit_code;
+            }
+            this.snackbarContent = message;
+            this.showSnackbar = true;
 
-          this.startup()
+            this.startup();
+          });
         })
-      }).catch(error => {
-        this.showProgressSpinner = false
-        this.snackbarContent = 'Failed to install Python: ' + error
-        this.showSnackbar = true
-      })
+        .catch((error) => {
+          this.showProgressSpinner = false;
+          this.snackbarContent = "Failed to install Python: " + error;
+          this.showSnackbar = true;
+        });
     },
     installPython: function () {
-      this.showProgressSpinner = true
-      this.downloadModalTitle = 'Installing Isolated Python 3.7'
-      this.downloadStatus = 'Starting installation...'
-      this.downloadProgressPercent = 0
-      this.$bvModal.show('download-modal')
+      this.showProgressSpinner = true;
+      this.downloadModalTitle = "Installing Isolated Python 3.7";
+      this.downloadStatus = "Starting installation...";
+      this.downloadProgressPercent = 0;
+      this.$bvModal.show("download-modal");
 
-      invoke('install_python').then(_ => {
-        this.$bvModal.hide('download-modal')
-        this.snackbarContent = 'Successfully installed Python to your system, installing required packages'
-        this.showSnackbar = true
+      invoke("install_python")
+        .then((_) => {
+          this.$bvModal.hide("download-modal");
+          this.snackbarContent =
+            "Successfully installed Python to your system, installing required packages";
+          this.showSnackbar = true;
 
-        this.$bvModal.show('install-console')
-        invoke('install_basic_packages').then((result) => {
-          let message = result.exit_code === 0 ? 'Successfully installed ' : 'Failed to install '
-          message += result.packages.join(', ')
-          if (result.exit_code !== 0) {
-            message += ' with exit code ' + result.exit_code
-          }
-          this.snackbarContent = message
-          this.showSnackbar = true
+          this.$bvModal.show("install-console");
+          invoke("install_basic_packages").then((result) => {
+            let message =
+              result.exit_code === 0
+                ? "Successfully installed "
+                : "Failed to install ";
+            message += result.packages.join(", ");
+            if (result.exit_code !== 0) {
+              message += " with exit code " + result.exit_code;
+            }
+            this.snackbarContent = message;
+            this.showSnackbar = true;
 
-          this.startup()
+            this.startup();
+          });
         })
-      }).catch(error => {
-        this.showProgressSpinner = false
-        this.snackbarContent = 'Failed to install Python: ' + error
-        this.showSnackbar = true
-      })
+        .catch((error) => {
+          this.showProgressSpinner = false;
+          this.snackbarContent = "Failed to install Python: " + error;
+          this.showSnackbar = true;
+        });
     },
     applyPythonSetup: function () {
-      this.showProgressSpinner = true
+      this.showProgressSpinner = true;
 
       if (this.rec_python && !this.python_path) {
-        this.python_path = this.rec_python
+        this.python_path = this.rec_python;
       }
 
-      invoke('set_python_path', { path: this.python_path }).then(() => {
-        invoke('check_rlbot_python').then(support => {
+      invoke("set_python_path", { path: this.python_path }).then(() => {
+        invoke("check_rlbot_python").then((support) => {
           if (support.python && !support.rlbotpython) {
-            this.$bvModal.show('install-console')
-            invoke('install_basic_packages').then((result) => {
-              let message = result.exit_code === 0 ? 'Successfully installed ' : 'Failed to install '
-              message += result.packages.join(', ')
+            this.$bvModal.show("install-console");
+            invoke("install_basic_packages").then((result) => {
+              let message =
+                result.exit_code === 0
+                  ? "Successfully installed "
+                  : "Failed to install ";
+              message += result.packages.join(", ");
               if (result.exit_code !== 0) {
-                message += ' with exit code ' + result.exit_code
+                message += " with exit code " + result.exit_code;
               }
-              this.snackbarContent = message
-              this.showSnackbar = true
+              this.snackbarContent = message;
+              this.showSnackbar = true;
 
-              this.startup(false)
-            })
+              this.startup(false);
+            });
           } else {
-            this.startup()
+            this.startup();
           }
-        })
-      })
+        });
+      });
     },
     partialPythonSetup: function () {
-      this.showProgressSpinner = true
-      this.python_path = this.rec_python
-      invoke('set_python_path', { path: this.python_path }).then(() => {
-        this.startup()
-      })
+      this.showProgressSpinner = true;
+      this.python_path = this.rec_python;
+      invoke("set_python_path", { path: this.python_path }).then(() => {
+        this.startup();
+      });
     },
     startup: function (redirectCheckForUpdates = true) {
-      invoke('check_rlbot_python').then(support => {
-        this.noPython = !support.python
-        this.hasRLBot = support.rlbotpython
+      invoke("check_rlbot_python").then((support) => {
+        this.noPython = !support.python;
+        this.hasRLBot = support.rlbotpython;
 
-        this.$bvModal.hide('install-console')
+        this.$bvModal.hide("install-console");
 
         if (!this.noPython && this.hasRLBot) {
-          this.$router.replace(`/?check_for_updates=${redirectCheckForUpdates}`)
-          return
+          this.$router.replace(
+            `/?check_for_updates=${redirectCheckForUpdates}`
+          );
+          return;
         }
 
-        this.startup_inner()
-      })
+        this.startup_inner();
+      });
     },
     startup_inner: function () {
-      this.showProgressSpinner = false
-      invoke('get_python_path').then(path => {
-        this.python_path = path
-      })
-      invoke('get_detected_python_path').then(info => {
-        console.log(info)
-        this.rec_python = info[0]
-        this.is_rec_isolated = info[1]
-      })
+      this.showProgressSpinner = false;
+      invoke("get_python_path").then((path) => {
+        this.python_path = path;
+      });
+      invoke("get_detected_python_path").then((info) => {
+        console.log(info);
+        this.rec_python = info[0];
+        this.is_rec_isolated = info[1];
+      });
 
-      invoke('is_windows').then(isWindows => {
-        this.is_windows = isWindows
-      })
-    }
+      invoke("is_windows").then((isWindows) => {
+        this.is_windows = isWindows;
+      });
+    },
   },
   computed: {},
   created: function () {
-    this.startup()
+    this.startup();
   },
   watch: {
     // call again the method if the route changes
-    $route: 'startup'
-  }
-}
+    $route: "startup",
+  },
+};

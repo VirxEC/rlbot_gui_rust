@@ -1,16 +1,16 @@
-import Colorpicker from './colorpicker-vue.js'
-import LauncherPreferenceModal from './launcher-preference-vue.js'
+import Colorpicker from "./colorpicker-vue.js";
+import LauncherPreferenceModal from "./launcher-preference-vue.js";
 
-const invoke = window.__TAURI__.invoke
-const listen = window.__TAURI__.event.listen
+const invoke = window.__TAURI__.invoke;
+const listen = window.__TAURI__.event.listen;
 
 export default {
-  name: 'story-start',
+  name: "story-start",
   components: {
     colorpicker: Colorpicker,
-    'launcher-preference-modal': LauncherPreferenceModal
+    "launcher-preference-modal": LauncherPreferenceModal,
   },
-  template: /* html */`
+  template: /* html */ `
   <b-container class="pt-5">
   <b-jumbotron header="Story Mode" lead="Go on a Rocket League adventure">
   </b-jumbotron>
@@ -64,40 +64,40 @@ export default {
   </b-modal>
   </b-container>
   `,
-  data () {
+  data() {
     return {
       form: {
-        teamname: '',
+        teamname: "",
         teamcolor: 0,
-        story_id: 'default',
+        story_id: "default",
         custom_story: {
-          story_path: ''
+          story_path: "",
         },
-        use_custom_maps: false
+        use_custom_maps: false,
       },
       storyIdOptions: [
-        { value: 'easy', text: 'Easy' },
-        { value: 'default', text: 'Default' },
-        { value: 'custom', text: 'User Provided Config' }
+        { value: "easy", text: "Easy" },
+        { value: "default", text: "Default" },
+        { value: "custom", text: "User Provided Config" },
       ],
       field: null,
-      listenForPickFile: listen('json_file_selected', event => {
-        const filePath = event.payload
+      listenForPickFile: listen("json_file_selected", (event) => {
+        const filePath = event.payload;
         if (this.field != null) {
-          this.form.custom_story[this.field] = filePath
-          this.field = null
+          this.form.custom_story[this.field] = filePath;
+          this.field = null;
         }
-      })
-    }
+      }),
+    };
   },
   methods: {
     pickFile: function (event) {
-      this.field = event.target.value
-      invoke('pick_json_file')
+      this.field = event.target.value;
+      invoke("pick_json_file");
     },
     submit: function (event) {
-      console.log('Submitting story-start')
-      event.preventDefault()
-    }
-  }
-}
+      console.log("Submitting story-start");
+      event.preventDefault();
+    },
+  },
+};
