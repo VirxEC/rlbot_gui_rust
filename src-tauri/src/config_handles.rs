@@ -252,17 +252,17 @@ pub async fn save_match_settings(window: Window, settings: MatchConfig) {
     settings.cleaned_scripts().save_config(&window).await;
 }
 
-async fn trimmed_to_bundle((runnable_type, skill, path): (String, f32, String)) -> Result<BotConfigBundle, RLBotCfgParseError> {
-    if runnable_type == "human" {
+async fn trimmed_to_bundle((skill, path): (Option<f32>, String)) -> Result<BotConfigBundle, RLBotCfgParseError> {
+    if path == "human" {
         Ok(BotConfigBundle::new_human())
-    } else if runnable_type == "pysonix" {
+    } else if let Some(skill) = skill {
         Ok(BotConfigBundle::new_psyonix(skill))
     } else {
         BotConfigBundle::minimal_from_path(path).await
     }
 }
 
-async fn trimmed_to_bot_bundles(window: &Window, trimmed_bundles: Vec<(String, f32, String)>) -> Vec<BotConfigBundle> {
+async fn trimmed_to_bot_bundles(window: &Window, trimmed_bundles: Vec<(Option<f32>, String)>) -> Vec<BotConfigBundle> {
     join_all(trimmed_bundles.into_iter().map(trimmed_to_bundle))
         .await
         .into_iter()
@@ -304,15 +304,18 @@ pub async fn get_team_settings(window: Window) -> HashMap<String, Vec<BotConfigB
     bots
 }
 
-fn trim_bot_bundles(bundles: Vec<BotConfigBundle>) -> Vec<(String, f32, String)> {
-    bundles.into_iter().map(|b| (b.runnable_type, b.skill, b.path)).collect()
+fn trim_bot_bundles(bundles: Vec<BotConfigBundle>) -> Vec<(Option<f32>, String)> {
+    bundles
+        .into_iter()
+        .map(|b| if b.path.is_empty() { (b.skill, b.runnable_type) } else { (b.skill, b.path) })
+        .collect()
 }
 
 #[tauri::command]
 pub async fn save_team_settings(window: Window, blue_team: Vec<BotConfigBundle>, orange_team: Vec<BotConfigBundle>) {
     let mut config = load_gui_config(&window).await;
-    config.set("team_settings", "blue_team", Some(serde_json::to_string(&trim_bot_bundles(blue_team)).unwrap()));
-    config.set("team_settings", "orange_team", Some(serde_json::to_string(&trim_bot_bundles(orange_team)).unwrap()));
+    config.set("team_settings", "blue_team", Some(dbg!(serde_json::to_string(&trim_bot_bundles(blue_team)).unwrap())));
+    config.set("team_settings", "orange_team", Some(dbg!(serde_json::to_string(&trim_bot_bundles(orange_team)).unwrap())));
 
     if let Err(e) = save_cfg(&config, get_config_path()).await {
         ccprintln!(&window, "Error saving team settings: {e}");

@@ -148,7 +148,7 @@ pub enum RLBotCfgParseError {
 #[serde(default)]
 pub struct BotConfigBundle {
     pub name: String,
-    pub skill: f32,
+    pub skill: Option<f32>,
     pub looks_path: String,
     pub path: String,
     config_file_name: String,
@@ -189,7 +189,7 @@ impl BotConfigBundle {
 
         Self {
             name,
-            skill,
+            skill: Some(skill),
             runnable_type: "psyonix".to_owned(),
             image: "imgs/psyonix.png".to_owned(),
             ..Default::default()
@@ -255,7 +255,7 @@ impl BotConfigBundle {
 
         Ok(Self {
             name,
-            skill: 1.,
+            skill: None,
             looks_path,
             path,
             config_file_name,
