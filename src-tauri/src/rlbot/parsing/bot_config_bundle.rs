@@ -144,10 +144,11 @@ pub enum RLBotCfgParseError {
     NoScriptFile(String),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(default)]
 pub struct BotConfigBundle {
     pub name: String,
+    pub skill: f32,
     pub looks_path: String,
     pub path: String,
     config_file_name: String,
@@ -167,6 +168,34 @@ pub struct BotConfigBundle {
 }
 
 impl BotConfigBundle {
+    pub fn new_human() -> Self {
+        Self {
+            name: "Human".to_owned(),
+            runnable_type: "human".to_owned(),
+            image: "imgs/human.png".to_owned(),
+            ..Default::default()
+        }
+    }
+
+    pub fn new_psyonix(skill: f32) -> Self {
+        let name = if skill == 1. {
+            "Psyonix Allstar"
+        } else if skill == 0.5 {
+            "Psyonix Pro"
+        } else {
+            "Psyonix Rookie"
+        }
+        .to_owned();
+
+        Self {
+            name,
+            skill,
+            runnable_type: "psyonix".to_owned(),
+            image: "imgs/psyonix.png".to_owned(),
+            ..Default::default()
+        }
+    }
+
     pub async fn minimal_from_path<T: AsRef<Path>>(config_path: T) -> Result<Self, RLBotCfgParseError> {
         let config_path = config_path.as_ref();
         Self::minimal_from_conf(config_path, &load_cfg(config_path).await?)
@@ -226,6 +255,7 @@ impl BotConfigBundle {
 
         Ok(Self {
             name,
+            skill: 1.,
             looks_path,
             path,
             config_file_name,

@@ -5,7 +5,7 @@ use crate::{
         agents::runnable::Runnable,
         parsing::{
             agent_config_parser::BotLooksConfig,
-            bot_config_bundle::{BotConfigBundle, ScriptConfigBundle},
+            bot_config_bundle::{BotConfigBundle, RLBotCfgParseError, ScriptConfigBundle},
             directory_scanner::{scan_directory_for_bot_configs, scan_directory_for_script_configs},
             match_settings_config_parser::MatchOptions,
         },
@@ -18,6 +18,7 @@ use crate::{
     *,
 };
 use configparser::ini::Ini;
+use futures_util::future::join_all;
 use glob::glob;
 use serde::Deserialize;
 use std::{
@@ -251,16 +252,50 @@ pub async fn save_match_settings(window: Window, settings: MatchConfig) {
     settings.cleaned_scripts().save_config(&window).await;
 }
 
+async fn trimmed_to_bundle((runnable_type, skill, path): (String, f32, String)) -> Result<BotConfigBundle, RLBotCfgParseError> {
+    if runnable_type == "human" {
+        Ok(BotConfigBundle::new_human())
+    } else if runnable_type == "pysonix" {
+        Ok(BotConfigBundle::new_psyonix(skill))
+    } else {
+        BotConfigBundle::minimal_from_path(path).await
+    }
+}
+
+async fn trimmed_to_bot_bundles(window: &Window, trimmed_bundles: Vec<(String, f32, String)>) -> Vec<BotConfigBundle> {
+    join_all(trimmed_bundles.into_iter().map(trimmed_to_bundle))
+        .await
+        .into_iter()
+        .flat_map(|f| {
+            if let Err(e) = &f {
+                ccprintln!(window, "Error loading bot config: {e}");
+            }
+
+            f
+        })
+        .collect()
+}
+
 #[tauri::command]
 pub async fn get_team_settings(window: Window) -> HashMap<String, Vec<BotConfigBundle>> {
     let config = load_gui_config(&window).await;
-    let blue_team = serde_json::from_str(
-        &config
-            .get("team_settings", "blue_team")
-            .unwrap_or_else(|| "[{\"name\": \"Human\", \"runnable_type\": \"human\", \"image\": \"imgs/human.png\"}]".to_owned()),
+
+    let blue_team = trimmed_to_bot_bundles(
+        &window,
+        serde_json::from_str(
+            &config
+                .get("team_settings", "blue_team")
+                .unwrap_or_else(|| format!("[{}]", serde_json::to_string(&BotConfigBundle::new_human()).unwrap())),
+        )
+        .unwrap_or_default(),
     )
-    .unwrap_or_default();
-    let orange_team = serde_json::from_str(&config.get("team_settings", "orange_team").unwrap_or_else(|| "[]".to_owned())).unwrap_or_default();
+    .await;
+
+    let orange_team = trimmed_to_bot_bundles(
+        &window,
+        serde_json::from_str(&config.get("team_settings", "orange_team").unwrap_or_else(|| "[]".to_owned())).unwrap_or_default(),
+    )
+    .await;
 
     let mut bots = HashMap::new();
     bots.insert("blue_team".to_owned(), blue_team);
@@ -269,11 +304,15 @@ pub async fn get_team_settings(window: Window) -> HashMap<String, Vec<BotConfigB
     bots
 }
 
+fn trim_bot_bundles(bundles: Vec<BotConfigBundle>) -> Vec<(String, f32, String)> {
+    bundles.into_iter().map(|b| (b.runnable_type, b.skill, b.path)).collect()
+}
+
 #[tauri::command]
 pub async fn save_team_settings(window: Window, blue_team: Vec<BotConfigBundle>, orange_team: Vec<BotConfigBundle>) {
     let mut config = load_gui_config(&window).await;
-    config.set("team_settings", "blue_team", Some(serde_json::to_string(&clean(&blue_team)).unwrap()));
-    config.set("team_settings", "orange_team", Some(serde_json::to_string(&clean(&orange_team)).unwrap()));
+    config.set("team_settings", "blue_team", Some(serde_json::to_string(&trim_bot_bundles(blue_team)).unwrap()));
+    config.set("team_settings", "orange_team", Some(serde_json::to_string(&trim_bot_bundles(orange_team)).unwrap()));
 
     if let Err(e) = save_cfg(&config, get_config_path()).await {
         ccprintln!(&window, "Error saving team settings: {e}");
