@@ -4,13 +4,11 @@ use crate::{
     config_handles::{load_gui_config, load_gui_config_sync},
     custom_maps::convert_to_path,
     get_config_path,
-    rlbot::parsing::{
-        bot_config_bundle::{Clean, ScriptConfigBundle},
-        match_settings_config_parser::*,
-    },
+    rlbot::parsing::{bot_config_bundle::ScriptConfigBundle, match_settings_config_parser::*},
 };
 use configparser::ini::Ini;
 use core::fmt;
+use futures_util::future::join_all;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, fmt::Debug, str::FromStr};
 use tauri::Window;
@@ -268,6 +266,20 @@ impl Default for MatchConfig {
 }
 
 impl MatchConfig {
+    async fn trimmed_to_bundles(window: &Window, trimmed_bundles: Vec<String>) -> Vec<ScriptConfigBundle> {
+        join_all(trimmed_bundles.into_iter().map(ScriptConfigBundle::minimal_from_path))
+            .await
+            .into_iter()
+            .flat_map(|f| {
+                if let Err(e) = &f {
+                    ccprintln!(window, "Error loading bot config: {e}");
+                }
+
+                f
+            })
+            .collect()
+    }
+
     pub async fn load(window: &Window) -> Self {
         let conf = load_gui_config(window).await;
 
@@ -281,7 +293,11 @@ impl MatchConfig {
         let enable_rendering = conf.getbool("match_settings", "enable_rendering").ok().flatten().unwrap_or_default();
         let enable_state_setting = conf.getbool("match_settings", "enable_state_setting").ok().flatten().unwrap_or(true);
         let auto_save_replay = conf.getbool("match_settings", "auto_save_replay").ok().flatten().unwrap_or_default();
-        let scripts = serde_json::from_str(&conf.get("match_settings", "scripts").unwrap_or_else(|| "[]".to_owned())).unwrap_or_default();
+        let scripts = Self::trimmed_to_bundles(
+            window,
+            serde_json::from_str(&conf.get("match_settings", "scripts").unwrap_or_else(|| "[]".to_owned())).unwrap_or_default(),
+        )
+        .await;
 
         Self {
             map,
@@ -303,7 +319,7 @@ impl MatchConfig {
         set_value_in_conf(conf, "match_settings", key, item);
     }
 
-    pub fn save_to_config(&mut self, conf: &mut Ini) {
+    pub fn save_to_config(&self, conf: &mut Ini) {
         Self::set_value_in_conf(conf, "map", &self.map);
         Self::set_value_in_conf(conf, "game_mode", &self.game_mode);
         Self::set_value_in_conf(conf, "match_behavior", &self.match_behavior);
@@ -314,11 +330,11 @@ impl MatchConfig {
         Self::set_value_in_conf(conf, "enable_rendering", &self.enable_rendering);
         Self::set_value_in_conf(conf, "enable_state_setting", &self.enable_state_setting);
         Self::set_value_in_conf(conf, "auto_save_replay", &self.auto_save_replay);
-        Self::set_value_in_conf(conf, "scripts", &self.scripts);
+        Self::set_value_in_conf(conf, "scripts", &self.scripts.iter().map(|x| &x.path).collect::<Vec<_>>());
         self.mutators.save_config(conf);
     }
 
-    pub async fn save_config(&mut self, window: &Window) {
+    pub async fn save_config(&self, window: &Window) {
         let mut conf = load_gui_config(window).await;
         self.save_to_config(&mut conf);
 
@@ -326,16 +342,6 @@ impl MatchConfig {
             ccprintln!(window, "Error writing config file: {e}");
         }
     }
-
-    pub fn cleaned_scripts(&self) -> Self {
-        let mut new = self.clone();
-        new.scripts = clean(&new.scripts);
-        new
-    }
-}
-
-pub fn clean<T: Clean>(items: &[T]) -> Vec<T> {
-    items.iter().map(Clean::cleaned).collect()
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -704,33 +704,33 @@ export default {
         }
       );
 
-      // const blueBots = this.blueTeam.map((bot) => {
-      //   return {
-      //     name: bot.name,
-      //     team: 0,
-      //     runnable_type: bot.runnable_type,
-      //     skill: bot.skill ? bot.skill : 1,
-      //     path: bot.path,
-      //   };
-      // });
-      // const orangeBots = this.orangeTeam.map((bot) => {
-      //   return {
-      //     name: bot.name,
-      //     team: 1,
-      //     runnable_type: bot.runnable_type,
-      //     skill: bot.skill ? bot.skill : 1,
-      //     path: bot.path,
-      //   };
-      // });
+      const blueBots = this.blueTeam.map((bot) => {
+        return {
+          name: bot.name,
+          team: 0,
+          runnable_type: bot.runnable_type,
+          skill: bot.skill ? bot.skill : 1,
+          path: bot.path,
+        };
+      });
+      const orangeBots = this.orangeTeam.map((bot) => {
+        return {
+          name: bot.name,
+          team: 1,
+          runnable_type: bot.runnable_type,
+          skill: bot.skill ? bot.skill : 1,
+          path: bot.path,
+        };
+      });
 
-      // invoke("start_match", {
-      //   botList: blueBots.concat(orangeBots),
-      //   matchSettings: this.matchSettings,
-      // }).catch((errMsg) => {
-      //   this.errorStartingMatchContent = errMsg;
-      //   this.$bvModal.show("no-rlbot-flag-modal");
-      //   this.matchStarting = false;
-      // });
+      invoke("start_match", {
+        botList: blueBots.concat(orangeBots),
+        matchSettings: this.matchSettings,
+      }).catch((errMsg) => {
+        this.errorStartingMatchContent = errMsg;
+        this.$bvModal.show("no-rlbot-flag-modal");
+        this.matchStarting = false;
+      });
     },
     killBots: function () {
       invoke("kill_bots");

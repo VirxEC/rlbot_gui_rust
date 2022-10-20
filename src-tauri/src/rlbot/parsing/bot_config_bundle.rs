@@ -126,10 +126,6 @@ pub fn to_base64(path: &str) -> Option<String> {
     }
 }
 
-pub trait Clean {
-    fn cleaned(&self) -> Self;
-}
-
 #[derive(Debug, Error)]
 pub enum RLBotCfgParseError {
     #[error(transparent)]
@@ -319,16 +315,6 @@ impl BotConfigBundle {
     }
 }
 
-impl Clean for BotConfigBundle {
-    fn cleaned(&self) -> Self {
-        let mut b = self.clone();
-        b.logo = None;
-        b.warn = None;
-        b.missing_python_packages = None;
-        b
-    }
-}
-
 impl Runnable for BotConfigBundle {
     fn get_config_file_name(&self) -> &str {
         &self.config_file_name
@@ -488,16 +474,6 @@ impl ScriptConfigBundle {
             requirements_file,
             requires_tkinter,
         })
-    }
-}
-
-impl Clean for ScriptConfigBundle {
-    fn cleaned(&self) -> Self {
-        let mut b = self.clone();
-        b.logo = None;
-        b.warn = None;
-        b.missing_python_packages = None;
-        b
     }
 }
 

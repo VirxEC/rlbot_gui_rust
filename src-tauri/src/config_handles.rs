@@ -249,7 +249,7 @@ pub async fn get_match_settings(window: Window) -> MatchConfig {
 
 #[tauri::command]
 pub async fn save_match_settings(window: Window, settings: MatchConfig) {
-    settings.cleaned_scripts().save_config(&window).await;
+    settings.save_config(&window).await;
 }
 
 async fn trimmed_to_bundle((skill, path): (Option<f32>, String)) -> Result<BotConfigBundle, RLBotCfgParseError> {
@@ -314,8 +314,8 @@ fn trim_bot_bundles(bundles: Vec<BotConfigBundle>) -> Vec<(Option<f32>, String)>
 #[tauri::command]
 pub async fn save_team_settings(window: Window, blue_team: Vec<BotConfigBundle>, orange_team: Vec<BotConfigBundle>) {
     let mut config = load_gui_config(&window).await;
-    config.set("team_settings", "blue_team", Some(dbg!(serde_json::to_string(&trim_bot_bundles(blue_team)).unwrap())));
-    config.set("team_settings", "orange_team", Some(dbg!(serde_json::to_string(&trim_bot_bundles(orange_team)).unwrap())));
+    config.set("team_settings", "blue_team", Some(serde_json::to_string(&trim_bot_bundles(blue_team)).unwrap()));
+    config.set("team_settings", "orange_team", Some(serde_json::to_string(&trim_bot_bundles(orange_team)).unwrap()));
 
     if let Err(e) = save_cfg(&config, get_config_path()).await {
         ccprintln!(&window, "Error saving team settings: {e}");
