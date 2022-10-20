@@ -1,0 +1,10 @@
+.vscode
+.github
+icons
+node_modules
+screenshots
+src-tauri
+*.md
+.eslintrc.json
+*.min.*
+package-lock.json

@@ -8,6 +8,11 @@ project to work its magic: https://github.com/RLBot/RLBot
 
 Works on Windows and partially works on Linux.
 
+## Useful program arguments for bot devs
+
+- `--console`: (Windows only) will spawn a console window that will output all text, and will inherite console if available
+- `--no-pipe`: Auto-enables `--console`, on Windows; Won't use the in-GUI console for RLBot-related things, but instead directly to a real console (work-around for some print flushing issues in Python & allowing for maximum print-spam)
+
 ### Screenshots
 
 You can download, update or create bots
@@ -42,7 +47,6 @@ recruit teammates and purchase upgrades for your car!
 - Real-time non-blocking subprocess stdout & stderr capture redirected to built-in GUI console for debugging purposes
 - In-GUI completely isolated Python installation for Windows users
 - Mini-console for quick & easy user status updates (installing packages, etc.)
-- (**USEFUL FOR RLBOT DEVS**) Running with `--no-pipe` will not pipe RLBot-related output to the GUI console, but instead directly to the inherited console
 
 ## User Installation
 
@@ -57,7 +61,7 @@ It will put "RLBotGUI" in your Windows start menu and desktop.
 1. Add the public GPG key of the ppa to your system: `wget -O- https://virxec.github.io/rlbot_gui_rust_apt/apt-repo/pgp-key.public | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/rl-bot-gui.gpg`
   - NOTE: You might not see the prompmt, but you may need to enter in your sudo password.
   - Deprecated method: `wget -O- https://virxec.github.io/rlbot_gui_rust_apt/apt-repo/pgp-key.public | sudo apt-key add -`
-2. Add the repository to your system (only 64-bit systems are supported): `echo "deb [arch=amd64] https://virxec.github.io/rlbot_gui_rust_apt/apt-repo/ stable main" | sudo tee /etc/apt/sources.list.d/rl-bot-gui.list > /dev/null`
+2. Add the repository to your system: `echo "deb [arch=amd64] https://virxec.github.io/rlbot_gui_rust_apt/apt-repo/ stable main" | sudo tee /etc/apt/sources.list.d/rl-bot-gui.list > /dev/null`
   - Deprecated method: `sudo add-apt-repository 'deb [arch=amd64] https://virxec.github.io/rlbot_gui_rust_apt/apt-repo/ stable main'`
 3. Refresh app list: `sudo apt update`
 4. Install the GUI: `sudo apt install rl-bot-gui`

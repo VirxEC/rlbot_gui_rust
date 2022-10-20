@@ -1,4 +1,4 @@
-#![allow(clippy::wildcard_imports, clippy::unused_async)]
+#![allow(clippy::wildcard_imports)]
 
 mod bot_management;
 mod commands;
@@ -39,10 +39,11 @@ use std::{
     thread,
     time::Duration,
 };
-use tauri::{App, Error as TauriError, Manager, Window};
+use tauri::{async_runtime::block_on as tauri_block_on, App, Error as TauriError, Manager, Window};
 use thiserror::Error;
 use tokio::sync::RwLock as AsyncRwLock;
 
+static NO_CONSOLE_WINDOWS: AtomicBool = AtomicBool::new(true);
 static USE_PIPE: AtomicBool = AtomicBool::new(true);
 
 const BOTPACK_FOLDER: &str = "RLBotPackDeletable";
@@ -57,12 +58,12 @@ static CONSOLE_INPUT_COMMANDS: Mutex<Vec<String>> = Mutex::new(Vec::new());
 static CONSOLE_TEXT_EMIT_QUEUE: RwLock<Option<Sender<ConsoleTextUpdate>>> = RwLock::new(None);
 static CONSOLE_TEXT_OUT_QUEUE: RwLock<Option<Sender<String>>> = RwLock::new(None);
 
-static MATCH_HANDLER_STDIN: Mutex<Option<ChildStdin>> = Mutex::new(None);
+static MATCH_HANDLER_STDIN: Mutex<(String, Option<ChildStdin>)> = Mutex::new((String::new(), None));
 static CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
 
-static PYTHON_PATH: RwLock<String> = RwLock::new(String::new());
-static BOT_FOLDER_SETTINGS: RwLock<Option<BotFolders>> = RwLock::new(None);
+static PYTHON_PATH: Lazy<AsyncRwLock<String>> = Lazy::new(|| AsyncRwLock::new(String::new()));
 static STORIES_CACHE: Lazy<AsyncRwLock<HashMap<StoryConfig, StoryModeConfig>>> = Lazy::new(|| AsyncRwLock::new(HashMap::new()));
+static BOT_FOLDER_SETTINGS: Lazy<AsyncRwLock<BotFolders>> = Lazy::new(|| AsyncRwLock::new(BotFolders::default()));
 
 #[cfg(windows)]
 fn auto_detect_python() -> Option<(String, bool)> {
@@ -229,7 +230,7 @@ macro_rules! ccprintlnr {
 fn has_chrome() -> bool {
     let reg_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe";
 
-    for install_type in [Hive::CurrentUser, Hive::LocalMachine].iter() {
+    for install_type in &[Hive::CurrentUser, Hive::LocalMachine] {
         let reg_key = match install_type.open(reg_path, Security::Read) {
             Ok(key) => key,
             Err(_) => continue,
@@ -268,7 +269,7 @@ fn get_command_status<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A
     #[cfg(windows)]
     {
         // disable window creation
-        command.creation_flags(0x08000000);
+        command.creation_flags(0x0800_0000);
     };
 
     match command.args(args).stdout(Stdio::null()).stderr(Stdio::null()).status() {
@@ -330,7 +331,7 @@ pub fn get_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(
     #[cfg(windows)]
     {
         // disable window creation
-        command.creation_flags(0x08000000);
+        command.creation_flags(0x0800_0000);
     }
 
     command
@@ -347,13 +348,12 @@ pub fn get_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(
 /// * `program` - The executable to run
 /// * `args` - The arguments to pass to the executable
 pub fn get_maybe_capture_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(program: S, args: I, use_pipe: bool) -> Result<Command, CommandError> {
-    match use_pipe {
-        true => get_capture_command(program, args),
-        false => {
-            let mut command = Command::new(program);
-            command.args(args).current_dir(get_content_folder());
-            Ok(command)
-        },
+    if use_pipe {
+        get_capture_command(program, args)
+    } else {
+        let mut command = Command::new(program);
+        command.args(args).current_dir(get_content_folder());
+        Ok(command)
     }
 }
 
@@ -398,8 +398,8 @@ pub fn spawn_capture_process_and_get_exit_code<S: AsRef<OsStr>, A: AsRef<OsStr>,
 /// # Errors
 ///
 /// This function will return an error if `PYTHON_PATH`'s lock has been poisoned.
-pub fn check_has_rlbot() -> Result<bool, String> {
-    Ok(get_command_status(&*PYTHON_PATH.read().map_err(|err| err.to_string())?, ["-c", "import rlbot"]))
+pub async fn check_has_rlbot() -> bool {
+    get_command_status(&*PYTHON_PATH.read().await, ["-c", "import rlbot"])
 }
 
 #[cfg(windows)]
@@ -447,11 +447,11 @@ enum InternalConsoleError {
 
 fn write_console_text_out_queue_to_file(window: &Window, to_write_out: Vec<String>) -> Result<(), InternalConsoleError> {
     let mut file = OpenOptions::new().write(true).append(true).open(get_log_path())?;
-    to_write_out.iter().for_each(|line| {
+    for line in to_write_out {
         if let Err(e) = writeln!(file, "{}", line) {
             ccprintln!(window, "Error writing to log file: {e}");
         }
-    });
+    }
 
     Ok(())
 }
@@ -531,7 +531,7 @@ fn try_emit_text<T: AsRef<str>>(window: &Window, text: T, replace_last: bool) ->
         println!("GOT STORY RESULT {text}");
         let text = text.replace("-|-*|STORY_RESULT ", "").replace("|*-|-", "");
         let save_state: StoryState = serde_json::from_str(&text).unwrap();
-        save_state.save(window);
+        save_state.save_sync(window);
         try_emit_signal(window, "load_updated_save_state", save_state)
     } else {
         if let Err(e) = issue_console_update(text.to_owned(), replace_last) {
@@ -549,11 +549,12 @@ fn emit_text<T: AsRef<str>>(window: &Window, text: T, replace_last: bool) {
     }
 }
 
-fn gui_setup_load_config(window: &Window) -> Result<(), Box<dyn StdError>> {
-    let gui_config = load_gui_config_sync(window);
-    *PYTHON_PATH.write()? = gui_config.get("python_config", "path").unwrap_or_else(|| auto_detect_python().unwrap_or_default().0);
-    *BOT_FOLDER_SETTINGS.write()? = Some(BotFolders::load_from_conf(&gui_config));
-    Ok(())
+fn gui_setup_load_config(window: &Window) {
+    tauri_block_on(async {
+        let gui_config = load_gui_config(window).await;
+        *PYTHON_PATH.write().await = gui_config.get("python_config", "path").unwrap_or_else(|| auto_detect_python().unwrap_or_default().0);
+        *BOT_FOLDER_SETTINGS.write().await = BotFolders::load_from_conf(&load_gui_config(window).await);
+    });
 }
 
 fn gui_setup(app: &mut App) -> Result<(), Box<dyn StdError>> {
@@ -592,7 +593,7 @@ fn gui_setup(app: &mut App) -> Result<(), Box<dyn StdError>> {
     });
 
     clear_log_file()?;
-    gui_setup_load_config(&window)?;
+    gui_setup_load_config(&window);
 
     let (mut pipe_reader, pipe_writer) = pipe()?;
     *CAPTURE_PIPE_WRITER.lock()? = Some(pipe_writer);
@@ -640,11 +641,13 @@ fn is_debug_build() -> bool {
 
 fn main() {
     let use_pipe = !std::env::args().any(|arg| arg == "--no-pipe");
-    dbg!(use_pipe);
     USE_PIPE.store(use_pipe, Ordering::Relaxed);
 
+    let no_console_windows = !std::env::args().any(|arg| arg == "--console");
+    NO_CONSOLE_WINDOWS.store(no_console_windows, Ordering::Relaxed);
+
     #[cfg(all(not(debug_assertions), windows))]
-    if use_pipe {
+    if use_pipe && no_console_windows {
         unsafe {
             winapi::um::wincon::FreeConsole();
         }
@@ -721,6 +724,7 @@ fn main() {
             create_python_venv,
             get_selected_tab,
             set_selected_tab,
+            shut_down_match_handler,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,4 +1,7 @@
-use super::{cfg_helper::load_cfg_sync, zip_extract_fixed};
+use super::{
+    cfg_helper::{load_cfg, save_cfg},
+    zip_extract_fixed,
+};
 use crate::{ccprintln, commands::UPDATE_DOWNLOAD_PROGRESS_SIGNAL, emit_text, get_config_path, load_gui_config};
 use fs_extra::dir;
 use futures_util::StreamExt;
@@ -9,13 +12,13 @@ use std::{
     collections::{HashMap, HashSet},
     error::Error,
     fs::{read_dir, remove_dir, remove_file, File},
-    io::{BufRead, BufReader, Cursor, Error as IoError, ErrorKind as IoErrorKind, Read, Write},
+    io::{BufRead, BufReader, Cursor, Error as IoError, ErrorKind as IoErrorKind, Write},
     ops::ControlFlow,
     path::{Path, PathBuf},
     time::Instant,
 };
 use tauri::Window;
-use tokio::task;
+use tokio::{fs as async_fs, task};
 
 const FOLDER_SUFFIX: &str = "master";
 
@@ -191,7 +194,7 @@ pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, c
 
         config.set("bot_folder_settings", "incr", Some(latest_release_tag_name));
 
-        if let Err(e) = config.write(config_path) {
+        if let Err(e) = save_cfg(&config, config_path).await {
             ccprintln(window, e.to_string());
             return BotpackStatus::Success("Downloaded the bot pack, but failed to write GUI's config.".to_owned());
         }
@@ -207,8 +210,9 @@ pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, c
 }
 
 /// Load the GUI config and check the get the current version number of the botpack
-pub fn get_current_tag_name() -> Option<u32> {
-    load_cfg_sync(get_config_path())
+pub async fn get_current_tag_name() -> Option<u32> {
+    load_cfg(get_config_path())
+        .await
         .ok()?
         .get("bot_folder_settings", "incr")?
         .replace("incr-", "")
@@ -247,7 +251,7 @@ async fn get_latest_release_tag(repo_full_name: &str) -> Result<u32, String> {
 /// * `window`: A reference to the GUI, obtained from a `#[tauri::command]` function
 /// * `repo_full_name`: The owner/name of the repo, e.x. "RLBot/RLBotPack"
 pub async fn is_botpack_up_to_date(window: &Window, repo_full_name: &str) -> bool {
-    let current_tag_name = match get_current_tag_name() {
+    let current_tag_name = match get_current_tag_name().await {
         Some(tag) => tag,
         None => return true,
     };
@@ -272,7 +276,7 @@ pub async fn is_botpack_up_to_date(window: &Window, repo_full_name: &str) -> boo
 pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str, checkout_folder: &str) -> BotpackStatus {
     let repo_full_name = format!("{repo_owner}/{repo_name}");
 
-    let current_tag_name = match get_current_tag_name() {
+    let current_tag_name = match get_current_tag_name().await {
         Some(tag) => tag,
         None => return BotpackStatus::RequiresFullDownload,
     };
@@ -346,7 +350,7 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
 
         config.set("bot_folder_settings", "incr", Some(format!("incr-{tag}")));
 
-        if let Err(e) = config.write(&config_path) {
+        if let Err(e) = save_cfg(&config, &config_path).await {
             ccprintln(window, e.to_string());
         }
 
@@ -447,24 +451,17 @@ impl MapPackUpdater {
     }
 
     /// For a map pack, gets you the index.json data
-    pub fn get_map_index(&self, window: &Window) -> Option<serde_json::Value> {
+    pub async fn get_map_index(&self, window: &Window) -> Option<serde_json::Value> {
         let index_path = self.full_path.join("index.json");
 
         if index_path.exists() {
-            let mut file = match File::open(index_path) {
-                Ok(file) => file,
+            let contents = match async_fs::read_to_string(index_path).await {
+                Ok(contents) => contents,
                 Err(e) => {
-                    ccprintln!(window, "Error opening index.json: {e}");
+                    ccprintln!(window, "Error reading index.json: {e}");
                     return None;
                 }
             };
-
-            let mut contents = String::new();
-
-            if let Err(e) = file.read_to_string(&mut contents) {
-                ccprintln!(window, "Error reading index.json: {e}");
-                return None;
-            }
 
             match serde_json::from_str(&contents) {
                 Ok(json) => Some(json),
@@ -482,7 +479,7 @@ impl MapPackUpdater {
     /// maps that have updated the revision, we grab them
     /// from the latest revision
     pub async fn needs_update(&self, window: &Window) -> BotpackStatus {
-        let index = match self.get_map_index(window) {
+        let index = match self.get_map_index(window).await {
             Some(index) => index,
             None => return BotpackStatus::RequiresFullDownload,
         };
@@ -522,12 +519,11 @@ impl MapPackUpdater {
     /// maps that have updated the revision, we grab them
     /// from the latest revision
     pub async fn hydrate_map_pack(&self, window: &Window, old_index: Option<serde_json::Value>) {
-        let new_maps = match self.get_map_index(window) {
-            Some(index) => Self::extract_maps_from_index(&index),
-            None => {
-                ccprintln(window, "Error getting index.json");
-                return;
-            }
+        let new_maps = if let Some(index) = self.get_map_index(window).await {
+            Self::extract_maps_from_index(&index)
+        } else {
+            ccprintln(window, "Error getting index.json");
+            return;
         };
 
         let old_maps = match old_index {

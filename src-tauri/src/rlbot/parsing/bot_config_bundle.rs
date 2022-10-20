@@ -2,16 +2,16 @@
 use std::os::windows::process::CommandExt;
 
 use crate::{
-    bot_management::cfg_helper::{load_cfg, load_cfg_sync, CfgHelperError},
+    bot_management::cfg_helper::{load_cfg, load_cfg_sync, Error},
     ccprintln, get_command_status,
     rlbot::agents::{base_script::SCRIPT_FILE_KEY, runnable::Runnable},
-    PYTHON_PATH,
 };
 use configparser::ini::Ini;
 use imghdr::Type;
 use serde::{Deserialize, Serialize};
 use std::{
     borrow::ToOwned,
+    ffi::OsStr,
     fs,
     io::Read,
     path::Path,
@@ -126,14 +126,10 @@ pub fn to_base64(path: &str) -> Option<String> {
     }
 }
 
-pub trait Clean {
-    fn cleaned(&self) -> Self;
-}
-
 #[derive(Debug, Error)]
 pub enum RLBotCfgParseError {
     #[error(transparent)]
-    CfgLoad(#[from] CfgHelperError),
+    CfgLoad(#[from] Error),
     #[error("No name found in config file {0}")]
     NoName(String),
     #[error("No looks config found in config file {0}")]
@@ -144,10 +140,11 @@ pub enum RLBotCfgParseError {
     NoScriptFile(String),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(default)]
 pub struct BotConfigBundle {
     pub name: String,
+    pub skill: Option<f32>,
     pub looks_path: String,
     pub path: String,
     config_file_name: String,
@@ -167,16 +164,44 @@ pub struct BotConfigBundle {
 }
 
 impl BotConfigBundle {
+    pub fn new_human() -> Self {
+        Self {
+            name: "Human".to_owned(),
+            runnable_type: "human".to_owned(),
+            image: "imgs/human.png".to_owned(),
+            ..Default::default()
+        }
+    }
+
+    pub fn new_psyonix(skill: f32) -> Self {
+        let name = if skill == 1. {
+            "Psyonix Allstar"
+        } else if skill == 0.5 {
+            "Psyonix Pro"
+        } else {
+            "Psyonix Rookie"
+        }
+        .to_owned();
+
+        Self {
+            name,
+            skill: Some(skill),
+            runnable_type: "psyonix".to_owned(),
+            image: "imgs/psyonix.png".to_owned(),
+            ..Default::default()
+        }
+    }
+
     pub async fn minimal_from_path<T: AsRef<Path>>(config_path: T) -> Result<Self, RLBotCfgParseError> {
         let config_path = config_path.as_ref();
-        Self::minimal_from_conf(config_path, load_cfg(config_path).await?)
+        Self::minimal_from_conf(config_path, &load_cfg(config_path).await?)
     }
 
     pub fn minimal_from_path_sync(config_path: &Path) -> Result<Self, RLBotCfgParseError> {
-        Self::minimal_from_conf(config_path, load_cfg_sync(config_path)?)
+        Self::minimal_from_conf(config_path, &load_cfg_sync(config_path)?)
     }
 
-    fn minimal_from_conf(config_path: &Path, conf: Ini) -> Result<Self, RLBotCfgParseError> {
+    fn minimal_from_conf(config_path: &Path, conf: &Ini) -> Result<Self, RLBotCfgParseError> {
         let path = config_path.to_string_lossy().to_string();
         let config_path_str = config_path.display().to_string();
         // the follow unwrap calls will probably never fail because the config file was loaded successfully, already
@@ -217,7 +242,7 @@ impl BotConfigBundle {
 
         let logo = None;
 
-        let info = Some(DevInfo::from_config(&conf));
+        let info = Some(DevInfo::from_config(conf));
 
         let runnable_type = String::from("rlbot");
         let warn = None;
@@ -226,6 +251,7 @@ impl BotConfigBundle {
 
         Ok(Self {
             name,
+            skill: None,
             looks_path,
             path,
             config_file_name,
@@ -289,16 +315,6 @@ impl BotConfigBundle {
     }
 }
 
-impl Clean for BotConfigBundle {
-    fn cleaned(&self) -> Self {
-        let mut b = self.clone();
-        b.logo = None;
-        b.warn = None;
-        b.missing_python_packages = None;
-        b
-    }
-}
-
 impl Runnable for BotConfigBundle {
     fn get_config_file_name(&self) -> &str {
         &self.config_file_name
@@ -312,16 +328,10 @@ impl Runnable for BotConfigBundle {
         self.supports_standalone && self.use_virtual_environment
     }
 
-    fn get_missing_packages(&self, window: &Window) -> Vec<String> {
+    fn get_missing_packages<S: AsRef<OsStr>>(&self, window: &Window, python: S) -> Vec<String> {
         if self.use_virtual_environment() {
             return Vec::new();
         }
-
-        let python = if let Ok(path) = PYTHON_PATH.read() {
-            path.to_owned()
-        } else {
-            return Vec::new();
-        };
 
         if let Some(req_file) = self.get_requirements_file() {
             let mut args: Vec<&str> = vec!["-c", "from rlbot_smh.get_missing_packages import run; run()"];
@@ -339,7 +349,7 @@ impl Runnable for BotConfigBundle {
             #[cfg(windows)]
             {
                 // disable window creation
-                command.creation_flags(0x08000000);
+                command.creation_flags(0x0800_0000);
             };
 
             match command.args(args).stdin(Stdio::null()).output() {
@@ -467,16 +477,6 @@ impl ScriptConfigBundle {
     }
 }
 
-impl Clean for ScriptConfigBundle {
-    fn cleaned(&self) -> Self {
-        let mut b = self.clone();
-        b.logo = None;
-        b.warn = None;
-        b.missing_python_packages = None;
-        b
-    }
-}
-
 impl Runnable for ScriptConfigBundle {
     fn get_config_file_name(&self) -> &str {
         &self.config_file_name
@@ -490,16 +490,10 @@ impl Runnable for ScriptConfigBundle {
         self.use_virtual_environment
     }
 
-    fn get_missing_packages(&self, window: &Window) -> Vec<String> {
+    fn get_missing_packages<S: AsRef<OsStr>>(&self, window: &Window, python: S) -> Vec<String> {
         if self.use_virtual_environment() {
             return Vec::new();
         }
-
-        let python = if let Ok(path) = PYTHON_PATH.read() {
-            path.to_owned()
-        } else {
-            return Vec::new();
-        };
 
         if let Some(req_file) = self.get_requirements_file() {
             let mut args: Vec<&str> = vec!["-c", "from rlbot_smh.get_missing_packages import run; run()"];
@@ -517,7 +511,7 @@ impl Runnable for ScriptConfigBundle {
             #[cfg(windows)]
             {
                 // disable window creation
-                command.creation_flags(0x08000000);
+                command.creation_flags(0x0800_0000);
             };
 
             match command.args(args).stdin(Stdio::null()).output() {

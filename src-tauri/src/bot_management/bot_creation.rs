@@ -55,14 +55,10 @@ async fn download_extract_bot_template<T: IntoUrl>(window: &Window, url: T, top_
 pub enum BoostrapError {
     #[error("There is already a bot named {0}, please choose a different name!")]
     NameExists(String),
-    #[error("Mutex {0} was None")]
-    MutexNone(String),
-    #[error("Mutex {0} was poisoned")]
-    MutexPoisoned(String),
     #[error("Failed to setup bot template: {0}")]
     SetupTemplate(#[from] DownloadExtractError),
     #[error("Failed change key in cfg: {0}")]
-    ChangeKey(#[from] cfg_helper::CfgHelperError),
+    ChangeKey(#[from] cfg_helper::Error),
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error("Couldn't to rename folder: {0}")]
@@ -92,12 +88,7 @@ pub async fn bootstrap_python_bot(window: &Window, bot_name: String, directory: 
 
     change_key_in_cfg(config_file, BOT_CONFIG_MODULE_HEADER, NAME_KEY, bot_name).await?;
 
-    BOT_FOLDER_SETTINGS
-        .write()
-        .map_err(|_| BoostrapError::MutexPoisoned("BOT_FOLDER_SETTINGS".to_owned()))?
-        .as_mut()
-        .ok_or_else(|| BoostrapError::MutexNone("BOT_FOLDER_SETTINGS".to_owned()))?
-        .add_file(window, config_file.clone());
+    BOT_FOLDER_SETTINGS.write().await.add_file(window, config_file.clone());
 
     if open::that(python_file).is_err() {
         // We don't want to return an error here, because the bot was successfully created
@@ -168,12 +159,7 @@ pub async fn bootstrap_python_hivemind(window: &Window, hive_name: String, direc
 
     let config_file = config_file.to_string_lossy();
 
-    BOT_FOLDER_SETTINGS
-        .write()
-        .map_err(|_| BoostrapError::MutexPoisoned("BOT_FOLDER_SETTINGS".to_owned()))?
-        .as_mut()
-        .ok_or_else(|| BoostrapError::MutexNone("BOT_FOLDER_SETTINGS".to_owned()))?
-        .add_file(window, config_file.to_string());
+    BOT_FOLDER_SETTINGS.write().await.add_file(window, config_file.to_string());
 
     if open::that(hive_file).is_err() {
         ccprintln!(
