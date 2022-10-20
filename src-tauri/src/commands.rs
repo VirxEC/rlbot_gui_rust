@@ -647,7 +647,7 @@ async fn pre_start_match(window: &Window) -> Result<(), String> {
 
     if port.is_some() {
         // kill the current bots if they're running
-        kill_bots().await?;
+        kill_bots(window.clone()).await?;
 
         // kill RLBot if it's running but Rocket League isn't
         if !rl_is_running {
@@ -703,11 +703,21 @@ pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_set
 }
 
 #[tauri::command]
-pub async fn kill_bots() -> Result<(), String> {
-    if let (_, Some(stdin)) = &mut *MATCH_HANDLER_STDIN.lock().map_err(|err| err.to_string())? {
-        const KILL_BOTS_COMMAND: &[u8] = "kill_bots | \n".as_bytes();
+pub async fn kill_bots(window: Window) -> Result<(), String> {
+    issue_match_handler_command(&window, &["kill_bots".to_owned()], CreateHandler::No, "")?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn shut_down_match_handler() -> Result<(), String> {
+    let mut stdin_lock = MATCH_HANDLER_STDIN.lock().map_err(|err| err.to_string())?;
+    if let (_, Some(stdin)) = &mut *stdin_lock {
+        const KILL_BOTS_COMMAND: &[u8] = "shut_down | \n".as_bytes();
         stdin.write_all(KILL_BOTS_COMMAND).map_err(|err| err.to_string())?;
     }
+
+    stdin_lock.1 = None;
 
     Ok(())
 }

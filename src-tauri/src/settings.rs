@@ -37,7 +37,7 @@ impl FromStr for BotFolder {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct BotFolders {
     pub files: HashMap<String, BotFolder>,
     pub folders: HashMap<String, BotFolder>,

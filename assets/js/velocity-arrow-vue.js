@@ -36,7 +36,7 @@ export default {
     onDragStart: function (evt) {
       this.$emit("dragstart", evt);
     },
-    onDragEnd: function (evt) {
+    onDragEnd: function () {
       this.$emit("dragend", this.object);
     },
     onDragMove: function (evt) {

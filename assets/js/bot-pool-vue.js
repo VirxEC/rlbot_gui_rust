@@ -128,7 +128,7 @@ export default {
     },
     getCategoryName: function (category) {
       return Object.entries(categories).find(
-        ([_, value]) => value === category
+        ([, value]) => value === category
       )[0];
     },
     getSecondaryCategoryIndex: function (category) {

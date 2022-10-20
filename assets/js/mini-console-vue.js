@@ -46,6 +46,7 @@ export default {
 
         try {
           this.$refs.scroller.scrollToBottom();
+          // eslint-disable-next-line no-empty
         } catch (e) {} // ignore the error, it randomly happens sometimes but it still works
       }),
     };

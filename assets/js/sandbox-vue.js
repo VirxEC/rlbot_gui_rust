@@ -1,6 +1,7 @@
 // https://konvajs.org/docs/vue/index.html
 import VelocityArrow from "./velocity-arrow-vue.js";
 
+// eslint-disable-next-line no-undef
 Vue.use(VueKonva);
 
 const PIXEL_HEIGHT = 580;
@@ -222,7 +223,7 @@ export default {
         z: canvasVec.z * 20,
       };
     },
-    handleDragStart: function (evt) {
+    handleDragStart: function () {
       this.dragging = true;
     },
     handleBallDragMove: function (evt) {
@@ -234,7 +235,7 @@ export default {
       this.cars[index].x = evt.target.x();
       this.cars[index].y = evt.target.y();
     },
-    handleBallDragEnd: function (evt) {
+    handleBallDragEnd: function () {
       this.dragging = false;
       const packetVec = this.toPacketVec({
         x: this.ball.x,

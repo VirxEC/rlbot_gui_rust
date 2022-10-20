@@ -245,7 +245,7 @@ export default {
       cityDisplayInfo: {},
       challenges: null,
       selectedCityId: "INTRO",
-      matchStartFailed: listen("match-start-failed", (_) => {
+      matchStartFailed: listen("match-start-failed", () => {
         this.game_in_progress = {};
         this.snackbarContent =
           "Error starting the match! See the console for more details.";

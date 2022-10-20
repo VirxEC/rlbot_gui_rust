@@ -95,6 +95,9 @@ export default {
         <b-dropdown-item @click="uploadLog()">
           Upload GUI log for help
         </b-dropdown-item>
+        <b-dropdown-item @click="shutDownMatchHandler()">
+          Shut Down Match Handler
+        </b-dropdown-item>
       </b-dropdown>
     </b-navbar-nav>
   </b-navbar>
@@ -538,12 +541,12 @@ export default {
           this.downloadStatus = event.payload.status;
         }
       ),
-      matchStarted: listen("match-started", (_) => {
+      matchStarted: listen("match-started", () => {
         this.$bvModal.hide("mini-console");
         this.matchStarting = false;
         this.gameAlreadyLaunched = true;
       }),
-      matchStartFailed: listen("match-start-failed", (_) => {
+      matchStartFailed: listen("match-start-failed", () => {
         this.matchStarting = false;
         this.snackbarContent =
           "Error starting the match! See the console for more details.";
@@ -558,7 +561,10 @@ export default {
   },
 
   methods: {
-    uploadLog: function (event) {
+    shutDownMatchHandler: function() {
+      invoke("shut_down_match_handler");
+    },
+    uploadLog: function () {
       this.miniConsoleTitle = "Uploading full log to hastebin";
       this.allowMiniConsoleClose = false;
       this.$bvModal.show("mini-console");
@@ -577,7 +583,7 @@ export default {
           });
       }, 500);
     },
-    pythonSetup: function (event) {
+    pythonSetup: function () {
       invoke("get_detected_python_path").then((info) => {
         this.rec_python = info[0];
       });
@@ -678,7 +684,7 @@ export default {
         this.quickReloadWarnings();
       });
     },
-    startMatch: async function (event) {
+    startMatch: async function () {
       this.matchStarting = true;
       this.miniConsoleTitle = "Starting Match";
       this.allowMiniConsoleClose = true;
@@ -726,17 +732,17 @@ export default {
         this.matchStarting = false;
       });
     },
-    killBots: function (event) {
+    killBots: function () {
       invoke("kill_bots");
       this.$bvModal.hide("mini-console");
       this.matchStarting = false;
     },
-    pickBotFolder: function (event) {
+    pickBotFolder: function () {
       invoke("pick_bot_folder").then(() => {
         invoke("get_folder_settings").then(this.folderSettingsReceived);
       });
     },
-    pickBotConfig: function (event) {
+    pickBotConfig: function () {
       invoke("pick_bot_config").then(() => {
         invoke("get_folder_settings").then(this.folderSettingsReceived);
       });

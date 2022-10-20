@@ -85,6 +85,7 @@ export default {
 
           try {
             this.$refs.scroller.scrollToBottom();
+            // eslint-disable-next-line no-empty
           } catch (e) {} // ignore the error, it randomly happens sometimes but it still works
         }
       }),
@@ -98,7 +99,7 @@ export default {
         this.$refs.scroller.scrollToBottom();
       }
     },
-    onUp: function (event) {
+    onUp: function () {
       if (this.commandsIndex < this.previousCommands.length - 1) {
         if (this.commandsIndex === -1) {
           this.savedInputCommand = this.inputCommand;
@@ -108,7 +109,7 @@ export default {
         this.inputCommand = this.previousCommands[this.commandsIndex];
       }
     },
-    onDown: function (event) {
+    onDown: function () {
       if (this.commandsIndex > -1) {
         this.commandsIndex -= 1;
 

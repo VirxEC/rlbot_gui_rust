@@ -110,7 +110,7 @@ export default {
       this.snackbarContent = "Creating isolated Python environment...";
       this.showSnackbar = true;
       invoke("create_python_venv", { path: this.rec_python })
-        .then((_) => {
+        .then(() => {
           this.snackbarContent =
             "Successfully created Python virtual environment, installing required packages";
           this.showSnackbar = true;
@@ -145,7 +145,7 @@ export default {
       this.$bvModal.show("download-modal");
 
       invoke("install_python")
-        .then((_) => {
+        .then(() => {
           this.$bvModal.hide("download-modal");
           this.snackbarContent =
             "Successfully installed Python to your system, installing required packages";

@@ -66,7 +66,7 @@ export default {
     },
   },
   methods: {
-    ok: function (id) {
+    ok: function () {
       // let the popup close first
       const event = {
         id: this.challenge.id,

@@ -206,7 +206,7 @@ export default {
       this.download_in_progress = true;
       invoke("download_bot_pack").then(this.handle_download_updates);
     },
-    handle_download_updates: function (finished) {
+    handle_download_updates: function () {
       this.download_in_progress = false;
       this.run_validation();
     },

@@ -63,12 +63,7 @@ static CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
 
 static PYTHON_PATH: Lazy<AsyncRwLock<String>> = Lazy::new(|| AsyncRwLock::new(String::new()));
 static STORIES_CACHE: Lazy<AsyncRwLock<HashMap<StoryConfig, StoryModeConfig>>> = Lazy::new(|| AsyncRwLock::new(HashMap::new()));
-static BOT_FOLDER_SETTINGS: Lazy<AsyncRwLock<BotFolders>> = Lazy::new(|| {
-    AsyncRwLock::new(BotFolders {
-        files: HashMap::new(),
-        folders: HashMap::new(),
-    })
-});
+static BOT_FOLDER_SETTINGS: Lazy<AsyncRwLock<BotFolders>> = Lazy::new(|| AsyncRwLock::new(BotFolders::default()));
 
 #[cfg(windows)]
 fn auto_detect_python() -> Option<(String, bool)> {
@@ -729,6 +724,7 @@ fn main() {
             create_python_venv,
             get_selected_tab,
             set_selected_tab,
+            shut_down_match_handler,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
