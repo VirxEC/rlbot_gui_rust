@@ -134,7 +134,7 @@ pub async fn scan_for_bots(window: Window) -> Result<Vec<BotConfigBundle>, Strin
 
     for (path, props) in &bfs.folders {
         if props.visible {
-            bots.extend(get_bots_from_directory(&window, &**path).await);
+            bots.extend(get_bots_from_directory(&window, path).await);
         }
     }
 
@@ -160,7 +160,7 @@ pub async fn scan_for_scripts(window: Window) -> Result<Vec<ScriptConfigBundle>,
 
     for (path, props) in &bfs.folders {
         if props.visible {
-            scripts.extend(get_scripts_from_directory(&window, &**path).await);
+            scripts.extend(get_scripts_from_directory(&window, path).await);
         }
     }
 
@@ -224,7 +224,7 @@ pub async fn show_path_in_explorer(window: Window, path: String) {
 
 #[tauri::command]
 pub async fn get_looks(path: String) -> Option<BotLooksConfig> {
-    match BotLooksConfig::from_path(&*path).await {
+    match BotLooksConfig::from_path(&path).await {
         Ok(looks) => Some(looks),
         Err(_) => None,
     }
@@ -232,7 +232,7 @@ pub async fn get_looks(path: String) -> Option<BotLooksConfig> {
 
 #[tauri::command]
 pub async fn save_looks(window: Window, path: String, config: BotLooksConfig) {
-    config.save_to_path(&window, &*path).await;
+    config.save_to_path(&window, &path).await;
 }
 
 #[tauri::command]

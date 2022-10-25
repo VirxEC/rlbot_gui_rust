@@ -45,7 +45,7 @@ impl BotFolders {
     pub fn load_from_conf(conf: &Ini) -> Self {
         let files = serde_json::from_str(&conf.get("bot_folder_settings", "files").unwrap_or_else(|| String::from("[]"))).unwrap_or_default();
 
-        let folders = serde_json::from_str(&*conf.get("bot_folder_settings", "folders").unwrap_or_else(|| String::from("[]"))).unwrap_or_default();
+        let folders = serde_json::from_str(&conf.get("bot_folder_settings", "folders").unwrap_or_else(|| String::from("[]"))).unwrap_or_default();
 
         Self { files, folders }
     }

@@ -251,7 +251,7 @@ pub async fn run_command(window: Window, input: String) -> Result<(), String> {
         input => (input, input),
     };
 
-    let args = input.strip_prefix(&original_program).and_then(shlex::split).unwrap_or_default();
+    let args = input.strip_prefix(original_program).and_then(shlex::split).unwrap_or_default();
     spawn_capture_process(program, args).map_err(|err| {
         let e = err.to_string();
         ccprintln(&window, &e);
@@ -547,7 +547,7 @@ pub async fn update_map_pack(window: Window) -> Result<String, String> {
 
 #[tauri::command]
 pub async fn is_botpack_up_to_date(window: Window) -> bool {
-    let repo_full_name = format!("{}/{}", BOTPACK_REPO_OWNER, BOTPACK_REPO_NAME);
+    let repo_full_name = format!("{BOTPACK_REPO_OWNER}/{BOTPACK_REPO_NAME}");
     bot_management::downloader::is_botpack_up_to_date(&window, &repo_full_name).await
 }
 

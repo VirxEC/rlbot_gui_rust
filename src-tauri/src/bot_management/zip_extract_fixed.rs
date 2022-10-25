@@ -40,7 +40,7 @@ pub enum ExtractError {
 /// * `replace`: Whether or not files should be overwritten if they already exist in the target directory
 pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, strip_toplevel: bool, replace: bool) -> Result<(), ExtractError> {
     if !target_dir.exists() {
-        fs::create_dir_all(&target_dir)?;
+        fs::create_dir_all(target_dir)?;
     }
 
     let mut archive = ZipArchive::new(source)?;
