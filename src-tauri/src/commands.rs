@@ -569,7 +569,7 @@ pub async fn save_launcher_settings(window: Window, settings: LauncherConfig) {
 ///
 /// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
 fn create_match_handler<S: AsRef<OsStr>>(window: &Window, use_pipe: bool, python_path: S) -> Option<(String, ChildStdin)> {
-    match get_maybe_capture_command(&python_path, ["-c", "from rlbot_smh.match_handler import listen; listen()"], use_pipe)
+    match get_maybe_capture_command(&python_path, ["-u", "-c", "from rlbot_smh.match_handler import listen; listen()"], use_pipe)
         .ok()?
         .stdin(Stdio::piped())
         .spawn()
