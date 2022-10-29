@@ -174,9 +174,9 @@ impl BotConfigBundle {
     }
 
     pub fn new_psyonix(skill: f32) -> Self {
-        let name = if skill == 1. {
+        let name = if (skill - 1.).abs() < f32::EPSILON {
             "Psyonix Allstar"
-        } else if skill == 0.5 {
+        } else if (skill - 0.5).abs() < f32::EPSILON {
             "Psyonix Pro"
         } else {
             "Psyonix Rookie"
@@ -443,9 +443,7 @@ impl ScriptConfigBundle {
             .getboolcoerce(BOT_CONFIG_MODULE_HEADER, USE_VIRTUAL_ENVIRONMENT_KEY)
             .unwrap_or(None)
             .unwrap_or_default();
-        let requirements_file = conf
-            .get(BOT_CONFIG_MODULE_HEADER, REQUIREMENTS_FILE_KEY)
-            .map(|path| format!("{}/{}", config_directory, path));
+        let requirements_file = conf.get(BOT_CONFIG_MODULE_HEADER, REQUIREMENTS_FILE_KEY).map(|path| format!("{config_directory}/{path}"));
         let requires_tkinter = conf.getboolcoerce(BOT_CONFIG_MODULE_HEADER, REQUIRES_TKINTER).unwrap_or(None).unwrap_or_default();
 
         let relative_logo_path = conf.get(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY).unwrap_or_else(|| String::from("logo.png"));

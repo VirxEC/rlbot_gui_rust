@@ -144,7 +144,7 @@ fn auto_detect_python() -> Option<(String, bool)> {
     let content_folder = get_content_folder();
     let rlbot_venv_paths = [content_folder.join("venv/bin/python"), content_folder.join("env/bin/python")];
 
-    for path in rlbot_venv_paths.iter() {
+    for path in &rlbot_venv_paths {
         if get_command_status(path, ["--version"]) {
             return Some((path.to_string_lossy().to_string(), true));
         }
@@ -448,7 +448,7 @@ enum InternalConsoleError {
 fn write_console_text_out_queue_to_file(window: &Window, to_write_out: Vec<String>) -> Result<(), InternalConsoleError> {
     let mut file = OpenOptions::new().write(true).append(true).open(get_log_path())?;
     for line in to_write_out {
-        if let Err(e) = writeln!(file, "{}", line) {
+        if let Err(e) = writeln!(file, "{line}") {
             ccprintln!(window, "Error writing to log file: {e}");
         }
     }
@@ -492,7 +492,7 @@ fn emit_console_text_emit_queue(window: &Window, mut updates: Vec<ConsoleTextUpd
 }
 
 fn issue_console_update(text: String, replace_last: bool) -> Result<(), InternalConsoleError> {
-    println!("{}", text);
+    println!("{text}");
 
     let converted_and_escaped = ansi_to_html::convert_escaped(&text)?;
     let update = ConsoleTextUpdate::from(converted_and_escaped, replace_last);

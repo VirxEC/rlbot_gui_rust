@@ -227,7 +227,7 @@ pub async fn get_current_tag_name() -> Option<u32> {
 /// `repo_full_name`: The owner/name of the repo, e.x. "RLBot/RLBotPack"
 /// `tag`: The tag number, e.x. `103`
 fn get_url_from_tag(repo_full_name: &str, tag: u32) -> String {
-    format!("https://github.com/{}/releases/download/incr-{}/incremental.zip", repo_full_name, tag)
+    format!("https://github.com/{repo_full_name}/releases/download/incr-{tag}/incremental.zip")
 }
 
 /// Finds what the tag is on the latest release in a repo
@@ -323,7 +323,7 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
     let mut tag = current_tag_name + 1;
 
     for handle in handles {
-        let patch_status = format!("Patching in update incr-{}", tag);
+        let patch_status = format!("Patching in update incr-{tag}");
         ccprintln(window, &patch_status);
 
         let progress = (tag - current_tag_name) as f32 / total_patches as f32 * 100.;
@@ -409,7 +409,7 @@ async fn apply_patch(resp: Result<reqwest::Response, reqwest::Error>, window: &W
             let mut last_ok = false;
             let mut count = 0;
             for line in BufReader::new(file).lines().flatten() {
-                let line = line.replace('\0', "").replace('\r', "");
+                let line = line.replace(['\0', '\r'], "");
                 if !line.is_empty() {
                     let file_name = local_folder_path.join(line);
                     if let Err(e) = remove_file(&file_name) {
