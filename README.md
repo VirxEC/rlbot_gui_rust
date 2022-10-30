@@ -10,6 +10,7 @@ Works on Windows and partially works on Linux.
 
 ## Useful program arguments for bot devs
 
+- `--debug`: Tricks JavaScript into think that the GUI was compiled in debug mode (won't check for updates on launch)
 - `--console`: (Windows only) will spawn a console window that will output all text, and will inherite console if available
 - `--no-pipe`: Auto-enables `--console`, on Windows; Won't use the in-GUI console for RLBot-related things, but instead directly to a real console (work-around for some print flushing issues in Python & allowing for maximum print-spam)
 

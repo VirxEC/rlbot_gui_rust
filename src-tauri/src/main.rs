@@ -45,6 +45,7 @@ use tokio::sync::RwLock as AsyncRwLock;
 
 static NO_CONSOLE_WINDOWS: AtomicBool = AtomicBool::new(true);
 static USE_PIPE: AtomicBool = AtomicBool::new(true);
+static IS_DEBUG_MODE: AtomicBool = AtomicBool::new(cfg!(debug_assertions));
 
 const BOTPACK_FOLDER: &str = "RLBotPackDeletable";
 const MAPPACK_FOLDER: &str = "RLBotMapPackDeletable";
@@ -636,7 +637,7 @@ fn gui_setup(app: &mut App) -> Result<(), Box<dyn StdError>> {
 
 #[tauri::command]
 fn is_debug_build() -> bool {
-    cfg!(debug_assertions)
+    IS_DEBUG_MODE.load(Ordering::Relaxed)
 }
 
 fn main() {
@@ -651,6 +652,10 @@ fn main() {
         unsafe {
             winapi::um::wincon::FreeConsole();
         }
+    }
+
+    if std::env::args().any(|arg| arg == "--debug") {
+        IS_DEBUG_MODE.store(true, Ordering::Relaxed);
     }
 
     println!("Config path: {}", get_config_path().display());
