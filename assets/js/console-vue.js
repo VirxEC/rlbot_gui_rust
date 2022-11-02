@@ -130,9 +130,7 @@ export default {
         this.previousCommands.unshift(this.inputCommand);
       }
 
-      invoke("run_command", { input: this.inputCommand }).catch((error) =>
-        console.error(error)
-      );
+      invoke("run_command", { input: this.inputCommand }).catch(console.error);
 
       this.inputCommand = "";
       this.savedInputCommand = "";
