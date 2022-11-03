@@ -600,19 +600,19 @@ fn issue_match_handler_command<S: AsRef<OsStr>>(window: &Window, command_parts: 
     let (used_py_path, match_handler_stdin) = &mut *command_lock;
 
     if match_handler_stdin.is_none() {
-        if let CreateHandler::Yes(use_pipe) = create_handler {
-            ccprintln(window, "Starting match handler!");
-            if let Some((py_path, stdin)) = create_match_handler(window, use_pipe, &python_path) {
-                *match_handler_stdin = Some(stdin);
-                *used_py_path = py_path;
-                create_handler = CreateHandler::No;
-            } else {
-                return Err("Couldn't start match handler".to_owned());
-            }
-        } else {
+        let CreateHandler::Yes(use_pipe) = create_handler else {
             ccprintln(window, "Not issuing command to handler as it's down and I was told to not start it");
             return Ok(());
-        }
+        };
+
+        ccprintln(window, "Starting match handler!");
+        let Some((py_path, stdin)) = create_match_handler(window, use_pipe, &python_path) else {
+            return Err("Couldn't start match handler".to_owned());
+        };
+
+        *match_handler_stdin = Some(stdin);
+        *used_py_path = py_path;
+        create_handler = CreateHandler::No;
     }
 
     let command = format!("{} | \n", command_parts.join(" | "));
@@ -825,7 +825,7 @@ fn pysonix_to_player_config(player: &Bot, team: Team) -> TeamBotBundle {
     TeamBotBundle {
         name: player.name.clone(),
         team,
-        skill: player.skill.unwrap_or(1.0) as f32,
+        skill: player.skill.unwrap_or(1.0),
         runnable_type: "psyonix".to_owned(),
         path: None,
     }

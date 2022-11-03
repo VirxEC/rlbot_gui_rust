@@ -83,7 +83,7 @@ fn auto_detect_python() -> Option<(String, bool)> {
     // Windows actually doesn't have a python3.7.exe command, just python.exe (no matter what)
     // but there is a pip3.7.exe and stuff
     // we can then use that to find the path to the right python.exe and use that
-    for pip in ["pip3.7", "pip3.8", "pip3.9", "pip3.6", "pip3"] {
+    for pip in ["pip3.7", "pip3.8", "pip3.9", "pip3.10", "pip3.6", "pip3"] {
         if let Ok(value) = get_python_from_pip(pip) {
             return Some((value, false));
         }
@@ -151,7 +151,7 @@ fn auto_detect_python() -> Option<(String, bool)> {
         }
     }
 
-    for python in ["python3.7", "python3.8", "python3.9", "python3.6", "python3"] {
+    for python in ["python3.7", "python3.8", "python3.9", "python3.10", "python3.6", "python3"] {
         if get_command_status(python, ["--version"]) {
             return Some((python.to_owned(), false));
         }
@@ -544,8 +544,7 @@ fn try_emit_text<T: AsRef<str>>(window: &Window, text: T, replace_last: bool) ->
 }
 
 fn emit_text<T: AsRef<str>>(window: &Window, text: T, replace_last: bool) {
-    let (signal, error) = try_emit_text(window, text, replace_last);
-    if let Some(e) = error {
+    if let (signal, Some(e)) = try_emit_text(window, text, replace_last) {
         ccprintln!(window, "Error emitting {signal}: {e}");
     }
 }

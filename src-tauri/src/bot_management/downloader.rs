@@ -519,12 +519,12 @@ impl MapPackUpdater {
     /// maps that have updated the revision, we grab them
     /// from the latest revision
     pub async fn hydrate_map_pack(&self, window: &Window, old_index: Option<serde_json::Value>) {
-        let new_maps = if let Some(index) = self.get_map_index(window).await {
-            Self::extract_maps_from_index(&index)
-        } else {
+        let Some(index) = self.get_map_index(window).await else {
             ccprintln(window, "Error getting index.json");
             return;
         };
+
+        let new_maps = Self::extract_maps_from_index(&index);
 
         let old_maps = match old_index {
             Some(index) => Self::extract_maps_from_index(&index),
