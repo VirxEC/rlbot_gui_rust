@@ -8,28 +8,27 @@ pub fn is_rocket_league_running(port: u16) -> Result<bool, String> {
     let mut rl_procs = system.processes_by_name(ROCKET_LEAGUE_PROGRAM_NAME);
     let port_arg = format!("{}:{port}", REQUIRED_ARGS[1]);
 
-    match rl_procs.next() {
-        Some(process_info) => {
-            let mut has_rlbot_arg = false;
-            let mut has_port_arg = false;
+    let Some(process_info) = rl_procs.next() else {
+        return Ok(false);
+    };
 
-            for arg in process_info.cmd().iter().skip(1) {
-                if arg == REQUIRED_ARGS[0] {
-                    has_rlbot_arg = true;
-                } else if arg == &port_arg {
-                    has_port_arg = true;
-                }
-            }
+    let mut has_rlbot_arg = false;
+    let mut has_port_arg = false;
 
-            if has_port_arg && has_rlbot_arg {
-                return Ok(true);
-            }
-
-            Err(format!(
-                "Please close Rocket League and let RLBot open it for you. Do not start Rocket League yourself. (Rocket League is not running with '{}' and/or on port {port} (with '{port_arg}'))",
-                REQUIRED_ARGS[0]
-            ))
+    for arg in process_info.cmd().iter().skip(1) {
+        if arg == REQUIRED_ARGS[0] {
+            has_rlbot_arg = true;
+        } else if arg == &port_arg {
+            has_port_arg = true;
         }
-        None => Ok(false),
     }
+
+    if has_port_arg && has_rlbot_arg {
+        return Ok(true);
+    }
+
+    Err(format!(
+        "Please close Rocket League and let RLBot open it for you. Do not start Rocket League yourself. (Rocket League is not running with '{}' and/or on port {port} (with '{port_arg}'))",
+        REQUIRED_ARGS[0]
+    ))
 }

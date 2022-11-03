@@ -966,24 +966,22 @@ async fn run_challenge(window: &Window, save_state: &StoryState, challenge_id: S
 
     let story_settings = save_state.get_story_settings();
 
-    let (city, challenge) = match get_challenge_by_id(story_settings, &challenge_id).await {
-        Some(challenge) => challenge,
-        None => return Err(format!("Could not find challenge with id {challenge_id}").into()),
+    let Some((city, challenge)) = get_challenge_by_id(story_settings, &challenge_id).await else {
+        return Err(format!("Could not find challenge with id {challenge_id}").into());
     };
 
     let all_bots = get_all_bot_configs(story_settings).await;
     let all_scripts = get_all_script_configs(story_settings).await;
 
-    let botpack_root = match BOT_FOLDER_SETTINGS
+    let Some(botpack_root) = BOT_FOLDER_SETTINGS
         .read()
         .await
         .folders
         .keys()
         .map(|bf| Path::new(bf).join("RLBotPack-master"))
         .find(|bf| bf.exists())
-    {
-        Some(bf) => bf,
-        None => return Err("Could not find RLBotPack-master folder".into()),
+    else {
+        return Err("Could not find RLBotPack-master folder".into());
     };
 
     let player_configs = make_player_configs(&challenge, picked_teammates, &all_bots, botpack_root.as_path());

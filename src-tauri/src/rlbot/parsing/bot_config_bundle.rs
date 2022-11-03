@@ -289,10 +289,7 @@ impl BotConfigBundle {
             .get(BOT_CONFIG_MODULE_HEADER, LOOKS_CONFIG_KEY)
             .map(|path| format!("{}/{path}", config_directory.display()));
 
-        let valid_looks = match &looks_path {
-            Some(path) => Path::new(path).exists(),
-            None => false,
-        };
+        let valid_looks = looks_path.as_ref().map_or(false, |path| Path::new(path).exists());
 
         if !valid_looks {
             return Err(RLBotCfgParseError::NoLooksConfig(config_path_str));
@@ -302,10 +299,7 @@ impl BotConfigBundle {
             .get(BOT_CONFIG_MODULE_HEADER, PYTHON_FILE_KEY)
             .map(|path| format!("{}/{path}", config_directory.display()));
 
-        let valid_path = match &python_path {
-            Some(path) => Path::new(path).exists(),
-            None => false,
-        };
+        let valid_path = python_path.as_ref().map_or(false, |path| Path::new(path).exists());
 
         if !valid_path {
             return Err(RLBotCfgParseError::NoPythonFile(config_path_str));

@@ -52,15 +52,13 @@ pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, st
     ccprintln!(window);
     for i in 0..num_files {
         let mut item = archive.by_index(i)?;
-        let mut relative_path = match item.enclosed_name() {
-            Some(path) => {
-                if cfg!(windows) {
-                    path.to_path_buf()
-                } else {
-                    PathBuf::from(path.to_string_lossy().replace('\\', "/"))
-                }
-            }
-            None => continue,
+        let Some(enclosed_name) = item.enclosed_name() else {
+            continue;
+        };
+        let mut relative_path = if cfg!(windows) {
+            enclosed_name.to_path_buf()
+        } else {
+            PathBuf::from(enclosed_name.to_string_lossy().replace('\\', "/"))
         };
 
         if do_strip_toplevel {

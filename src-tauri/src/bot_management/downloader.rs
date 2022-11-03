@@ -79,10 +79,11 @@ async fn get_json_from_url(client: &Client, url: &str) -> Result<serde_json::Val
 /// * `repo_full_name` The owner/name of the repo, e.x. "RLBot/RLBotPack"
 async fn get_repo_size(client: &Client, repo_full_name: &str) -> Result<u64, Box<dyn Error>> {
     let data = get_json_from_url(client, &format!("https://api.github.com/repos/{repo_full_name}")).await?;
-    match data["size"].as_u64() {
-        Some(size) => Ok(size * 1000),
-        None => Err(Box::new(IoError::new(IoErrorKind::Other, "Failed to get repository size"))),
-    }
+    let Some(size) = data["size"].as_u64() else {
+        return Err(Box::new(IoError::new(IoErrorKind::Other, "Failed to get repository size")));
+    };
+
+    Ok(size * 1000)
 }
 
 /// An update packet that the GUI understands
@@ -251,9 +252,8 @@ async fn get_latest_release_tag(repo_full_name: &str) -> Result<u32, String> {
 /// * `window`: A reference to the GUI, obtained from a `#[tauri::command]` function
 /// * `repo_full_name`: The owner/name of the repo, e.x. "RLBot/RLBotPack"
 pub async fn is_botpack_up_to_date(window: &Window, repo_full_name: &str) -> bool {
-    let current_tag_name = match get_current_tag_name().await {
-        Some(tag) => tag,
-        None => return true,
+    let Some(current_tag_name) = get_current_tag_name().await else {
+        return true;
     };
 
     match get_latest_release_tag(repo_full_name).await {
@@ -276,9 +276,8 @@ pub async fn is_botpack_up_to_date(window: &Window, repo_full_name: &str) -> boo
 pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str, checkout_folder: &str) -> BotpackStatus {
     let repo_full_name = format!("{repo_owner}/{repo_name}");
 
-    let current_tag_name = match get_current_tag_name().await {
-        Some(tag) => tag,
-        None => return BotpackStatus::RequiresFullDownload,
+    let Some(current_tag_name) = get_current_tag_name().await else {
+        return BotpackStatus::RequiresFullDownload;
     };
 
     let latest_release_tag = match get_latest_release_tag(&repo_full_name).await {
@@ -479,13 +478,10 @@ impl MapPackUpdater {
     /// maps that have updated the revision, we grab them
     /// from the latest revision
     pub async fn needs_update(&self, window: &Window) -> BotpackStatus {
-        let index = match self.get_map_index(window).await {
-            Some(index) => index,
-            None => return BotpackStatus::RequiresFullDownload,
+        let Some(index) = self.get_map_index(window).await else {
+            return BotpackStatus::RequiresFullDownload;
         };
-
         let revision = index["revision"].as_u64().unwrap();
-
         let url = format!("https://api.github.com/repos/{}/{}/releases/latest", self.repo_owner, self.repo_name);
 
         let latest_release = match get_json_from_url(&self.client, &url).await {
