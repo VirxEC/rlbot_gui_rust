@@ -3,7 +3,7 @@ crate::storymode_json! {
         "psyonix-pro": {
             "name": "Psyonix Pro",
             "type": "psyonix",
-            "skill": 0.5,
+            "skill": 0.5
         },
         "psyonix-allstar-name": {
             "name": "Psyonix Allstar",
@@ -135,10 +135,30 @@ crate::storymode_json! {
             "type": "rlbot",
             "path": ["$RLBOTPACKROOT", "RLBotPack", "Kamael_family", "peter.cfg"]
         },
+        "oneborg": {
+            "name": "Oneborg",
+            "type": "rlbot",
+            "path": ["$RLBOTPACKROOT", "RLBotPack", "Oneborg", "src", "bot.cfg"]
+        },
         "invisibot": {
             "name": "Invisibot",
             "type": "rlbot",
             "path": ["$RLBOTPACKROOT", "RLBotPack", "Invisibot", "src", "invisibot.cfg"]
+        },
+        "king": {
+            "name": "king.",
+            "type": "rlbot",
+            "path": ["$RLBOTPACKROOT", "RLBotPack", "King", "King.cfg"]
+        },
+        "element": {
+            "name": "Element",
+            "type": "rlbot",
+            "path": ["$RLBOTPACKROOT", "RLBotPack", "Element", "bot.cfg"]
+        },
+        "nexto": {
+            "name": "Nexto",
+            "type": "rlbot",
+            "path": ["$RLBOTPACKROOT", "RLBotPack", "Necto", "Nexto", "bot.cfg"]
         }
     }
 }
