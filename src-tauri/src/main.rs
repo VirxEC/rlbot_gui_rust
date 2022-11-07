@@ -232,9 +232,8 @@ fn has_chrome() -> bool {
     let reg_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe";
 
     for install_type in &[Hive::CurrentUser, Hive::LocalMachine] {
-        let reg_key = match install_type.open(reg_path, Security::Read) {
-            Ok(key) => key,
-            Err(_) => continue,
+        let Some(reg_key) = install_type.open(reg_path, Security::Read) else {
+            continue;
         };
 
         if let Ok(chrome_path) = reg_key.value("") {
@@ -273,10 +272,11 @@ fn get_command_status<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A
         command.creation_flags(0x0800_0000);
     };
 
-    match command.args(args).stdout(Stdio::null()).stderr(Stdio::null()).status() {
-        Ok(status) => status.success(),
-        Err(_) => false,
-    }
+    let Ok(status) = command.args(args).stdout(Stdio::null()).stderr(Stdio::null()).status() else {
+        return false;
+    };
+
+    status.success()
 }
 
 #[derive(Debug, Error)]
@@ -385,13 +385,15 @@ pub fn spawn_capture_process<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<I
 /// * `program` - The executable to run
 /// * `args` - The arguments to pass to the executable
 pub fn spawn_capture_process_and_get_exit_code<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(program: S, args: I) -> i32 {
-    if let Ok(mut child) = spawn_capture_process(program, args) {
-        if let Ok(exit_status) = child.wait() {
-            return exit_status.code().unwrap_or(1);
-        }
-    }
+    let Ok(mut child) = spawn_capture_process(program, args) else {
+        return 2;
+    };
 
-    2
+    let Ok(exit_status) = child.wait() else {
+        return 2;
+    };
+
+    exit_status.code().unwrap_or(1)
 }
 
 /// Check whether or not the rlbot pip package is installed

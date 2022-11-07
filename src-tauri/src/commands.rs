@@ -370,7 +370,7 @@ pub enum BootstrapCustomPythonError {
     ExtractZip(#[from] ExtractError),
 }
 
-/// Downloads RLBot's isloated Python 3.7.9 environment and unzips it.
+/// Downloads `RLBot`'s isloated Python 3.7.9 environment and unzips it.
 /// Updates the user with continuous progress updates.
 ///
 /// WORKS FOR WINDOWS ONLY
@@ -389,10 +389,11 @@ pub async fn bootstrap_custom_python(window: &Window) -> Result<(), BootstrapCus
 
     let download_url = "https://virxec.github.io/rlbot_gui_rust/python-3.7.9-custom-amd64.zip";
     let res = reqwest::Client::new().get(download_url).send().await?;
-    let total_size = 21_873_000;
+    let total_size: u32 = 21_873_000;
     let mut stream = res.bytes_stream();
-    let mut bytes = Vec::with_capacity(total_size);
+    let mut bytes = Vec::with_capacity(total_size as usize);
     let mut last_update = Instant::now();
+    let total_size = f64::from(total_size);
 
     if !file_path.exists() {
         while let Some(new_bytes) = stream.next().await {
@@ -400,7 +401,7 @@ pub async fn bootstrap_custom_python(window: &Window) -> Result<(), BootstrapCus
             bytes.extend_from_slice(&new_bytes?);
 
             if last_update.elapsed().as_secs_f32() >= 0.1 {
-                let progress = bytes.len() as f32 / total_size as f32 * 100.0;
+                let progress = bytes.len() as f64 / total_size * 100.0;
                 window.emit(UPDATE_DOWNLOAD_PROGRESS_SIGNAL, ProgressBarUpdate::new(progress, "Downloading zip...".to_owned()))?;
                 last_update = Instant::now();
             }
@@ -781,7 +782,7 @@ fn make_human_config(team: Team) -> TeamBotBundle {
 /// # Arguments
 ///
 /// * `path` - The un-parsed JSON path to collapse
-/// * `botpack_root` - The path to the root of the RLBotPack, which will replace `$RLBOTPACKROOT`
+/// * `botpack_root` - The path to the root of the `RLBotPack`, which will replace `$RLBOTPACKROOT`
 fn collapse_path(cfg_path: Option<&Vec<String>>, botpack_root: &Path) -> Option<String> {
     let cfg_path = cfg_path?;
 
@@ -804,7 +805,7 @@ fn collapse_path(cfg_path: Option<&Vec<String>>, botpack_root: &Path) -> Option<
 ///
 /// `player` - The JSON map that contains the bot's config
 /// `team` - The team the bot should be on
-/// `botpack_root` - The path to the root of the RLBotPack, which will replace `$RLBOTPACKROOT`
+/// `botpack_root` - The path to the root of the `RLBotPack`, which will replace `$RLBOTPACKROOT`
 fn rlbot_to_player_config(player: &Bot, team: Team, botpack_root: &Path) -> TeamBotBundle {
     TeamBotBundle {
         name: player.name.clone(),
@@ -837,7 +838,7 @@ fn pysonix_to_player_config(player: &Bot, team: Team) -> TeamBotBundle {
 ///
 /// `player` - The JSON map that contains the bot's config
 /// `team` - The team the bot should be on
-/// `botpack_root` - The path to the root of the RLBotPack, which will replace `$RLBOTPACKROOT`
+/// `botpack_root` - The path to the root of the `RLBotPack`, which will replace `$RLBOTPACKROOT`
 fn bot_to_team_bot_bundle(player: &Bot, team: Team, botpack_root: &Path) -> TeamBotBundle {
     if player.type_field == BotType::Psyonix {
         pysonix_to_player_config(player, team)
@@ -853,7 +854,7 @@ fn bot_to_team_bot_bundle(player: &Bot, team: Team, botpack_root: &Path) -> Team
 /// * `challenge` - The JSON map that contains the key `humanTeamSize`
 /// * `human_pick` - The names of the bots that the human picked for teammates
 /// * `all_bots` - The JSON that contains a mapping of bot names to bot information
-/// * `botpack_root` - The path to the root of the RLBotPack, which will replace `$RLBOTPACKROOT`
+/// * `botpack_root` - The path to the root of the `RLBotPack`, which will replace `$RLBOTPACKROOT`
 fn make_player_configs(challenge: &Challenge, human_picks: &[String], all_bots: &HashMap<String, Bot>, botpack_root: &Path) -> Vec<TeamBotBundle> {
     let mut player_configs = vec![make_human_config(Team::Blue)];
 
@@ -877,7 +878,7 @@ fn make_player_configs(challenge: &Challenge, human_picks: &[String], all_bots: 
 /// # Arguments
 ///
 /// * `script` - The JSON map that the key "path" which points to the script's .py file
-/// * `botpack_root` - The path to the root of the RLBotPack, which will replace `$RLBOTPACKROOT`
+/// * `botpack_root` - The path to the root of the `RLBotPack`, which will replace `$RLBOTPACKROOT`
 fn script_to_miniscript_bundle(script: &Script, botpack_root: &Path) -> MiniScriptBundle {
     MiniScriptBundle {
         path: collapse_path(Some(&script.path), botpack_root).unwrap_or_default(),
@@ -890,7 +891,7 @@ fn script_to_miniscript_bundle(script: &Script, botpack_root: &Path) -> MiniScri
 ///
 /// * `challenge` - The JSON map that contains the key `scripts`
 /// * `all_scripts` - The JSON that contains a mapping of script names to script information
-/// * `botpack_root` - The path to the root of the RLBotPack, which will replace `$RLBOTPACKROOT`
+/// * `botpack_root` - The path to the root of the `RLBotPack`, which will replace `$RLBOTPACKROOT`
 fn make_script_configs(challenge: &Challenge, all_scripts: &HashMap<String, Script>, botpack_root: &Path) -> Vec<MiniScriptBundle> {
     challenge
         .scripts

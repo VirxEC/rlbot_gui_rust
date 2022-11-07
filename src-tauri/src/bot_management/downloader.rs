@@ -66,9 +66,9 @@ fn remove_empty_folders<T: AsRef<Path>>(window: &Window, dir: T) -> Result<(), B
 /// * `client`: The client to use to make the request
 /// * `url`: The URL to get the JSON from
 async fn get_json_from_url(client: &Client, url: &str) -> Result<serde_json::Value, Box<dyn Error>> {
-    // get random string
-    let user_agent: [char; 8] = rand::thread_rng().gen();
-    Ok(client.get(url).header(USER_AGENT, user_agent.iter().collect::<String>()).send().await?.json().await?)
+    // get random string 8-character string
+    let user_agent: String = rand::thread_rng().gen::<[char; 8]>().iter().collect();
+    Ok(client.get(url).header(USER_AGENT, user_agent).send().await?.json().await?)
 }
 
 /// Call GitHub API to get an estimate size of a GitHub in bytes, or None if the API call fails
@@ -79,7 +79,8 @@ async fn get_json_from_url(client: &Client, url: &str) -> Result<serde_json::Val
 /// * `repo_full_name` The owner/name of the repo, e.x. "RLBot/RLBotPack"
 async fn get_repo_size(client: &Client, repo_full_name: &str) -> Result<u64, Box<dyn Error>> {
     let data = get_json_from_url(client, &format!("https://api.github.com/repos/{repo_full_name}")).await?;
-    let Some(size) = data["size"].as_u64() else {
+    let json_size = data.get("size").ok_or("Failed to get size from GitHub API")?;
+    let Some(size) = json_size.as_u64() else {
         return Err(Box::new(IoError::new(IoErrorKind::Other, "Failed to get repository size")));
     };
 
@@ -89,12 +90,12 @@ async fn get_repo_size(client: &Client, repo_full_name: &str) -> Result<u64, Box
 /// An update packet that the GUI understands
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProgressBarUpdate {
-    pub percent: f32,
+    pub percent: f64,
     pub status: String,
 }
 
 impl ProgressBarUpdate {
-    pub const fn new(percent: f32, status: String) -> Self {
+    pub const fn new(percent: f64, status: String) -> Self {
         Self { percent, status }
     }
 }
@@ -123,19 +124,21 @@ async fn download_and_extract_repo_zip<T: IntoUrl, J: AsRef<Path>>(
     let local_folder_path = local_folder_path.as_ref();
     let res = client.get(download_url).send().await?;
 
-    let total_size = (get_repo_size(client, repo_full_name).await.unwrap_or(190_000_000) as f32 * 0.62).round() as usize;
+    let uncompresed_size = get_repo_size(client, repo_full_name).await.unwrap_or(170_000_000);
+    let real_size_estimate = uncompresed_size * 62 / 100;
     let mut stream = res.bytes_stream();
-    let mut bytes = Vec::with_capacity(total_size);
+    let mut bytes = Vec::with_capacity(real_size_estimate as usize);
     let mut last_update = Instant::now();
+    let real_size_estimate = real_size_estimate as f64;
 
     while let Some(new_bytes) = stream.next().await {
         // put the new bytes into bytes
         bytes.extend_from_slice(&new_bytes?);
 
         if last_update.elapsed().as_secs_f32() >= 0.1 {
-            let progress = bytes.len() as f32 / total_size as f32 * 100.0;
+            let progress = bytes.len() as f64 / real_size_estimate * 100.0;
             if let Err(e) = window.emit(UPDATE_DOWNLOAD_PROGRESS_SIGNAL, ProgressBarUpdate::new(progress, "Downloading zip...".to_owned())) {
-                ccprintln!(window, "Error when updating progress bar: {}", e);
+                ccprintln!(window, "Error when updating progress bar: {e}");
             }
             last_update = Instant::now();
         }
@@ -163,15 +166,15 @@ async fn download_and_extract_repo_zip<T: IntoUrl, J: AsRef<Path>>(
 /// # Arguments
 ///
 /// * `window`: A reference to the GUI, obtained from a `#[tauri::command]` function
-/// * `repo_owner`: The owner of the repo, e.x. "RLBot"
-/// * `repo_name`: The name of the repo, e.x. "RLBotPack"
+/// * `repo_owner`: The owner of the repo, e.x. `"RLBot"`
+/// * `repo_name`: The name of the repo, e.x. `"RLBotPack"`
 /// * `checkout_folder`: The folder to checkout the repo to
 /// * `update_tag_settings`: Whether to update the incr tag in the GUI config
 pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, checkout_folder: &str, update_tag_settings: bool) -> BotpackStatus {
     let client = Client::new();
     let repo_full_name = format!("{repo_owner}/{repo_name}");
 
-    let status = download_and_extract_repo_zip(
+    if let Err(e) = download_and_extract_repo_zip(
         window,
         &client,
         &format!("https://github.com/{repo_full_name}/archive/refs/heads/master.zip"),
@@ -179,9 +182,13 @@ pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, c
         true,
         &repo_full_name,
     )
-    .await;
+    .await
+    {
+        ccprintln(window, e.to_string());
+        return BotpackStatus::Skipped("Failed to download the bot pack...".to_owned());
+    };
 
-    if status.is_ok() && update_tag_settings {
+    if update_tag_settings {
         let latest_release_tag_name = match get_json_from_url(&client, &format!("https://api.github.com/repos/{repo_full_name}/releases/latest")).await {
             Ok(release) => release["tag_name"].as_str().unwrap_or_default().to_owned(),
             Err(e) => {
@@ -201,13 +208,7 @@ pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, c
         }
     }
 
-    match status {
-        Ok(_) => BotpackStatus::Success("Downloaded the bot pack!".to_owned()),
-        Err(e) => {
-            ccprintln(window, e.to_string());
-            BotpackStatus::Skipped("Failed to download the bot pack...".to_owned())
-        }
-    }
+    BotpackStatus::Success("Downloaded the bot pack!".to_owned())
 }
 
 /// Load the GUI config and check the get the current version number of the botpack
@@ -270,8 +271,8 @@ pub async fn is_botpack_up_to_date(window: &Window, repo_full_name: &str) -> boo
 /// # Arguments
 ///
 /// * `window`: A reference to the GUI, obtained from a `#[tauri::command]` function
-/// * `repo_owner`: The owner of the repo, e.x. "RLBot"
-/// * `repo_name`: The name of the repo, e.x. "RLBotPack"
+/// * `repo_owner`: The owner of the repo, e.x. `"RLBot"`
+/// * `repo_name`: The name of the repo, e.x. `"RLBotPack"`
 /// * `checkout_folder`: The folder to checkout the repo to
 pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str, checkout_folder: &str) -> BotpackStatus {
     let repo_full_name = format!("{repo_owner}/{repo_name}");
@@ -311,21 +312,19 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
 
     let tag_deleted_files_path = local_folder_path.join(".deleted");
 
-    let mut handles = Vec::new();
-
-    for tag in (current_tag_name + 1)..=latest_release_tag {
-        let url = get_url_from_tag(&repo_full_name, tag);
-
-        handles.push(task::spawn(async move { Client::new().get(url).send().await }));
-    }
+    let handles = ((current_tag_name + 1)..=latest_release_tag)
+        .map(|tag| get_url_from_tag(&repo_full_name, tag))
+        .map(|url| task::spawn(async move { Client::new().get(url).send().await }))
+        .collect::<Vec<_>>();
 
     let mut tag = current_tag_name + 1;
+    let total_patches = f64::from(total_patches);
 
     for handle in handles {
         let patch_status = format!("Patching in update incr-{tag}");
         ccprintln(window, &patch_status);
 
-        let progress = (tag - current_tag_name) as f32 / total_patches as f32 * 100.;
+        let progress = f64::from(tag - current_tag_name) / total_patches * 100.;
         if let Err(e) = window.emit(UPDATE_DOWNLOAD_PROGRESS_SIGNAL, ProgressBarUpdate::new(progress, patch_status)) {
             ccprintln!(window, "Error when updating progress bar: {e}");
         }
@@ -338,7 +337,7 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
             }
         };
 
-        let progress = progress + 1. / (total_patches as f32 * 2.) * 100.;
+        let progress = progress + 1. / (total_patches * 2.) * 100.;
         if let Err(e) = window.emit(UPDATE_DOWNLOAD_PROGRESS_SIGNAL, ProgressBarUpdate::new(progress, format!("Applying patch incr-{tag}..."))) {
             ccprintln!(window, "Error when updating progress bar: {}", e);
         }
@@ -403,32 +402,32 @@ async fn apply_patch(resp: Result<reqwest::Response, reqwest::Error>, window: &W
         return ControlFlow::Break(());
     }
 
-    match File::open(tag_deleted_files_path) {
-        Ok(file) => {
-            let mut last_ok = false;
-            let mut count = 0;
-            for line in BufReader::new(file).lines().flatten() {
-                let line = line.replace(['\0', '\r'], "");
-                if !line.is_empty() {
-                    let file_name = local_folder_path.join(line);
-                    if let Err(e) = remove_file(&file_name) {
-                        ccprintln!(window, "Error deleting {}: {e}", file_name.display());
-                        last_ok = false;
-                    } else {
-                        emit_text(window, format!("Deleted {}", file_name.display()), last_ok);
-                        last_ok = true;
-                        count += 1;
-                    }
-                }
-            }
-
-            emit_text(window, format!("Deleted {count} files"), last_ok);
-        }
+    let file = match File::open(tag_deleted_files_path) {
+        Ok(file) => file,
         Err(e) => {
             ccprintln!(window, "Error opening .deleted file: {e}");
             return ControlFlow::Break(());
         }
+    };
+
+    let mut last_ok = false;
+    let mut count = 0;
+    for line in BufReader::new(file).lines().flatten() {
+        let line = line.replace(['\0', '\r'], "");
+        if !line.is_empty() {
+            let file_name = local_folder_path.join(line);
+            if let Err(e) = remove_file(&file_name) {
+                ccprintln!(window, "Error deleting {}: {e}", file_name.display());
+                last_ok = false;
+            } else {
+                emit_text(window, format!("Deleted {}", file_name.display()), last_ok);
+                last_ok = true;
+                count += 1;
+            }
+        }
     }
+
+    emit_text(window, format!("Deleted {count} files"), last_ok);
     ControlFlow::Continue(())
 }
 

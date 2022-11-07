@@ -179,6 +179,7 @@ pub struct MiniScriptBundle {
     pub path: String,
 }
 
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MiniMatchConfig {
     pub map: MapType,
@@ -230,6 +231,7 @@ impl MiniMatchConfig {
     }
 }
 
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MatchConfig {
     pub map: MapType,
