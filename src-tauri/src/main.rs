@@ -7,6 +7,7 @@ mod custom_maps;
 mod rlbot;
 mod settings;
 mod stories;
+mod tauri_plugin;
 
 #[cfg(windows)]
 use registry::{Hive, Security};
@@ -43,6 +44,8 @@ use tauri::{async_runtime::block_on as tauri_block_on, App, Error as TauriError,
 use thiserror::Error;
 use tokio::sync::RwLock as AsyncRwLock;
 
+const MAIN_WINDOW_NAME: &str = "main";
+
 static NO_CONSOLE_WINDOWS: AtomicBool = AtomicBool::new(true);
 static USE_PIPE: AtomicBool = AtomicBool::new(true);
 static IS_DEBUG_MODE: AtomicBool = AtomicBool::new(cfg!(debug_assertions));
@@ -59,7 +62,7 @@ static CONSOLE_INPUT_COMMANDS: Mutex<Vec<String>> = Mutex::new(Vec::new());
 static CONSOLE_TEXT_EMIT_QUEUE: RwLock<Option<Sender<ConsoleTextUpdate>>> = RwLock::new(None);
 static CONSOLE_TEXT_OUT_QUEUE: RwLock<Option<Sender<String>>> = RwLock::new(None);
 
-static MATCH_HANDLER_STDIN: Mutex<(String, Option<ChildStdin>)> = Mutex::new((String::new(), None));
+static MATCH_HANDLER_STDIN: Mutex<(String, Option<(Child, ChildStdin)>)> = Mutex::new((String::new(), None));
 static CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
 
 static PYTHON_PATH: Lazy<AsyncRwLock<String>> = Lazy::new(|| AsyncRwLock::new(String::new()));
@@ -431,7 +434,7 @@ fn get_home_folder() -> (PathBuf, &'static str) {
 }
 
 #[derive(Debug, Error)]
-enum InternalConsoleError {
+pub enum InternalConsoleError {
     #[error("Mutex {0} was poisoned")]
     Poisoned(String),
     #[error("Could not complete I/O operation: {0}")]
@@ -560,7 +563,6 @@ fn gui_setup_load_config(window: &Window) {
 }
 
 fn gui_setup(app: &mut App) -> Result<(), Box<dyn StdError>> {
-    const MAIN_WINDOW_NAME: &str = "main";
     let window = app.get_window(MAIN_WINDOW_NAME).ok_or(format!("Cannot find window '{MAIN_WINDOW_NAME}'"))?;
     let window2 = window.clone();
     let window3 = window.clone();
@@ -663,6 +665,7 @@ fn main() {
 
     tauri::Builder::default()
         .setup(|app| gui_setup(app))
+        .plugin(tauri_plugin::init())
         .invoke_handler(tauri::generate_handler![
             get_folder_settings,
             save_folder_settings,

@@ -569,13 +569,13 @@ pub async fn save_launcher_settings(window: Window, settings: LauncherConfig) {
 /// # Arguments
 ///
 /// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
-fn create_match_handler<S: AsRef<OsStr>>(window: &Window, use_pipe: bool, python_path: S) -> Option<(String, ChildStdin)> {
+fn create_match_handler<S: AsRef<OsStr>>(window: &Window, use_pipe: bool, python_path: S) -> Option<(String, (Child, ChildStdin))> {
     match get_maybe_capture_command(&python_path, ["-u", "-c", "from rlbot_smh.match_handler import listen; listen()"], use_pipe)
         .ok()?
         .stdin(Stdio::piped())
         .spawn()
     {
-        Ok(mut child) => child.stdin.take().map(|stdin| (python_path.as_ref().to_string_lossy().to_string(), stdin)),
+        Ok(mut child) => child.stdin.take().map(|stdin| (python_path.as_ref().to_string_lossy().to_string(), (child, stdin))),
         Err(err) => {
             ccprintln!(window, "Error starting match handler: {err}");
             None
@@ -617,7 +617,7 @@ fn issue_match_handler_command<S: AsRef<OsStr>>(window: &Window, command_parts: 
     }
 
     let command = format!("{} | \n", command_parts.join(" | "));
-    let stdin = match_handler_stdin.as_mut().ok_or("Tried creating match handler but failed")?;
+    let (_, stdin) = match_handler_stdin.as_mut().ok_or("Tried creating match handler but failed")?;
 
     if stdin.write_all(command.as_bytes()).is_err() {
         drop(match_handler_stdin.take());
@@ -690,17 +690,17 @@ async fn start_match_helper(window: &Window, bot_list: Vec<TeamBotBundle>, match
 
 #[tauri::command]
 pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_settings: MiniMatchConfig) -> Result<(), String> {
-    start_match_helper(&window, bot_list, match_settings, USE_PIPE.load(Ordering::Relaxed))
-        .await
-        .map_err(|error| {
-            if let Err(e) = window.emit("match-start-failed", ()) {
-                ccprintln!(&window, "Failed to emit match-start-failed: {e}");
-            }
+    let Err(error) = start_match_helper(&window, bot_list, match_settings, USE_PIPE.load(Ordering::Relaxed)).await else {
+        return Ok(());
+    };
 
-            ccprintln(&window, &error);
+    if let Err(e) = window.emit("match-start-failed", ()) {
+        ccprintln!(&window, "Failed to emit match-start-failed: {e}");
+    }
 
-            error
-        })
+    ccprintln(&window, &error);
+
+    Err(error)
 }
 
 #[tauri::command]
@@ -712,13 +712,33 @@ pub async fn kill_bots(window: Window) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn shut_down_match_handler() -> Result<(), String> {
-    let mut stdin_lock = MATCH_HANDLER_STDIN.lock().map_err(|err| err.to_string())?;
-    if let (_, Some(stdin)) = &mut *stdin_lock {
+    let mut handler_lock = MATCH_HANDLER_STDIN.lock().map_err(|err| err.to_string())?;
+
+    // Send the command to the match handler to shut down
+    if let (_, Some((_, stdin))) = &mut *handler_lock {
         const KILL_BOTS_COMMAND: &[u8] = "shut_down | \n".as_bytes();
         stdin.write_all(KILL_BOTS_COMMAND).map_err(|err| err.to_string())?;
     }
 
-    stdin_lock.1 = None;
+    // Drop stdin
+    handler_lock.1 = None;
+
+    // Wait 15 seconds for the child to exit on it's own, then kill it if it's still running
+    if let (_, Some((child, _))) = &mut *handler_lock {
+        let start_time = Instant::now();
+        let pause_duration = Duration::from_secs_f32(0.25);
+
+        while start_time.elapsed() < Duration::from_secs(15) {
+            if let Ok(Some(_)) = child.try_wait() {
+                return Ok(());
+            }
+
+            thread::sleep(pause_duration);
+        }
+
+        child.kill().map_err(|err| err.to_string())?;
+        child.wait().map_err(|err| err.to_string())?;
+    }
 
     Ok(())
 }
@@ -856,21 +876,18 @@ fn bot_to_team_bot_bundle(player: &Bot, team: Team, botpack_root: &Path) -> Team
 /// * `all_bots` - The JSON that contains a mapping of bot names to bot information
 /// * `botpack_root` - The path to the root of the `RLBotPack`, which will replace `$RLBOTPACKROOT`
 fn make_player_configs(challenge: &Challenge, human_picks: &[String], all_bots: &HashMap<String, Bot>, botpack_root: &Path) -> Vec<TeamBotBundle> {
-    let mut player_configs = vec![make_human_config(Team::Blue)];
+    let blue = human_picks[..challenge.human_team_size as usize - 1]
+        .iter()
+        .filter_map(|name| all_bots.get(name))
+        .map(|bot| bot_to_team_bot_bundle(bot, Team::Blue, botpack_root));
 
-    for name in human_picks[..challenge.human_team_size as usize - 1].iter() {
-        if let Some(bot) = all_bots.get(name) {
-            player_configs.push(bot_to_team_bot_bundle(bot, Team::Blue, botpack_root));
-        }
-    }
+    let orange = challenge
+        .opponent_bots
+        .iter()
+        .filter_map(|name| all_bots.get(name))
+        .map(|bot| bot_to_team_bot_bundle(bot, Team::Orange, botpack_root));
 
-    for opponent in &challenge.opponent_bots {
-        if let Some(bot) = all_bots.get(opponent) {
-            player_configs.push(bot_to_team_bot_bundle(bot, Team::Orange, botpack_root));
-        }
-    }
-
-    player_configs
+    [make_human_config(Team::Blue)].into_iter().chain(blue).chain(orange).collect()
 }
 
 /// Load a script from a Script config

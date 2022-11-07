@@ -43,12 +43,11 @@ fn remove_empty_folders<T: AsRef<Path>>(window: &Window, dir: T) -> Result<(), B
     let dir = dir.as_ref();
 
     // remove any empty sub folders
-    for entry in read_dir(dir)?.flatten() {
-        let path = entry.path();
-        if path.is_dir() {
-            remove_empty_folders(window, &path)?;
-        }
-    }
+    read_dir(dir)?
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.is_dir())
+        .try_for_each(|path| remove_empty_folders(window, path))?;
 
     // remove the folder if it is empty
     if dir.read_dir()?.next().is_none() {
@@ -520,28 +519,22 @@ impl MapPackUpdater {
         };
 
         let new_maps = Self::extract_maps_from_index(&index);
+        let old_maps = old_index.map(|index| Self::extract_maps_from_index(&index)).unwrap_or_default();
 
-        let old_maps = match old_index {
-            Some(index) => Self::extract_maps_from_index(&index),
-            None => HashMap::new(),
-        };
-
-        let mut to_fetch = HashSet::new();
-        for (path, revision) in &new_maps {
-            if !old_maps.contains_key(path) || old_maps[path] < *revision {
-                to_fetch.insert(path.clone());
-            }
-        }
+        let to_fetch = new_maps
+            .into_iter()
+            .filter(|(path, revision)| !old_maps.contains_key(path) || old_maps[path] < *revision)
+            .map(|(path, _)| path)
+            .collect::<HashSet<String>>();
 
         if to_fetch.is_empty() {
             return;
         }
 
-        let mut filename_to_path = HashMap::new();
-        for path in &to_fetch {
-            let filename = Path::new(path).file_name().unwrap().to_string_lossy();
-            filename_to_path.insert(filename.to_string(), path.clone());
-        }
+        let filename_to_path = to_fetch
+            .into_iter()
+            .map(|path| (Path::new(&path).file_name().unwrap().to_string_lossy().to_string(), path))
+            .collect::<HashMap<String, String>>();
 
         let url = format!("https://api.github.com/repos/{}/{}/releases/latest", self.repo_owner, self.repo_name);
 

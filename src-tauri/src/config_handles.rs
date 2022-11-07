@@ -132,17 +132,13 @@ pub async fn scan_for_bots(window: Window) -> Result<Vec<BotConfigBundle>, Strin
     let bfs = BOT_FOLDER_SETTINGS.read().await;
     let mut bots = Vec::new();
 
-    for (path, props) in &bfs.folders {
-        if props.visible {
-            bots.extend(get_bots_from_directory(&window, path).await);
-        }
+    for (path, _) in bfs.folders.iter().filter(|(_, props)| props.visible) {
+        bots.extend(get_bots_from_directory(&window, path).await);
     }
 
-    for (path, props) in &bfs.files {
-        if props.visible {
-            if let Ok(bundle) = BotConfigBundle::minimal_from_path(Path::new(path)).await {
-                bots.push(bundle);
-            }
+    for (path, _) in bfs.files.iter().filter(|(_, props)| props.visible) {
+        if let Ok(bundle) = BotConfigBundle::minimal_from_path(Path::new(path)).await {
+            bots.push(bundle);
         }
     }
 
@@ -158,17 +154,13 @@ pub async fn scan_for_scripts(window: Window) -> Result<Vec<ScriptConfigBundle>,
     let bfs = BOT_FOLDER_SETTINGS.read().await.clone();
     let mut scripts = Vec::with_capacity(bfs.folders.len() + bfs.files.len());
 
-    for (path, props) in &bfs.folders {
-        if props.visible {
-            scripts.extend(get_scripts_from_directory(&window, path).await);
-        }
+    for (path, _) in bfs.folders.iter().filter(|(_, props)| props.visible) {
+        scripts.extend(get_scripts_from_directory(&window, path).await);
     }
 
-    for (path, props) in &bfs.files {
-        if props.visible {
-            if let Ok(bundle) = ScriptConfigBundle::minimal_from_path(Path::new(path)).await {
-                scripts.push(bundle);
-            }
+    for (path, _) in bfs.files.iter().filter(|(_, props)| props.visible) {
+        if let Ok(bundle) = ScriptConfigBundle::minimal_from_path(Path::new(path)).await {
+            scripts.push(bundle);
         }
     }
 
@@ -376,22 +368,24 @@ fn read_recommendations_json<P: AsRef<Path>>(path: P) -> Result<AllRecommendatio
 }
 
 fn get_recommendations_json(window: &Window, bfs: &BotFolders) -> Option<AllRecommendations<String>> {
-    // Search for and load the json file
-    for path in bfs.folders.keys() {
-        match glob(&format!("{path}/**/recommendations.json")) {
-            Ok(pattern) => {
-                for path2 in pattern.flatten() {
-                    match read_recommendations_json(path2) {
-                        Ok(recommendations) => return Some(recommendations),
-                        Err(e) => ccprintln(window, e),
-                    }
-                }
+    bfs.folders
+        .keys()
+        .filter_map(|path| match glob(&format!("{path}/**/recommendations.json")) {
+            Ok(pattern) => Some(pattern),
+            Err(e) => {
+                ccprintln!(window, "{e}");
+                None
             }
-            Err(e) => ccprintln(window, e.to_string()),
-        }
-    }
-
-    None
+        })
+        .flatten()
+        .flatten()
+        .find_map(|path| match read_recommendations_json(path) {
+            Ok(recommendations) => Some(recommendations),
+            Err(e) => {
+                ccprintln(window, e);
+                None
+            }
+        })
 }
 
 #[tauri::command]
@@ -402,59 +396,48 @@ pub async fn get_recommendations(window: Window) -> Option<AllRecommendations<Bo
 
     // If we found the json, return the corresponding BotConfigBundles for the bots
     get_recommendations_json(&window, &bfs).map(|j| {
+        let folders = bfs
+            .folders
+            .iter()
+            .filter(|(_, props)| props.visible)
+            .flat_map(|(path, _)| match glob(&format!("{path}/**/*.cfg")) {
+                Ok(paths) => Some(paths.flatten().filter_map(|path| BotConfigBundle::name_from_path(path.as_path()).ok()).collect::<Vec<_>>()),
+                Err(e) => {
+                    ccprintln(&window, e.to_string());
+                    None
+                }
+            })
+            .flatten();
+
+        let files = bfs
+            .files
+            .iter()
+            .filter(|(_, props)| props.visible)
+            .flat_map(|(path, _)| BotConfigBundle::name_from_path(Path::new(path)).ok());
+
         // Get a list of all the bots in (bot name, bot config file path) pairs
-        let name_path_pairs = {
-            let mut bots = Vec::new();
-
-            bots.extend(
-                bfs.folders
-                    .iter()
-                    .filter_map(|(path, props)| {
-                        if props.visible {
-                            match glob(&format!("{path}/**/*.cfg")) {
-                                Ok(paths) => Some(paths.flatten().filter_map(|path| BotConfigBundle::name_from_path(path.as_path()).ok()).collect::<Vec<_>>()),
-                                Err(e) => {
-                                    ccprintln(&window, e.to_string());
-                                    None
-                                }
-                            }
-                        } else {
-                            None
-                        }
-                    })
-                    .flatten(),
-            );
-
-            bots.extend(
-                bfs.files
-                    .iter()
-                    .filter_map(|(path, props)| if props.visible { BotConfigBundle::name_from_path(Path::new(path)).ok() } else { None }),
-            );
-
-            bots
-        };
+        let name_path_pairs = folders.chain(files).collect::<Vec<_>>();
 
         // Load all of the bot config bundles
         j.change_generic(&|bot_name| {
-            for (name, path) in &name_path_pairs {
-                if name == bot_name {
-                    if let Ok(mut bundle) = BotConfigBundle::minimal_from_path_sync(Path::new(path)) {
-                        bundle.logo = bundle.load_logo();
+            name_path_pairs
+                .iter()
+                .filter(|(name, _)| name == bot_name)
+                .find_map(|(_, path)| BotConfigBundle::minimal_from_path_sync(Path::new(path)).ok())
+                .map(|mut bundle| {
+                    bundle.logo = bundle.load_logo();
 
-                        if has_rlbot {
-                            let missing_packages = bundle.get_missing_packages(&window, &python_path);
-                            if !missing_packages.is_empty() {
-                                bundle.warn = Some("pythonpkg".to_owned());
-                            }
-                            bundle.missing_python_packages = Some(missing_packages);
+                    if has_rlbot {
+                        let missing_packages = bundle.get_missing_packages(&window, &python_path);
+                        if !missing_packages.is_empty() {
+                            bundle.warn = Some("pythonpkg".to_owned());
                         }
-
-                        return bundle;
+                        bundle.missing_python_packages = Some(missing_packages);
                     }
-                }
-            }
 
-            BotConfigBundle::default()
+                    bundle
+                })
+                .unwrap_or_default()
         })
     })
 }
