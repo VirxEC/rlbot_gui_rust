@@ -43,6 +43,7 @@ jobs:
           key: ${{ runner.os }}-cargo
       
       - name: Update Rust to last stable
+        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
         run: rustup update stable
 
       - name: Install Tauri CLI
@@ -138,6 +139,7 @@ jobs:
           key: ${{ runner.os }}-cargo
 
       - name: Update Rust to last stable
+        if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
         run: rustup update stable
 
       - name: Install ubuntu dev packages
