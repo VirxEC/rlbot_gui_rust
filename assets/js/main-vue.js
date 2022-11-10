@@ -561,7 +561,7 @@ export default {
   },
 
   methods: {
-    shutDownMatchHandler: function() {
+    shutDownMatchHandler: function () {
       invoke("shut_down_match_handler");
     },
     uploadLog: function () {
@@ -774,11 +774,10 @@ export default {
       this.updateBGImage(this.matchSettings.map);
     },
     resetMutatorsToDefault: function () {
-      const self = this;
       Object.keys(this.matchOptions.mutators).forEach(function (mutator) {
         const mutatorName = mutator.replace("_types", "");
-        self.matchSettings.mutators[mutatorName] =
-          self.matchOptions.mutators[mutator][0];
+        this.matchSettings.mutators[mutatorName] =
+          this.matchOptions.mutators[mutator][0];
       });
     },
     resetMatchSettingsToDefault: function () {
@@ -799,10 +798,7 @@ export default {
     },
     updateBGImage: function (mapName) {
       const bodyStyle = {
-        backgroundImage:
-          "url(../imgs/arenas/" +
-          mapName +
-          ".jpg), url(../imgs/arenas/UtopiaRetro.jpg)",
+        backgroundImage: `url(../imgs/arenas/${mapName}.jpg), url(../imgs/arenas/UtopiaRetro.jpg)`,
       };
       this.$emit("background-change", bodyStyle);
     },
@@ -851,6 +847,7 @@ export default {
       this.$bvModal.hide("new-bot-modal");
       this.allowMiniConsoleClose = false;
       this.showProgressSpinner = true;
+
       if (language === "python") {
         this.miniConsoleTitle = "Creating Python Bot";
         this.$bvModal.show("mini-console");
@@ -905,7 +902,7 @@ export default {
       this.folderSettings.files[bot.name] = bot;
       this.botsReceived([bot]);
     },
-    botsReceived: function (bots) {
+    botsReceived: function (bots, updateTeams = false) {
       const freshBots = bots.filter(
         (bot) => !this.botPool.find((element) => element.path === bot.path)
       );
@@ -916,8 +913,24 @@ export default {
         .concat(freshBots);
       botPool = botPool.sort((a, b) => a.name.localeCompare(b.name));
       this.botPool = STARTING_BOT_POOL.concat(botPool);
-      this.distinguishDuplicateBots(this.botPool);
       this.showProgressSpinner = false;
+
+      this.distinguishDuplicateBots(this.botPool);
+
+      if (updateTeams) {
+        invoke("get_team_settings").then((teamSettings) => {
+          this.teamSettingsReceived(teamSettings);
+        });
+      }
+
+      invoke("get_missing_bot_logos", {
+        bots: this.botPool.slice(STARTING_BOT_POOL.length),
+      }).then((botLogos) => {
+        botLogos.forEach((botLogo) => {
+          const index = botLogo.index + STARTING_BOT_POOL.length;
+          this.botPool[index].logo = botLogo.logo;
+        });
+      });
 
       invoke("get_missing_bot_packages", {
         bots: this.botPool.slice(STARTING_BOT_POOL.length),
@@ -927,15 +940,6 @@ export default {
           this.botPool[index].warn = botPackageInfo.warn;
           this.botPool[index].missing_python_packages =
             botPackageInfo.missing_packages;
-        });
-      });
-
-      invoke("get_missing_bot_logos", {
-        bots: this.botPool.slice(STARTING_BOT_POOL.length),
-      }).then((botLogos) => {
-        botLogos.forEach((botLogo) => {
-          const index = botLogo.index + STARTING_BOT_POOL.length;
-          this.botPool[index].logo = botLogo.logo;
         });
       });
     },
@@ -958,6 +962,14 @@ export default {
       this.distinguishDuplicateBots(this.scriptPool);
       this.showProgressSpinner = false;
 
+      invoke("get_missing_script_logos", { scripts: this.scriptPool }).then(
+        (scriptLogos) => {
+          scriptLogos.forEach((scriptLogo) => {
+            this.scriptPool[scriptLogo.index].logo = scriptLogo.logo;
+          });
+        }
+      );
+
       invoke("get_missing_script_packages", { scripts: this.scriptPool }).then(
         (scriptPackageInfos) => {
           scriptPackageInfos.forEach((scriptPackageInfo) => {
@@ -968,39 +980,36 @@ export default {
           });
         }
       );
-
-      invoke("get_missing_script_logos", { scripts: this.scriptPool }).then(
-        (scriptLogos) => {
-          scriptLogos.forEach((scriptLogo) => {
-            this.scriptPool[scriptLogo.index].logo = scriptLogo.logo;
-          });
-        }
-      );
     },
     applyLanguageWarnings: function (bots) {
       if (this.languageSupport) {
         bots.forEach((bot) => {
           if (bot.info && bot.info.language) {
             const language = bot.info.language.toLowerCase();
+
             if (language.match(/python/i)) {
               // Python is handled elsewhere
               return;
             }
+
             if (
               !this.languageSupport.node &&
               language.match(/(java|type|coffee)( |_)?script|js|ts|node/i)
             ) {
               bot.warn = "node";
             }
+
             if (
               !this.languageSupport.java &&
               language.match(/java|kotlin|scala/i)
             ) {
               bot.warn = "java";
             }
+
             if (!this.languageSupport.chrome && language.match(/scratch/i)) {
               bot.warn = "chrome";
             }
+
             if (
               !this.languageSupport.dotnet &&
               language.match(/c( |_)?(#|sharp|sharp)|(dot|\.)( |_)?net/i)
@@ -1012,7 +1021,7 @@ export default {
       }
     },
 
-    distinguishDuplicateBots: function (pool) {
+    distinguishDuplicateBots: function (pool, ...extras) {
       const uniqueNames = [
         ...new Set(pool.filter((bot) => bot.path).map((bot) => bot.name)),
       ];
@@ -1020,16 +1029,29 @@ export default {
 
       for (const name of uniqueNames) {
         const bots = pool.filter((bot) => bot.name === name);
-        if (bots.length === 1) {
-          bots[0].uniquePathSegment = null;
+        if (bots.length <= 1) {
+          if (bots.length === 1) {
+            bots[0].uniquePathSegment = null;
+          }
           continue;
         }
-        for (let i = 0; bots.length > 0 && i < 99; i++) {
+
+        for (let i = 0; i < 99; i++) {
           const pathSegments = bots.map((b) => splitPath(b)[i]);
+          if (pathSegments.length == 0) {
+            break;
+          }
+
           for (const bot of bots.slice()) {
             const path = splitPath(bot);
             const count = pathSegments.filter((s) => s === path[i]).length;
             if (count === 1) {
+              extras
+                .flat()
+                .filter((b) => b.path == bot.path)
+                .map((b) => {
+                  b.uniquePathSegment = path[i];
+                });
               bot.uniquePathSegment = path[i];
               bots.splice(bots.indexOf(bot), 1);
             }
@@ -1057,11 +1079,30 @@ export default {
     },
     teamSettingsReceived: function (teamSettings) {
       if (teamSettings) {
-        this.blueTeam = teamSettings.blue_team;
-        this.orangeTeam = teamSettings.orange_team;
+        const blueTeam = teamSettings.blue_team;
+        const orangeTeam = teamSettings.orange_team;
+
+        this.distinguishDuplicateBots(this.botPool, blueTeam, orangeTeam);
+
+        this.blueTeam = blueTeam;
+        this.orangeTeam = orangeTeam;
       }
 
-      this.distinguishDuplicateBots(this.blueTeam.concat(this.orangeTeam));
+      invoke("get_missing_bot_logos", { bots: this.blueTeam }).then(
+        (botLogos) => {
+          botLogos.forEach((botLogo) => {
+            this.blueTeam[botLogo.index].logo = botLogo.logo;
+          });
+        }
+      );
+
+      invoke("get_missing_bot_logos", { bots: this.orangeTeam }).then(
+        (botLogos) => {
+          botLogos.forEach((botLogo) => {
+            this.orangeTeam[botLogo.index].logo = botLogo.logo;
+          });
+        }
+      );
 
       invoke("get_missing_bot_packages", { bots: this.blueTeam }).then(
         (botPackageInfos) => {
@@ -1083,22 +1124,6 @@ export default {
         }
       );
 
-      invoke("get_missing_bot_logos", { bots: this.blueTeam }).then(
-        (botLogos) => {
-          botLogos.forEach((botLogo) => {
-            this.blueTeam[botLogo.index].logo = botLogo.logo;
-          });
-        }
-      );
-
-      invoke("get_missing_bot_logos", { bots: this.orangeTeam }).then(
-        (botLogos) => {
-          botLogos.forEach((botLogo) => {
-            this.orangeTeam[botLogo.index].logo = botLogo.logo;
-          });
-        }
-      );
-
       this.applyLanguageWarnings(this.blueTeam.concat(this.orangeTeam));
     },
 
@@ -1111,9 +1136,11 @@ export default {
       }
     },
 
-    folderSettingsReceived: function (folderSettings) {
+    folderSettingsReceived: function (folderSettings, updateTeams = false) {
       this.folderSettings = folderSettings;
-      invoke("scan_for_bots").then(this.botsReceived);
+      invoke("scan_for_bots").then((bots) =>
+        this.botsReceived(bots, updateTeams)
+      );
       invoke("scan_for_scripts").then(this.scriptsReceived);
       invoke("get_match_options").then(this.matchOptionsReceived);
     },
@@ -1235,8 +1262,9 @@ export default {
       invoke("get_language_support").then((support) => {
         this.languageSupport = support;
 
-        invoke("get_folder_settings").then(this.folderSettingsReceived);
-        invoke("get_team_settings").then(this.teamSettingsReceived);
+        invoke("get_folder_settings").then((folderSettings) => {
+          this.folderSettingsReceived(folderSettings, true);
+        });
       });
 
       invoke("get_match_settings").then(this.matchSettingsReceived);

@@ -23,12 +23,11 @@ pub fn find_all(bf: &HashMap<String, BotFolder>) -> Vec<MapType> {
 }
 
 pub fn convert_to_path(map: &str, bf: &HashMap<String, BotFolder>) -> Option<String> {
-    for folder in get_search_folders(bf) {
-        if let Ok(pattern) = glob(&format!("{folder}/**/{map}")) {
-            if let Some(map_path) = pattern.flatten().next() {
-                return Some(map_path.to_string_lossy().to_string());
-            }
-        }
-    }
-    None
+    get_search_folders(bf)
+        .into_iter()
+        .flat_map(|folder| glob(&format!("{folder}/**/{map}")))
+        .flatten()
+        .flatten()
+        .next()
+        .map(|pattern| pattern.to_string_lossy().to_string())
 }

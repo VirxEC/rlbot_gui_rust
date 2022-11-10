@@ -7,6 +7,7 @@ mod custom_maps;
 mod rlbot;
 mod settings;
 mod stories;
+mod tauri_plugin;
 
 #[cfg(windows)]
 use registry::{Hive, Security};
@@ -43,8 +44,11 @@ use tauri::{async_runtime::block_on as tauri_block_on, App, Error as TauriError,
 use thiserror::Error;
 use tokio::sync::RwLock as AsyncRwLock;
 
+const MAIN_WINDOW_NAME: &str = "main";
+
 static NO_CONSOLE_WINDOWS: AtomicBool = AtomicBool::new(true);
 static USE_PIPE: AtomicBool = AtomicBool::new(true);
+static IS_DEBUG_MODE: AtomicBool = AtomicBool::new(cfg!(debug_assertions));
 
 const BOTPACK_FOLDER: &str = "RLBotPackDeletable";
 const MAPPACK_FOLDER: &str = "RLBotMapPackDeletable";
@@ -58,7 +62,7 @@ static CONSOLE_INPUT_COMMANDS: Mutex<Vec<String>> = Mutex::new(Vec::new());
 static CONSOLE_TEXT_EMIT_QUEUE: RwLock<Option<Sender<ConsoleTextUpdate>>> = RwLock::new(None);
 static CONSOLE_TEXT_OUT_QUEUE: RwLock<Option<Sender<String>>> = RwLock::new(None);
 
-static MATCH_HANDLER_STDIN: Mutex<(String, Option<ChildStdin>)> = Mutex::new((String::new(), None));
+static MATCH_HANDLER_STDIN: Mutex<(String, Option<(Child, ChildStdin)>)> = Mutex::new((String::new(), None));
 static CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
 
 static PYTHON_PATH: Lazy<AsyncRwLock<String>> = Lazy::new(|| AsyncRwLock::new(String::new()));
@@ -82,7 +86,7 @@ fn auto_detect_python() -> Option<(String, bool)> {
     // Windows actually doesn't have a python3.7.exe command, just python.exe (no matter what)
     // but there is a pip3.7.exe and stuff
     // we can then use that to find the path to the right python.exe and use that
-    for pip in ["pip3.7", "pip3.8", "pip3.9", "pip3.6", "pip3"] {
+    for pip in ["pip3.7", "pip3.8", "pip3.9", "pip3.10", "pip3.6", "pip3"] {
         if let Ok(value) = get_python_from_pip(pip) {
             return Some((value, false));
         }
@@ -150,7 +154,7 @@ fn auto_detect_python() -> Option<(String, bool)> {
         }
     }
 
-    for python in ["python3.7", "python3.8", "python3.9", "python3.6", "python3"] {
+    for python in ["python3.7", "python3.8", "python3.9", "python3.10", "python3.6", "python3"] {
         if get_command_status(python, ["--version"]) {
             return Some((python.to_owned(), false));
         }
@@ -231,9 +235,8 @@ fn has_chrome() -> bool {
     let reg_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe";
 
     for install_type in &[Hive::CurrentUser, Hive::LocalMachine] {
-        let reg_key = match install_type.open(reg_path, Security::Read) {
-            Ok(key) => key,
-            Err(_) => continue,
+        let Some(reg_key) = install_type.open(reg_path, Security::Read) else {
+            continue;
         };
 
         if let Ok(chrome_path) = reg_key.value("") {
@@ -272,10 +275,11 @@ fn get_command_status<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A
         command.creation_flags(0x0800_0000);
     };
 
-    match command.args(args).stdout(Stdio::null()).stderr(Stdio::null()).status() {
-        Ok(status) => status.success(),
-        Err(_) => false,
-    }
+    let Ok(status) = command.args(args).stdout(Stdio::null()).stderr(Stdio::null()).status() else {
+        return false;
+    };
+
+    status.success()
 }
 
 #[derive(Debug, Error)]
@@ -384,13 +388,15 @@ pub fn spawn_capture_process<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<I
 /// * `program` - The executable to run
 /// * `args` - The arguments to pass to the executable
 pub fn spawn_capture_process_and_get_exit_code<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(program: S, args: I) -> i32 {
-    if let Ok(mut child) = spawn_capture_process(program, args) {
-        if let Ok(exit_status) = child.wait() {
-            return exit_status.code().unwrap_or(1);
-        }
-    }
+    let Ok(mut child) = spawn_capture_process(program, args) else {
+        return 2;
+    };
 
-    2
+    let Ok(exit_status) = child.wait() else {
+        return 2;
+    };
+
+    exit_status.code().unwrap_or(1)
 }
 
 /// Check whether or not the rlbot pip package is installed
@@ -428,7 +434,7 @@ fn get_home_folder() -> (PathBuf, &'static str) {
 }
 
 #[derive(Debug, Error)]
-enum InternalConsoleError {
+pub enum InternalConsoleError {
     #[error("Mutex {0} was poisoned")]
     Poisoned(String),
     #[error("Could not complete I/O operation: {0}")]
@@ -543,8 +549,7 @@ fn try_emit_text<T: AsRef<str>>(window: &Window, text: T, replace_last: bool) ->
 }
 
 fn emit_text<T: AsRef<str>>(window: &Window, text: T, replace_last: bool) {
-    let (signal, error) = try_emit_text(window, text, replace_last);
-    if let Some(e) = error {
+    if let (signal, Some(e)) = try_emit_text(window, text, replace_last) {
         ccprintln!(window, "Error emitting {signal}: {e}");
     }
 }
@@ -558,7 +563,6 @@ fn gui_setup_load_config(window: &Window) {
 }
 
 fn gui_setup(app: &mut App) -> Result<(), Box<dyn StdError>> {
-    const MAIN_WINDOW_NAME: &str = "main";
     let window = app.get_window(MAIN_WINDOW_NAME).ok_or(format!("Cannot find window '{MAIN_WINDOW_NAME}'"))?;
     let window2 = window.clone();
     let window3 = window.clone();
@@ -636,7 +640,7 @@ fn gui_setup(app: &mut App) -> Result<(), Box<dyn StdError>> {
 
 #[tauri::command]
 fn is_debug_build() -> bool {
-    cfg!(debug_assertions)
+    IS_DEBUG_MODE.load(Ordering::Relaxed)
 }
 
 fn main() {
@@ -653,10 +657,15 @@ fn main() {
         }
     }
 
+    if std::env::args().any(|arg| arg == "--debug") {
+        IS_DEBUG_MODE.store(true, Ordering::Relaxed);
+    }
+
     println!("Config path: {}", get_config_path().display());
 
     tauri::Builder::default()
         .setup(|app| gui_setup(app))
+        .plugin(tauri_plugin::init())
         .invoke_handler(tauri::generate_handler![
             get_folder_settings,
             save_folder_settings,

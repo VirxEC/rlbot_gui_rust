@@ -370,7 +370,7 @@ pub enum BootstrapCustomPythonError {
     ExtractZip(#[from] ExtractError),
 }
 
-/// Downloads RLBot's isloated Python 3.7.9 environment and unzips it.
+/// Downloads `RLBot`'s isloated Python 3.7.9 environment and unzips it.
 /// Updates the user with continuous progress updates.
 ///
 /// WORKS FOR WINDOWS ONLY
@@ -389,10 +389,11 @@ pub async fn bootstrap_custom_python(window: &Window) -> Result<(), BootstrapCus
 
     let download_url = "https://virxec.github.io/rlbot_gui_rust/python-3.7.9-custom-amd64.zip";
     let res = reqwest::Client::new().get(download_url).send().await?;
-    let total_size = 21_873_000;
+    let total_size: u32 = 21_873_000;
     let mut stream = res.bytes_stream();
-    let mut bytes = Vec::with_capacity(total_size);
+    let mut bytes = Vec::with_capacity(total_size as usize);
     let mut last_update = Instant::now();
+    let total_size = f64::from(total_size);
 
     if !file_path.exists() {
         while let Some(new_bytes) = stream.next().await {
@@ -400,7 +401,7 @@ pub async fn bootstrap_custom_python(window: &Window) -> Result<(), BootstrapCus
             bytes.extend_from_slice(&new_bytes?);
 
             if last_update.elapsed().as_secs_f32() >= 0.1 {
-                let progress = bytes.len() as f32 / total_size as f32 * 100.0;
+                let progress = bytes.len() as f64 / total_size * 100.0;
                 window.emit(UPDATE_DOWNLOAD_PROGRESS_SIGNAL, ProgressBarUpdate::new(progress, "Downloading zip...".to_owned()))?;
                 last_update = Instant::now();
             }
@@ -568,13 +569,13 @@ pub async fn save_launcher_settings(window: Window, settings: LauncherConfig) {
 /// # Arguments
 ///
 /// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
-fn create_match_handler<S: AsRef<OsStr>>(window: &Window, use_pipe: bool, python_path: S) -> Option<(String, ChildStdin)> {
+fn create_match_handler<S: AsRef<OsStr>>(window: &Window, use_pipe: bool, python_path: S) -> Option<(String, (Child, ChildStdin))> {
     match get_maybe_capture_command(&python_path, ["-u", "-c", "from rlbot_smh.match_handler import listen; listen()"], use_pipe)
         .ok()?
         .stdin(Stdio::piped())
         .spawn()
     {
-        Ok(mut child) => child.stdin.take().map(|stdin| (python_path.as_ref().to_string_lossy().to_string(), stdin)),
+        Ok(mut child) => child.stdin.take().map(|stdin| (python_path.as_ref().to_string_lossy().to_string(), (child, stdin))),
         Err(err) => {
             ccprintln!(window, "Error starting match handler: {err}");
             None
@@ -600,23 +601,23 @@ fn issue_match_handler_command<S: AsRef<OsStr>>(window: &Window, command_parts: 
     let (used_py_path, match_handler_stdin) = &mut *command_lock;
 
     if match_handler_stdin.is_none() {
-        if let CreateHandler::Yes(use_pipe) = create_handler {
-            ccprintln(window, "Starting match handler!");
-            if let Some((py_path, stdin)) = create_match_handler(window, use_pipe, &python_path) {
-                *match_handler_stdin = Some(stdin);
-                *used_py_path = py_path;
-                create_handler = CreateHandler::No;
-            } else {
-                return Err("Couldn't start match handler".to_owned());
-            }
-        } else {
+        let CreateHandler::Yes(use_pipe) = create_handler else {
             ccprintln(window, "Not issuing command to handler as it's down and I was told to not start it");
             return Ok(());
-        }
+        };
+
+        ccprintln(window, "Starting match handler!");
+        let Some((py_path, stdin)) = create_match_handler(window, use_pipe, &python_path) else {
+            return Err("Couldn't start match handler".to_owned());
+        };
+
+        *match_handler_stdin = Some(stdin);
+        *used_py_path = py_path;
+        create_handler = CreateHandler::No;
     }
 
     let command = format!("{} | \n", command_parts.join(" | "));
-    let stdin = match_handler_stdin.as_mut().ok_or("Tried creating match handler but failed")?;
+    let (_, stdin) = match_handler_stdin.as_mut().ok_or("Tried creating match handler but failed")?;
 
     if stdin.write_all(command.as_bytes()).is_err() {
         drop(match_handler_stdin.take());
@@ -689,17 +690,17 @@ async fn start_match_helper(window: &Window, bot_list: Vec<TeamBotBundle>, match
 
 #[tauri::command]
 pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_settings: MiniMatchConfig) -> Result<(), String> {
-    start_match_helper(&window, bot_list, match_settings, USE_PIPE.load(Ordering::Relaxed))
-        .await
-        .map_err(|error| {
-            if let Err(e) = window.emit("match-start-failed", ()) {
-                ccprintln!(&window, "Failed to emit match-start-failed: {e}");
-            }
+    let Err(error) = start_match_helper(&window, bot_list, match_settings, USE_PIPE.load(Ordering::Relaxed)).await else {
+        return Ok(());
+    };
 
-            ccprintln(&window, &error);
+    if let Err(e) = window.emit("match-start-failed", ()) {
+        ccprintln!(&window, "Failed to emit match-start-failed: {e}");
+    }
 
-            error
-        })
+    ccprintln(&window, &error);
+
+    Err(error)
 }
 
 #[tauri::command]
@@ -711,13 +712,33 @@ pub async fn kill_bots(window: Window) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn shut_down_match_handler() -> Result<(), String> {
-    let mut stdin_lock = MATCH_HANDLER_STDIN.lock().map_err(|err| err.to_string())?;
-    if let (_, Some(stdin)) = &mut *stdin_lock {
+    let mut handler_lock = MATCH_HANDLER_STDIN.lock().map_err(|err| err.to_string())?;
+
+    // Send the command to the match handler to shut down
+    if let (_, Some((_, stdin))) = &mut *handler_lock {
         const KILL_BOTS_COMMAND: &[u8] = "shut_down | \n".as_bytes();
         stdin.write_all(KILL_BOTS_COMMAND).map_err(|err| err.to_string())?;
     }
 
-    stdin_lock.1 = None;
+    // Drop stdin
+    handler_lock.1 = None;
+
+    // Wait 15 seconds for the child to exit on it's own, then kill it if it's still running
+    if let (_, Some((child, _))) = &mut *handler_lock {
+        let start_time = Instant::now();
+        let pause_duration = Duration::from_secs_f32(0.25);
+
+        while start_time.elapsed() < Duration::from_secs(15) {
+            if let Ok(Some(_)) = child.try_wait() {
+                return Ok(());
+            }
+
+            thread::sleep(pause_duration);
+        }
+
+        child.kill().map_err(|err| err.to_string())?;
+        child.wait().map_err(|err| err.to_string())?;
+    }
 
     Ok(())
 }
@@ -781,7 +802,7 @@ fn make_human_config(team: Team) -> TeamBotBundle {
 /// # Arguments
 ///
 /// * `path` - The un-parsed JSON path to collapse
-/// * `botpack_root` - The path to the root of the RLBotPack, which will replace `$RLBOTPACKROOT`
+/// * `botpack_root` - The path to the root of the `RLBotPack`, which will replace `$RLBOTPACKROOT`
 fn collapse_path(cfg_path: Option<&Vec<String>>, botpack_root: &Path) -> Option<String> {
     let cfg_path = cfg_path?;
 
@@ -804,7 +825,7 @@ fn collapse_path(cfg_path: Option<&Vec<String>>, botpack_root: &Path) -> Option<
 ///
 /// `player` - The JSON map that contains the bot's config
 /// `team` - The team the bot should be on
-/// `botpack_root` - The path to the root of the RLBotPack, which will replace `$RLBOTPACKROOT`
+/// `botpack_root` - The path to the root of the `RLBotPack`, which will replace `$RLBOTPACKROOT`
 fn rlbot_to_player_config(player: &Bot, team: Team, botpack_root: &Path) -> TeamBotBundle {
     TeamBotBundle {
         name: player.name.clone(),
@@ -825,7 +846,7 @@ fn pysonix_to_player_config(player: &Bot, team: Team) -> TeamBotBundle {
     TeamBotBundle {
         name: player.name.clone(),
         team,
-        skill: player.skill.unwrap_or(1.0) as f32,
+        skill: player.skill.unwrap_or(1.0),
         runnable_type: "psyonix".to_owned(),
         path: None,
     }
@@ -837,7 +858,7 @@ fn pysonix_to_player_config(player: &Bot, team: Team) -> TeamBotBundle {
 ///
 /// `player` - The JSON map that contains the bot's config
 /// `team` - The team the bot should be on
-/// `botpack_root` - The path to the root of the RLBotPack, which will replace `$RLBOTPACKROOT`
+/// `botpack_root` - The path to the root of the `RLBotPack`, which will replace `$RLBOTPACKROOT`
 fn bot_to_team_bot_bundle(player: &Bot, team: Team, botpack_root: &Path) -> TeamBotBundle {
     if player.type_field == BotType::Psyonix {
         pysonix_to_player_config(player, team)
@@ -853,23 +874,20 @@ fn bot_to_team_bot_bundle(player: &Bot, team: Team, botpack_root: &Path) -> Team
 /// * `challenge` - The JSON map that contains the key `humanTeamSize`
 /// * `human_pick` - The names of the bots that the human picked for teammates
 /// * `all_bots` - The JSON that contains a mapping of bot names to bot information
-/// * `botpack_root` - The path to the root of the RLBotPack, which will replace `$RLBOTPACKROOT`
+/// * `botpack_root` - The path to the root of the `RLBotPack`, which will replace `$RLBOTPACKROOT`
 fn make_player_configs(challenge: &Challenge, human_picks: &[String], all_bots: &HashMap<String, Bot>, botpack_root: &Path) -> Vec<TeamBotBundle> {
-    let mut player_configs = vec![make_human_config(Team::Blue)];
+    let blue = human_picks[..challenge.human_team_size as usize - 1]
+        .iter()
+        .filter_map(|name| all_bots.get(name))
+        .map(|bot| bot_to_team_bot_bundle(bot, Team::Blue, botpack_root));
 
-    for name in human_picks[..challenge.human_team_size as usize - 1].iter() {
-        if let Some(bot) = all_bots.get(name) {
-            player_configs.push(bot_to_team_bot_bundle(bot, Team::Blue, botpack_root));
-        }
-    }
+    let orange = challenge
+        .opponent_bots
+        .iter()
+        .filter_map(|name| all_bots.get(name))
+        .map(|bot| bot_to_team_bot_bundle(bot, Team::Orange, botpack_root));
 
-    for opponent in &challenge.opponent_bots {
-        if let Some(bot) = all_bots.get(opponent) {
-            player_configs.push(bot_to_team_bot_bundle(bot, Team::Orange, botpack_root));
-        }
-    }
-
-    player_configs
+    [make_human_config(Team::Blue)].into_iter().chain(blue).chain(orange).collect()
 }
 
 /// Load a script from a Script config
@@ -877,7 +895,7 @@ fn make_player_configs(challenge: &Challenge, human_picks: &[String], all_bots: 
 /// # Arguments
 ///
 /// * `script` - The JSON map that the key "path" which points to the script's .py file
-/// * `botpack_root` - The path to the root of the RLBotPack, which will replace `$RLBOTPACKROOT`
+/// * `botpack_root` - The path to the root of the `RLBotPack`, which will replace `$RLBOTPACKROOT`
 fn script_to_miniscript_bundle(script: &Script, botpack_root: &Path) -> MiniScriptBundle {
     MiniScriptBundle {
         path: collapse_path(Some(&script.path), botpack_root).unwrap_or_default(),
@@ -890,7 +908,7 @@ fn script_to_miniscript_bundle(script: &Script, botpack_root: &Path) -> MiniScri
 ///
 /// * `challenge` - The JSON map that contains the key `scripts`
 /// * `all_scripts` - The JSON that contains a mapping of script names to script information
-/// * `botpack_root` - The path to the root of the RLBotPack, which will replace `$RLBOTPACKROOT`
+/// * `botpack_root` - The path to the root of the `RLBotPack`, which will replace `$RLBOTPACKROOT`
 fn make_script_configs(challenge: &Challenge, all_scripts: &HashMap<String, Script>, botpack_root: &Path) -> Vec<MiniScriptBundle> {
     challenge
         .scripts
@@ -966,24 +984,22 @@ async fn run_challenge(window: &Window, save_state: &StoryState, challenge_id: S
 
     let story_settings = save_state.get_story_settings();
 
-    let (city, challenge) = match get_challenge_by_id(story_settings, &challenge_id).await {
-        Some(challenge) => challenge,
-        None => return Err(format!("Could not find challenge with id {challenge_id}").into()),
+    let Some((city, challenge)) = get_challenge_by_id(story_settings, &challenge_id).await else {
+        return Err(format!("Could not find challenge with id {challenge_id}").into());
     };
 
     let all_bots = get_all_bot_configs(story_settings).await;
     let all_scripts = get_all_script_configs(story_settings).await;
 
-    let botpack_root = match BOT_FOLDER_SETTINGS
+    let Some(botpack_root) = BOT_FOLDER_SETTINGS
         .read()
         .await
         .folders
         .keys()
         .map(|bf| Path::new(bf).join("RLBotPack-master"))
         .find(|bf| bf.exists())
-    {
-        Some(bf) => bf,
-        None => return Err("Could not find RLBotPack-master folder".into()),
+    else {
+        return Err("Could not find RLBotPack-master folder".into());
     };
 
     let player_configs = make_player_configs(&challenge, picked_teammates, &all_bots, botpack_root.as_path());

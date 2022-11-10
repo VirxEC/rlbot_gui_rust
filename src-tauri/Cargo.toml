@@ -1,13 +1,13 @@
 [package]
 name = "rl-bot-gui"
-version = "1.0.34"
+version = "1.0.35"
 description = "The RLBot GUI ported to Rust"
 authors = ["VirxEC"]
 license = "MIT"
 repository = "https://github.com/VirxEC/rlbot_gui_rust"
 default-run = "rl-bot-gui"
 edition = "2021"
-rust-version = "1.63"
+rust-version = "1.65"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

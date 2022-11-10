@@ -83,7 +83,7 @@ pub struct Bot {
     pub name: String,
     #[serde(rename = "type")]
     pub type_field: BotType,
-    pub skill: Option<f64>,
+    pub skill: Option<f32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<Vec<String>>,
 }

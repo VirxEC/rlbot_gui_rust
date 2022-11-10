@@ -116,14 +116,14 @@ fn get_file_extension(vec: &[u8]) -> Option<&'static str> {
 }
 
 pub fn to_base64(path: &str) -> Option<String> {
-    if let Ok(file) = &mut fs::File::open(path) {
-        let mut vec = Vec::new();
-        file.read_to_end(&mut vec).ok()?;
+    let Ok(file) = &mut fs::File::open(path) else {
+        return None;
+    };
 
-        get_file_extension(&vec).map(|extension| format!("data:image/{extension};base64,{}", base64::encode(vec).replace("\r\n", "")))
-    } else {
-        None
-    }
+    let mut vec = Vec::new();
+    file.read_to_end(&mut vec).ok()?;
+
+    get_file_extension(&vec).map(|extension| format!("data:image/{extension};base64,{}", base64::encode(vec).replace("\r\n", "")))
 }
 
 #[derive(Debug, Error)]
@@ -289,10 +289,7 @@ impl BotConfigBundle {
             .get(BOT_CONFIG_MODULE_HEADER, LOOKS_CONFIG_KEY)
             .map(|path| format!("{}/{path}", config_directory.display()));
 
-        let valid_looks = match &looks_path {
-            Some(path) => Path::new(path).exists(),
-            None => false,
-        };
+        let valid_looks = looks_path.as_ref().map_or(false, |path| Path::new(path).exists());
 
         if !valid_looks {
             return Err(RLBotCfgParseError::NoLooksConfig(config_path_str));
@@ -302,10 +299,7 @@ impl BotConfigBundle {
             .get(BOT_CONFIG_MODULE_HEADER, PYTHON_FILE_KEY)
             .map(|path| format!("{}/{path}", config_directory.display()));
 
-        let valid_path = match &python_path {
-            Some(path) => Path::new(path).exists(),
-            None => false,
-        };
+        let valid_path = python_path.as_ref().map_or(false, |path| Path::new(path).exists());
 
         if !valid_path {
             return Err(RLBotCfgParseError::NoPythonFile(config_path_str));
@@ -333,39 +327,42 @@ impl Runnable for BotConfigBundle {
             return Vec::new();
         }
 
-        if let Some(req_file) = self.get_requirements_file() {
-            let mut args: Vec<&str> = vec!["-c", "from rlbot_smh.get_missing_packages import run; run()"];
-
-            if self.requires_tkinter {
-                args.push("requires_tkinter");
-            }
-
-            let file = format!("requirements_file={req_file}");
-
-            args.push(&file);
-
-            let mut command = process::Command::new(python);
-
-            #[cfg(windows)]
-            {
-                // disable window creation
-                command.creation_flags(0x0800_0000);
+        let Some(req_file) = self.get_requirements_file() else {
+            return if self.requires_tkinter && !get_command_status(python, ["-c", "import tkinter"]) {
+                vec![String::from("tkinter")]
+            } else {
+                Vec::new()
             };
+        };
 
-            match command.args(args).stdin(Stdio::null()).output() {
-                Ok(proc) => {
-                    let output = from_utf8(proc.stdout.as_slice()).unwrap();
-                    if let Ok(packages) = serde_json::from_str(output) {
-                        return packages;
-                    }
-                }
-                Err(e) => ccprintln(window, format!("Failed to calculate missing packages: {e}")),
-            }
-        } else if self.requires_tkinter && !get_command_status(python, ["-c", "import tkinter"]) {
-            return vec![String::from("tkinter")];
+        let mut args: Vec<&str> = vec!["-c", "from rlbot_smh.get_missing_packages import run; run()"];
+
+        if self.requires_tkinter {
+            args.push("requires_tkinter");
         }
 
-        Vec::new()
+        let file = format!("requirements_file={req_file}");
+
+        args.push(&file);
+
+        let mut command = process::Command::new(python);
+
+        #[cfg(windows)]
+        {
+            // disable window creation
+            command.creation_flags(0x0800_0000);
+        };
+
+        match command.args(args).stdin(Stdio::null()).output() {
+            Ok(proc) => {
+                let output = from_utf8(proc.stdout.as_slice()).unwrap();
+                serde_json::from_str(output).unwrap_or_default()
+            }
+            Err(e) => {
+                ccprintln(window, format!("Failed to calculate missing packages: {e}"));
+                Vec::new()
+            }
+        }
     }
 
     fn logo(&self) -> &Option<String> {
@@ -493,39 +490,42 @@ impl Runnable for ScriptConfigBundle {
             return Vec::new();
         }
 
-        if let Some(req_file) = self.get_requirements_file() {
-            let mut args: Vec<&str> = vec!["-c", "from rlbot_smh.get_missing_packages import run; run()"];
-
-            if self.requires_tkinter {
-                args.push("requires_tkinter");
-            }
-
-            let file = format!("requirements_file={req_file}");
-
-            args.push(&file);
-
-            let mut command = process::Command::new(python);
-
-            #[cfg(windows)]
-            {
-                // disable window creation
-                command.creation_flags(0x0800_0000);
+        let Some(req_file) = self.get_requirements_file() else {
+            return if self.requires_tkinter && !get_command_status(python, ["-c", "import tkinter"]) {
+                vec![String::from("tkinter")]
+            } else {
+                Vec::new()
             };
+        };
 
-            match command.args(args).stdin(Stdio::null()).output() {
-                Ok(proc) => {
-                    let output = from_utf8(proc.stdout.as_slice()).unwrap();
-                    if let Ok(packages) = serde_json::from_str(output) {
-                        return packages;
-                    }
-                }
-                Err(e) => ccprintln(window, format!("Failed to calculate missing packages: {e}")),
-            }
-        } else if self.requires_tkinter && !get_command_status(python, ["-c", "import tkinter"]) {
-            return vec![String::from("tkinter")];
+        let mut args: Vec<&str> = vec!["-c", "from rlbot_smh.get_missing_packages import run; run()"];
+
+        if self.requires_tkinter {
+            args.push("requires_tkinter");
         }
 
-        Vec::new()
+        let file = format!("requirements_file={req_file}");
+
+        args.push(&file);
+
+        let mut command = process::Command::new(python);
+
+        #[cfg(windows)]
+        {
+            // disable window creation
+            command.creation_flags(0x0800_0000);
+        };
+
+        match command.args(args).stdin(Stdio::null()).output() {
+            Ok(proc) => {
+                let output = from_utf8(proc.stdout.as_slice()).unwrap();
+                serde_json::from_str(output).unwrap_or_default()
+            }
+            Err(e) => {
+                ccprintln(window, format!("Failed to calculate missing packages: {e}"));
+                Vec::new()
+            }
+        }
     }
 
     fn logo(&self) -> &Option<String> {
@@ -533,11 +533,11 @@ impl Runnable for ScriptConfigBundle {
     }
 
     fn load_logo(&self) -> Option<String> {
-        if let Some(logo_path) = &self.logo_path {
-            to_base64(logo_path)
-        } else {
-            None
-        }
+        let Some(logo_path) = &self.logo_path else {
+            return None;
+        };
+
+        to_base64(logo_path)
     }
 
     fn is_rlbot_controlled(&self) -> bool {
