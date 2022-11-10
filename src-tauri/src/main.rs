@@ -232,21 +232,15 @@ macro_rules! ccprintlnr {
 
 #[cfg(windows)]
 fn has_chrome() -> bool {
-    let reg_path = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe";
+    const REG_PATH: &str = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\chrome.exe";
 
-    for install_type in &[Hive::CurrentUser, Hive::LocalMachine] {
-        let Some(reg_key) = install_type.open(reg_path, Security::Read) else {
-            continue;
-        };
-
-        if let Ok(chrome_path) = reg_key.value("") {
-            if Path::new(&chrome_path.to_string()).is_file() {
-                return true;
-            }
-        }
-    }
-
-    false
+    [Hive::CurrentUser, Hive::LocalMachine]
+        .into_iter()
+        .filter_map(|install_type| install_type.open(REG_PATH, Security::Read).ok())
+        .any(|reg_key| match reg_key.value("") {
+            Ok(chrome_path) => Path::new(&chrome_path.to_string()).is_file(),
+            Err(_) => false,
+        })
 }
 
 #[cfg(target_os = "macos")]

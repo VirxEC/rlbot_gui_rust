@@ -400,7 +400,7 @@ pub async fn get_recommendations(window: Window) -> Option<AllRecommendations<Bo
             .folders
             .iter()
             .filter(|(_, props)| props.visible)
-            .flat_map(|(path, _)| match glob(&format!("{path}/**/*.cfg")) {
+            .filter_map(|(path, _)| match glob(&format!("{path}/**/*.cfg")) {
                 Ok(paths) => Some(paths.flatten().filter_map(|path| BotConfigBundle::name_from_path(path.as_path()).ok()).collect::<Vec<_>>()),
                 Err(e) => {
                     ccprintln(&window, e.to_string());
@@ -413,7 +413,7 @@ pub async fn get_recommendations(window: Window) -> Option<AllRecommendations<Bo
             .files
             .iter()
             .filter(|(_, props)| props.visible)
-            .flat_map(|(path, _)| BotConfigBundle::name_from_path(Path::new(path)).ok());
+            .filter_map(|(path, _)| BotConfigBundle::name_from_path(Path::new(path)).ok());
 
         // Get a list of all the bots in (bot name, bot config file path) pairs
         let name_path_pairs = folders.chain(files).collect::<Vec<_>>();

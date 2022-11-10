@@ -575,7 +575,7 @@ pub struct ChallengeAttempt {
     challenge_completed: bool,
 }
 
-/// Represents users game state in RLBot Story Mode
+/// Represents users game state in `RLBot` Story Mode
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct StoryState {
     version: u8,

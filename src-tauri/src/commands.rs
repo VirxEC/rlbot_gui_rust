@@ -562,7 +562,7 @@ pub async fn save_launcher_settings(window: Window, settings: LauncherConfig) {
     settings.write_to_file(&window).await;
 }
 
-/// Starts the match handler, which is written in Python so it can use the RLBot package (also written in Python)
+/// Starts the match handler, which is written in Python so it can use the `RLBot` package (also written in Python)
 ///
 /// Returns None if it fails, otherwise returns pipe for the child process's stdin
 ///
