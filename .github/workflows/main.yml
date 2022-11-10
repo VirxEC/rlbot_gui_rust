@@ -117,13 +117,13 @@ jobs:
           cver=$(grep -x "version = ".*"" ../src-tauri/Cargo.toml | head -1)
           cver=${cver#"version = \""}
           cver=${cver%"\""}
-          echo '::set-output name=rawVersion::'$cver
+          echo 'name=rawVersion::'$cver >> $GITHUB_OUTPUT
           cver=v$cver
-          echo '::set-output name=releaseVersion::'$cver
+          echo 'name=releaseVersion::'$cver >> $GITHUB_OUTPUT
           if [ $(git tag -l "$cver") ]; then
-              echo '::set-output name=versionChanged::false'
+              echo 'name=versionChanged::false' >> $GITHUB_OUTPUT
           else
-              echo '::set-output name=versionChanged::true'
+              echo 'name=versionChanged::true' >> $GITHUB_OUTPUT
           fi
 
       - name: Fetch build cache
