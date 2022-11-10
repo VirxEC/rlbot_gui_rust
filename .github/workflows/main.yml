@@ -32,7 +32,7 @@ jobs:
 
       - name: Fetch build cache
         if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
-        uses: actions/cache@v3.0.4
+        uses: actions/cache@v3
         id: cache
         with:
           path: |
@@ -41,6 +41,9 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
           key: ${{ runner.os }}-cargo
+      
+      - name: Update Rust to last stable
+        run: rustup update stable
 
       - name: Install Tauri CLI
         if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
@@ -124,7 +127,7 @@ jobs:
 
       - name: Fetch build cache
         if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
-        uses: actions/cache@v3.0.4
+        uses: actions/cache@v3
         id: cache
         with:
           path: |
@@ -133,6 +136,9 @@ jobs:
             ~/.cargo/registry/cache/
             ~/.cargo/git/db/
           key: ${{ runner.os }}-cargo
+
+      - name: Update Rust to last stable
+        run: rustup update stable
 
       - name: Install ubuntu dev packages
         if: ${{ steps.version_check_staging.outputs.versionChanged == 'true' }}
