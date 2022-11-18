@@ -409,7 +409,7 @@ fn get_content_folder() -> PathBuf {
 
 #[cfg(target_os = "macos")]
 fn get_content_folder() -> PathBuf {
-    get_home_folder().join("Library/Application Support/rlbotgui")
+    get_home_folder().0.join("Library/Application Support/rlbotgui")
 }
 
 #[cfg(target_os = "linux")]
