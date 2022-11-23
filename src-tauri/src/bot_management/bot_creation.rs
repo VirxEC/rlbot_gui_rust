@@ -88,7 +88,7 @@ pub async fn bootstrap_python_bot(window: &Window, bot_name: String, directory: 
 
     change_key_in_cfg(config_file, BOT_CONFIG_MODULE_HEADER, NAME_KEY, bot_name).await?;
 
-    BOT_FOLDER_SETTINGS.write().await.add_file(window, config_file.clone());
+    BOT_FOLDER_SETTINGS.write().await.add_file(window, config_file.clone())?;
 
     if open::that(python_file).is_err() {
         // We don't want to return an error here, because the bot was successfully created
@@ -159,7 +159,7 @@ pub async fn bootstrap_python_hivemind(window: &Window, hive_name: String, direc
 
     let config_file = config_file.to_string_lossy();
 
-    BOT_FOLDER_SETTINGS.write().await.add_file(window, config_file.to_string());
+    BOT_FOLDER_SETTINGS.write().await.add_file(window, config_file.to_string())?;
 
     if open::that(hive_file).is_err() {
         ccprintln!(

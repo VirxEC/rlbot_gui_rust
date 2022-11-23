@@ -1,5 +1,8 @@
 use crate::{
-    bot_management::{cfg_helper::save_cfg, downloader::MapPackUpdater},
+    bot_management::{
+        cfg_helper::{self, save_cfg},
+        downloader::MapPackUpdater,
+    },
     custom_maps,
     rlbot::{
         agents::runnable::Runnable,
@@ -11,10 +14,7 @@ use crate::{
         },
     },
     settings::*,
-    stories::{
-        bots_base,
-        cmaps::{Bot, City, Script, Settings, StoryModeConfig},
-    },
+    stories::{bots_base, Bot, City, Script, Settings, StoryModeConfig},
     *,
 };
 use configparser::ini::Ini;
@@ -24,8 +24,8 @@ use serde::Deserialize;
 use std::{
     collections::HashMap,
     fs::{create_dir_all, read_to_string},
+    io,
     path::Path,
-    process::Command,
 };
 use tauri::{api::dialog::FileDialogBuilder, async_runtime::block_on as tauri_block_on, Window};
 use tokio::fs as async_fs;
@@ -104,10 +104,17 @@ pub fn load_gui_config_sync(window: &Window) -> Ini {
     conf
 }
 
+#[derive(Debug, Error)]
+pub enum SaveFolderSettingsError {
+    #[error(transparent)]
+    Io(#[from] io::Error),
+}
+
+impl_serialize_from_display!(SaveFolderSettingsError);
+
 #[tauri::command]
-pub async fn save_folder_settings(window: Window, bot_folder_settings: BotFolders) -> Result<(), String> {
-    BOT_FOLDER_SETTINGS.write().await.update_config(&window, bot_folder_settings);
-    Ok(())
+pub async fn save_folder_settings(window: Window, bot_folder_settings: BotFolders) -> Result<(), SaveFolderSettingsError> {
+    BOT_FOLDER_SETTINGS.write().await.update_config(&window, bot_folder_settings).map_err(Into::into)
 }
 
 #[tauri::command]
@@ -128,7 +135,7 @@ async fn get_bots_from_directory(window: &Window, path: &str) -> Vec<BotConfigBu
 }
 
 #[tauri::command]
-pub async fn scan_for_bots(window: Window) -> Result<Vec<BotConfigBundle>, String> {
+pub async fn scan_for_bots(window: Window) -> Vec<BotConfigBundle> {
     let bfs = BOT_FOLDER_SETTINGS.read().await;
     let mut bots = Vec::new();
 
@@ -142,7 +149,7 @@ pub async fn scan_for_bots(window: Window) -> Result<Vec<BotConfigBundle>, Strin
         }
     }
 
-    Ok(bots)
+    bots
 }
 
 async fn get_scripts_from_directory(window: &Window, path: &str) -> Vec<ScriptConfigBundle> {
@@ -150,9 +157,9 @@ async fn get_scripts_from_directory(window: &Window, path: &str) -> Vec<ScriptCo
 }
 
 #[tauri::command]
-pub async fn scan_for_scripts(window: Window) -> Result<Vec<ScriptConfigBundle>, String> {
+pub async fn scan_for_scripts(window: Window) -> Vec<ScriptConfigBundle> {
     let bfs = BOT_FOLDER_SETTINGS.read().await.clone();
-    let mut scripts = Vec::with_capacity(bfs.folders.len() + bfs.files.len());
+    let mut scripts = Vec::new();
 
     for (path, _) in bfs.folders.iter().filter(|(_, props)| props.visible) {
         scripts.extend(get_scripts_from_directory(&window, path).await);
@@ -164,14 +171,18 @@ pub async fn scan_for_scripts(window: Window) -> Result<Vec<ScriptConfigBundle>,
         }
     }
 
-    Ok(scripts)
+    scripts
 }
 
 #[tauri::command]
 pub fn pick_bot_folder(window: Window) {
     FileDialogBuilder::new().pick_folder(move |path| {
-        if let Some(path) = path {
-            tauri_block_on(BOT_FOLDER_SETTINGS.write()).add_folder(&window, path.to_string_lossy().to_string());
+        let Some(path) = path else {
+            return;
+        };
+
+        if let Err(error) = tauri_block_on(BOT_FOLDER_SETTINGS.write()).add_folder(&window, path.to_string_lossy().to_string()) {
+            ccprintln!(&window, "Error adding folder: {error}");
         }
     });
 }
@@ -179,8 +190,12 @@ pub fn pick_bot_folder(window: Window) {
 #[tauri::command]
 pub fn pick_bot_config(window: Window) {
     FileDialogBuilder::new().add_filter("Bot Cfg File", &["cfg"]).pick_file(move |path| {
-        if let Some(path) = path {
-            tauri_block_on(BOT_FOLDER_SETTINGS.write()).add_file(&window, path.to_string_lossy().to_string());
+        let Some(path) = path else {
+            return;
+        };
+
+        if let Err(error) = tauri_block_on(BOT_FOLDER_SETTINGS.write()).add_file(&window, path.to_string_lossy().to_string()) {
+            ccprintln!(&window, "Error adding file: {error}");
         }
     });
 }
@@ -188,38 +203,46 @@ pub fn pick_bot_config(window: Window) {
 #[tauri::command]
 pub fn pick_json_file(window: Window) {
     FileDialogBuilder::new().add_filter("JSON File", &["json"]).pick_file(move |path| {
-        if let Some(path) = path {
-            if let Err(e) = window.emit("json_file_selected", path.to_string_lossy().to_string()) {
-                ccprintln!(&window, "Error emiting json_file_selected event: {e}");
-            }
+        let Some(path) = path else {
+            return;
+        };
+
+        if let Err(e) = window.emit("json_file_selected", path.to_string_lossy().to_string()) {
+            ccprintln!(&window, "Error emiting json_file_selected event: {e}");
         }
     });
 }
 
+#[derive(Debug, Error)]
+pub enum ShowPathInExplorerError {
+    #[error("Path does not exist")]
+    DoesNotExist,
+    #[error("Couldn't open path: {0}")]
+    Other(#[from] std::io::Error),
+}
+
+impl_serialize_from_display!(ShowPathInExplorerError);
+
 #[tauri::command]
-pub async fn show_path_in_explorer(window: Window, path: String) {
-    let command = if cfg!(target_os = "windows") {
-        "explorer.exe"
-    } else if cfg!(target_os = "macos") {
-        "open"
-    } else {
-        "xdg-open"
-    };
-
+pub fn show_path_in_explorer(mut path: String) -> Result<(), ShowPathInExplorerError> {
     let ppath = Path::new(&*path);
-    let path = if ppath.is_file() { ppath.parent().unwrap().to_string_lossy().to_string() } else { path };
 
-    if let Err(e) = Command::new(command).arg(&path).spawn() {
-        ccprintln!(&window, "Error opening path: {e}");
+    if !ppath.exists() {
+        return Err(ShowPathInExplorerError::DoesNotExist);
     }
+
+    if ppath.is_file() {
+        path = ppath.parent().unwrap().to_string_lossy().to_string();
+    }
+
+    open::that(path)?;
+
+    Ok(())
 }
 
 #[tauri::command]
-pub async fn get_looks(path: String) -> Option<BotLooksConfig> {
-    match BotLooksConfig::from_path(&path).await {
-        Ok(looks) => Some(looks),
-        Err(_) => None,
-    }
+pub async fn get_looks(path: String) -> Result<BotLooksConfig, cfg_helper::Error> {
+    BotLooksConfig::from_path(&path).await
 }
 
 #[tauri::command]
@@ -315,7 +338,7 @@ pub async fn save_team_settings(window: Window, blue_team: Vec<BotConfigBundle>,
 }
 
 #[tauri::command]
-pub async fn get_language_support() -> Result<HashMap<String, bool>, String> {
+pub async fn get_language_support() -> HashMap<String, bool> {
     let mut lang_support = HashMap::new();
 
     lang_support.insert("java".to_owned(), get_command_status("java", ["-version"]));
@@ -324,7 +347,7 @@ pub async fn get_language_support() -> Result<HashMap<String, bool>, String> {
     lang_support.insert("fullpython".to_owned(), get_command_status(&*PYTHON_PATH.read().await, ["-c", "import tkinter"]));
     lang_support.insert("dotnet".to_owned(), get_command_status("dotnet", ["--list"]));
 
-    Ok(dbg!(lang_support))
+    dbg!(lang_support)
 }
 
 #[tauri::command]
@@ -338,7 +361,7 @@ pub async fn get_python_path() -> String {
 }
 
 #[tauri::command]
-pub async fn set_python_path(window: Window, path: String) -> Result<(), String> {
+pub async fn set_python_path(window: Window, path: String) {
     *PYTHON_PATH.write().await = path.clone();
     let mut config = load_gui_config(&window).await;
     config.set("python_config", "path", Some(path));
@@ -346,8 +369,6 @@ pub async fn set_python_path(window: Window, path: String) -> Result<(), String>
     if let Err(e) = save_cfg(&config, get_config_path()).await {
         ccprintln!(&window, "Error saving python path: {e}");
     }
-
-    Ok(())
 }
 
 #[tauri::command]
@@ -361,10 +382,16 @@ pub fn pick_appearance_file(window: Window) {
     });
 }
 
-fn read_recommendations_json<P: AsRef<Path>>(path: P) -> Result<AllRecommendations<String>, String> {
-    let raw_json = read_to_string(&path).map_err(|e| format!("Failed to read {e}"))?;
+#[derive(Debug, Error)]
+enum ReadRecommendationsError {
+    #[error("Failed to read file: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("Failed to parse file: {0}")]
+    Parse(#[from] serde_json::Error),
+}
 
-    serde_json::from_str(&raw_json).map_err(|e| format!("Error parsing file {}: {e}", path.as_ref().to_string_lossy()))
+fn read_recommendations_json<P: AsRef<Path>>(path: P) -> Result<AllRecommendations<String>, ReadRecommendationsError> {
+    Ok(serde_json::from_str(&read_to_string(&path)?)?)
 }
 
 fn get_recommendations_json(window: &Window, bfs: &BotFolders) -> Option<AllRecommendations<String>> {
@@ -382,7 +409,7 @@ fn get_recommendations_json(window: &Window, bfs: &BotFolders) -> Option<AllReco
         .find_map(|path| match read_recommendations_json(path) {
             Ok(recommendations) => Some(recommendations),
             Err(e) => {
-                ccprintln(window, e);
+                ccprintln(window, e.to_string());
                 None
             }
         })
@@ -475,13 +502,8 @@ pub async fn story_delete_save(window: Window) {
 pub async fn get_map_pack_revision(window: Window) -> Option<String> {
     let location = Path::new(&get_content_folder()).join(MAPPACK_FOLDER);
     let updater = MapPackUpdater::new(location, MAPPACK_REPO.0.to_owned(), MAPPACK_REPO.1.to_owned());
-    if let Some(index) = updater.get_map_index(&window).await {
-        if let Some(revision) = index.get("revision") {
-            return Some(revision.to_string());
-        }
-    }
 
-    None
+    Some(updater.get_map_index(&window).await?.get("revision")?.to_string())
 }
 
 async fn get_custom_story_json(story_settings: &StoryConfig) -> Option<StoryModeConfig> {
@@ -500,20 +522,10 @@ async fn get_custom_story_json(story_settings: &StoryConfig) -> Option<StoryMode
 
 async fn get_story_config(story_settings: &StoryConfig) -> Option<StoryModeConfig> {
     match story_settings.story_id {
-        StoryIDs::Default => {
-            if story_settings.use_custom_maps {
-                Some(stories::cmaps::default::json())
-            } else {
-                Some(stories::default::json())
-            }
-        }
-        StoryIDs::Easy => {
-            if story_settings.use_custom_maps {
-                Some(stories::cmaps::easy::json())
-            } else {
-                Some(stories::easy::json())
-            }
-        }
+        StoryIDs::Default if story_settings.use_custom_maps => Some(stories::cmaps::default::JSON.clone()),
+        StoryIDs::Default => Some(stories::default::JSON.clone()),
+        StoryIDs::Easy if story_settings.use_custom_maps => Some(stories::cmaps::easy::JSON.clone()),
+        StoryIDs::Easy => Some(stories::easy::JSON.clone()),
         StoryIDs::Custom => get_custom_story_json(story_settings).await,
     }
 }
@@ -533,7 +545,7 @@ pub async fn get_cities_json(story_settings: StoryConfig) -> HashMap<String, Cit
 }
 
 pub async fn get_all_bot_configs(story_settings: &StoryConfig) -> HashMap<String, Bot> {
-    let mut bots = bots_base::json().bots;
+    let mut bots = bots_base::JSON.bots.clone();
 
     if let Some(config) = get_story_config(story_settings).await {
         bots.extend(config.bots);

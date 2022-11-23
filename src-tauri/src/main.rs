@@ -18,7 +18,7 @@ use crate::{
     commands::*,
     config_handles::*,
     settings::{BotFolders, ConsoleTextUpdate, GameTickPacket, StoryConfig, StoryState},
-    stories::cmaps::StoryModeConfig,
+    stories::StoryModeConfig,
 };
 use crossbeam_channel::{unbounded, SendError, Sender};
 use once_cell::sync::Lazy;
@@ -44,6 +44,8 @@ use tauri::{async_runtime::block_on as tauri_block_on, App, Error as TauriError,
 use thiserror::Error;
 use tokio::sync::RwLock as AsyncRwLock;
 
+pub use serde;
+
 const MAIN_WINDOW_NAME: &str = "main";
 
 static NO_CONSOLE_WINDOWS: AtomicBool = AtomicBool::new(true);
@@ -68,6 +70,22 @@ static CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
 static PYTHON_PATH: Lazy<AsyncRwLock<String>> = Lazy::new(|| AsyncRwLock::new(String::new()));
 static STORIES_CACHE: Lazy<AsyncRwLock<HashMap<StoryConfig, StoryModeConfig>>> = Lazy::new(|| AsyncRwLock::new(HashMap::new()));
 static BOT_FOLDER_SETTINGS: Lazy<AsyncRwLock<BotFolders>> = Lazy::new(|| AsyncRwLock::new(BotFolders::default()));
+
+#[macro_export]
+macro_rules! impl_serialize_from_display {
+    ($($t:ty),*) => {
+        $(
+            impl $crate::serde::Serialize for $t {
+                fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+                where
+                    S: $crate::serde::Serializer,
+                {
+                    serializer.serialize_str(&self.to_string())
+                }
+            }
+        )*
+    };
+}
 
 #[cfg(windows)]
 fn auto_detect_python() -> Option<(String, bool)> {
@@ -279,7 +297,7 @@ fn get_command_status<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A
 #[derive(Debug, Error)]
 pub enum CommandError {
     #[error("Mutex {0} was poisoned")]
-    Poisoned(String),
+    Poisoned(&'static str),
     #[error("I/O error: {0}")]
     IO(#[from] std::io::Error),
     #[error("Pipe is closed")]
@@ -303,7 +321,7 @@ pub enum CommandError {
 pub fn get_capture_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(program: S, args: I) -> Result<Command, CommandError> {
     let mut command = get_command(program, args);
 
-    let pipe = CAPTURE_PIPE_WRITER.lock().map_err(|_| CommandError::Poisoned("CAPTURE_PIPE_WRITER".to_owned()))?;
+    let pipe = CAPTURE_PIPE_WRITER.lock().map_err(|_| CommandError::Poisoned("CAPTURE_PIPE_WRITER"))?;
     let out_pipe = pipe.as_ref().ok_or(CommandError::ClosedPipe)?.try_clone()?;
     let err_pipe = pipe.as_ref().ok_or(CommandError::ClosedPipe)?.try_clone()?;
 
@@ -430,7 +448,7 @@ fn get_home_folder() -> (PathBuf, &'static str) {
 #[derive(Debug, Error)]
 pub enum InternalConsoleError {
     #[error("Mutex {0} was poisoned")]
-    Poisoned(String),
+    Poisoned(&'static str),
     #[error("Could not complete I/O operation: {0}")]
     Io(#[from] std::io::Error),
     #[error(transparent)]
@@ -438,7 +456,7 @@ pub enum InternalConsoleError {
     #[error(transparent)]
     Tauri(#[from] TauriError),
     #[error("{0} was None")]
-    None(String),
+    None(&'static str),
     #[error(transparent)]
     ConsoleUpdateSender(#[from] SendError<ConsoleTextUpdate>),
     #[error(transparent)]
@@ -457,7 +475,7 @@ fn write_console_text_out_queue_to_file(window: &Window, to_write_out: Vec<Strin
 }
 
 fn update_internal_console(update: &ConsoleTextUpdate) -> Result<(), InternalConsoleError> {
-    let mut console_text = CONSOLE_TEXT.lock().map_err(|_| InternalConsoleError::Poisoned("CONSOLE_TEXT".to_owned()))?;
+    let mut console_text = CONSOLE_TEXT.lock().map_err(|_| InternalConsoleError::Poisoned("CONSOLE_TEXT"))?;
     if update.replace_last {
         console_text.pop();
     }
@@ -500,16 +518,16 @@ fn issue_console_update(text: String, replace_last: bool) -> Result<(), Internal
 
     CONSOLE_TEXT_EMIT_QUEUE
         .read()
-        .map_err(|_| InternalConsoleError::Poisoned("CONSOLE_TEXT_EMIT_QUEUE".to_owned()))?
+        .map_err(|_| InternalConsoleError::Poisoned("CONSOLE_TEXT_EMIT_QUEUE"))?
         .as_ref()
-        .ok_or_else(|| InternalConsoleError::None("CONSOLE_TEXT_EMIT_QUEUE".to_owned()))?
+        .ok_or_else(|| InternalConsoleError::None("CONSOLE_TEXT_EMIT_QUEUE"))?
         .send(update)?;
 
     CONSOLE_TEXT_OUT_QUEUE
         .read()
-        .map_err(|_| InternalConsoleError::Poisoned("CONSOLE_TEXT_OUT_QUEUE".to_owned()))?
+        .map_err(|_| InternalConsoleError::Poisoned("CONSOLE_TEXT_OUT_QUEUE"))?
         .as_ref()
-        .ok_or_else(|| InternalConsoleError::None("CONSOLE_TEXT_OUT_QUEUE".to_owned()))?
+        .ok_or_else(|| InternalConsoleError::None("CONSOLE_TEXT_OUT_QUEUE"))?
         .send(text)?;
 
     Ok(())
@@ -565,7 +583,7 @@ fn gui_setup(app: &mut App) -> Result<(), Box<dyn StdError>> {
     let (emit_sender, emit_receiver) = unbounded();
     CONSOLE_TEXT_EMIT_QUEUE
         .write()
-        .map_err(|_| InternalConsoleError::Poisoned("CONSOLE_TEXT_EMIT_QUEUE".to_owned()))?
+        .map_err(|_| InternalConsoleError::Poisoned("CONSOLE_TEXT_EMIT_QUEUE"))?
         .replace(emit_sender);
 
     thread::spawn(move || loop {
@@ -579,7 +597,7 @@ fn gui_setup(app: &mut App) -> Result<(), Box<dyn StdError>> {
     let (file_write_sender, file_write_receiver) = unbounded();
     CONSOLE_TEXT_OUT_QUEUE
         .write()
-        .map_err(|_| InternalConsoleError::Poisoned("CONSOLE_TEXT_OUT_QUEUE".to_owned()))?
+        .map_err(|_| InternalConsoleError::Poisoned("CONSOLE_TEXT_OUT_QUEUE"))?
         .replace(file_write_sender);
 
     thread::spawn(move || loop {

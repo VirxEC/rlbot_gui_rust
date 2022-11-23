@@ -306,7 +306,7 @@ pub enum RespawnTime {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct Mutators {
+pub struct MutatorOptions {
     pub match_length_types: Vec<MatchLength>,
     pub max_score_types: Vec<MaxScore>,
     pub overtime_types: Vec<Overtime>,
@@ -325,7 +325,7 @@ pub struct Mutators {
     pub respawn_time_types: Vec<RespawnTime>,
 }
 
-impl Default for Mutators {
+impl Default for MutatorOptions {
     fn default() -> Self {
         Self {
             match_length_types: enum_to_vec(),
@@ -357,7 +357,7 @@ pub struct MatchOptions {
     pub map_types: Vec<MapType>,
     pub game_modes: Vec<GameMode>,
     pub match_behaviours: Vec<ExistingMatchBehavior>,
-    pub mutators: Mutators,
+    pub mutators: MutatorOptions,
 }
 
 impl Default for MatchOptions {
@@ -371,7 +371,7 @@ impl Default for MatchOptions {
             },
             game_modes: enum_to_vec(),
             match_behaviours: enum_to_vec(),
-            mutators: Mutators::default(),
+            mutators: MutatorOptions::default(),
         }
     }
 }

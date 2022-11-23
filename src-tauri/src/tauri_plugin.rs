@@ -5,18 +5,13 @@ use tauri::{
     RunEvent, Runtime,
 };
 
-pub fn close() -> Result<(), String> {
-    tauri_block_on(async { shut_down_match_handler().await })?;
-    Ok(())
-}
-
 pub fn log_text(text: String) -> Result<(), InternalConsoleError> {
     println!("{text}");
     CONSOLE_TEXT_OUT_QUEUE
         .read()
-        .map_err(|_| InternalConsoleError::Poisoned("CONSOLE_TEXT_OUT_QUEUE".to_owned()))?
+        .map_err(|_| InternalConsoleError::Poisoned("CONSOLE_TEXT_OUT_QUEUE"))?
         .as_ref()
-        .ok_or_else(|| InternalConsoleError::None("CONSOLE_TEXT_OUT_QUEUE".to_owned()))?
+        .ok_or_else(|| InternalConsoleError::None("CONSOLE_TEXT_OUT_QUEUE"))?
         .send(text)?;
 
     Ok(())
@@ -26,8 +21,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
     PluginBuilder::new("eventhandler")
         .on_event(|_, event| {
             if let RunEvent::Exit = event {
-                if let Err(e) = close() {
-                    if let Err(e) = log_text(e) {
+                if let Err(e) = tauri_block_on(async { shut_down_match_handler().await }) {
+                    if let Err(e) = log_text(e.to_string()) {
                         println!("{e}");
                     }
                 }
