@@ -19,6 +19,7 @@ Works on Windows and partially works on Linux.
 You can download, update or create bots
 
 ![HomeScreenshot](screenshots/gui-home.png)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FVirxEC%2Frlbot_gui_rust.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2FVirxEC%2Frlbot_gui_rust?ref=badge_shield)
 
 In Story Mode, you can take over cities by beating challenges and can also
 recruit teammates and purchase upgrades for your car!
@@ -189,3 +190,7 @@ This will download a pre-compiled version of the Tauri CLI.
    - select _Reopen with Encoding_, select the one with _Guessed from content_ (probably Windows 1252)
    - now do that again, but _Save with Encoding_ and _UTF-8_
 6. Don't forget to bump the version number in `src-tauri/Cargo.toml`
+
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2FVirxEC%2Frlbot_gui_rust.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2FVirxEC%2Frlbot_gui_rust?ref=badge_large)
