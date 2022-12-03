@@ -1,6 +1,6 @@
 [package]
 name = "rl-bot-gui"
-version = "1.0.35"
+version = "1.0.36"
 description = "The RLBot GUI ported to Rust"
 authors = ["VirxEC"]
 license = "MIT"
@@ -38,7 +38,7 @@ fs_extra = "1.2"
 futures-util = "0.3"
 sysinfo = "0.26.1"
 os_pipe = "1.0"
-tokio = "1.19"
+tokio = { version = "1.22", features = ["parking_lot"] }
 strum = { version = "0.24", features = ["derive"] }
 serde-enum-str = "0.2.5"
 shlex = "1.1"

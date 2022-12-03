@@ -67,7 +67,7 @@ static CONSOLE_TEXT_OUT_QUEUE: RwLock<Option<Sender<String>>> = RwLock::new(None
 static MATCH_HANDLER_STDIN: Mutex<(String, Option<(Child, ChildStdin)>)> = Mutex::new((String::new(), None));
 static CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
 
-static PYTHON_PATH: Lazy<AsyncRwLock<String>> = Lazy::new(|| AsyncRwLock::new(String::new()));
+static PYTHON_PATH: AsyncRwLock<String> = AsyncRwLock::const_new(String::new());
 static STORIES_CACHE: Lazy<AsyncRwLock<HashMap<StoryConfig, StoryModeConfig>>> = Lazy::new(|| AsyncRwLock::new(HashMap::new()));
 static BOT_FOLDER_SETTINGS: Lazy<AsyncRwLock<BotFolders>> = Lazy::new(|| AsyncRwLock::new(BotFolders::default()));
 
