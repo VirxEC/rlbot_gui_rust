@@ -246,27 +246,31 @@ async fn get_missing_packages_generic<T: Runnable + Send + Sync>(window: &Window
             .enumerate()
             .filter_map(|(index, runnable)| {
                 if runnable.is_rlbot_controlled() && runnable.may_require_python_packages() {
-                    let mut warn = runnable.warn().clone();
-                    let mut missing_packages = runnable.missing_python_packages().clone();
-
-                    if let Some(missing_packages) = &missing_packages {
-                        if warn == Some("pythonpkg".to_owned()) && missing_packages.is_empty() {
+                    let mut warn = runnable.warn().as_deref();
+                    let missing_packages = Some(if let Some(missing_packages) = runnable.missing_python_packages() {
+                        if warn == Some("pythonpkg") && missing_packages.is_empty() {
                             warn = None;
                         }
+
+                        missing_packages.clone()
                     } else {
                         let bot_missing_packages = runnable.get_missing_packages(window, &python_path);
 
                         if bot_missing_packages.is_empty() {
                             warn = None;
                         } else {
-                            warn = Some("pythonpkg".to_owned());
+                            warn = Some("pythonpkg");
                         }
 
-                        missing_packages = Some(bot_missing_packages);
-                    }
+                        bot_missing_packages
+                    });
 
-                    if &warn != runnable.warn() || &missing_packages != runnable.missing_python_packages() {
-                        return Some(MissingPackagesUpdate { index, warn, missing_packages });
+                    if warn != runnable.warn().as_deref() || &missing_packages != runnable.missing_python_packages() {
+                        return Some(MissingPackagesUpdate {
+                            index,
+                            warn: warn.map(String::from),
+                            missing_packages,
+                        });
                     }
                 }
 
@@ -279,11 +283,7 @@ async fn get_missing_packages_generic<T: Runnable + Send + Sync>(window: &Window
             .enumerate()
             .filter_map(|(index, runnable)| {
                 if runnable.is_rlbot_controlled() && (runnable.warn().is_some() || runnable.missing_python_packages().is_some()) {
-                    Some(MissingPackagesUpdate {
-                        index,
-                        warn: None,
-                        missing_packages: None,
-                    })
+                    Some(MissingPackagesUpdate { index, ..Default::default() })
                 } else {
                     None
                 }

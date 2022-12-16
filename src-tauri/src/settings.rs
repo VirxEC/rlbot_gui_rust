@@ -393,7 +393,7 @@ impl PackageResult {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct MissingPackagesUpdate {
     pub index: usize,
     pub warn: Option<String>,

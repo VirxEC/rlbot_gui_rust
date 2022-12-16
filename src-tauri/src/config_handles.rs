@@ -511,12 +511,12 @@ async fn get_custom_story_json(story_settings: &StoryConfig) -> Option<StoryMode
         return None;
     }
 
-    if let Some(json) = STORIES_CACHE.read().await.get(story_settings) {
+    if let Some(json) = CUSTOM_STORIES_CACHE.read().await.get(story_settings) {
         return Some(json.clone());
     }
 
     let story_config: StoryModeConfig = serde_json::from_str(&async_fs::read_to_string(&story_settings.custom_config.story_path).await.ok()?).ok()?;
-    STORIES_CACHE.write().await.insert(story_settings.clone(), story_config.clone());
+    CUSTOM_STORIES_CACHE.write().await.insert(story_settings.clone(), story_config.clone());
     Some(story_config)
 }
 

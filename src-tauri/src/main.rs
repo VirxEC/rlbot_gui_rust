@@ -68,7 +68,7 @@ static MATCH_HANDLER_STDIN: Mutex<(String, Option<(Child, ChildStdin)>)> = Mutex
 static CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
 
 static PYTHON_PATH: AsyncRwLock<String> = AsyncRwLock::const_new(String::new());
-static STORIES_CACHE: Lazy<AsyncRwLock<HashMap<StoryConfig, StoryModeConfig>>> = Lazy::new(|| AsyncRwLock::new(HashMap::new()));
+static CUSTOM_STORIES_CACHE: Lazy<AsyncRwLock<HashMap<StoryConfig, StoryModeConfig>>> = Lazy::new(|| AsyncRwLock::new(HashMap::new()));
 static BOT_FOLDER_SETTINGS: Lazy<AsyncRwLock<BotFolders>> = Lazy::new(|| AsyncRwLock::new(BotFolders::default()));
 
 #[macro_export]
