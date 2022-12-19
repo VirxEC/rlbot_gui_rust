@@ -68,8 +68,8 @@ static MATCH_HANDLER_STDIN: Mutex<(String, Option<(Child, ChildStdin)>)> = Mutex
 static CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
 
 static PYTHON_PATH: AsyncRwLock<String> = AsyncRwLock::const_new(String::new());
-static CUSTOM_STORIES_CACHE: Lazy<AsyncRwLock<HashMap<StoryConfig, StoryModeConfig>>> = Lazy::new(|| AsyncRwLock::new(HashMap::new()));
-static BOT_FOLDER_SETTINGS: Lazy<AsyncRwLock<BotFolders>> = Lazy::new(|| AsyncRwLock::new(BotFolders::default()));
+static CUSTOM_STORIES_CACHE: AsyncRwLock<Lazy<HashMap<StoryConfig, StoryModeConfig>>> = AsyncRwLock::const_new(Lazy::new(HashMap::new));
+static BOT_FOLDER_SETTINGS: AsyncRwLock<Lazy<BotFolders>> = AsyncRwLock::const_new(Lazy::new(BotFolders::default));
 
 #[macro_export]
 macro_rules! impl_serialize_from_display {
@@ -570,7 +570,7 @@ fn gui_setup_load_config(window: &Window) {
     tauri_block_on(async {
         let gui_config = load_gui_config(window).await;
         *PYTHON_PATH.write().await = gui_config.get("python_config", "path").unwrap_or_else(|| auto_detect_python().unwrap_or_default().0);
-        *BOT_FOLDER_SETTINGS.write().await = BotFolders::load_from_conf(&load_gui_config(window).await);
+        **BOT_FOLDER_SETTINGS.write().await = BotFolders::load_from_conf(&load_gui_config(window).await);
     });
 }
 
