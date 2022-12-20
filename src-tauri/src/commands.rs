@@ -15,14 +15,13 @@ use crate::{
         setup_manager,
     },
     settings::*,
-    stories::cmaps::{Bot, BotType, Challenge, City, Script},
+    stories::{Bot, BotType, Challenge, City, Script},
     *,
 };
 use futures_util::StreamExt;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::{
     collections::HashMap,
-    error::Error,
     fs::{create_dir_all, File},
     io::{copy, Cursor, Write},
     path::Path,
@@ -39,7 +38,7 @@ const DEBUG_MODE_SHORT_GAMES: bool = false;
 pub const UPDATE_DOWNLOAD_PROGRESS_SIGNAL: &str = "update-download-progress";
 
 #[tauri::command]
-pub async fn check_rlbot_python() -> Result<HashMap<String, bool>, String> {
+pub async fn check_rlbot_python() -> HashMap<String, bool> {
     let mut python_support = HashMap::new();
 
     let python_path = PYTHON_PATH.read().await.to_owned();
@@ -55,7 +54,7 @@ pub async fn check_rlbot_python() -> Result<HashMap<String, bool>, String> {
         python_support.insert("rlbotpython".to_owned(), false);
     }
 
-    Ok(dbg!(python_support))
+    dbg!(python_support)
 }
 
 fn ensure_bot_directory(window: &Window) -> PathBuf {
@@ -78,60 +77,30 @@ pub enum BeginBotError {
     LoadCfg(#[from] RLBotCfgParseError),
 }
 
-#[tauri::command]
-pub async fn begin_python_bot(window: Window, bot_name: String) -> Result<BotConfigBundle, String> {
-    async fn inner(window: &Window, bot_name: String) -> Result<BotConfigBundle, BeginBotError> {
-        let config_file = bootstrap_python_bot(window, bot_name, ensure_bot_directory(window)).await?;
-        Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file)).await?)
-    }
+impl_serialize_from_display!(BeginBotError);
 
-    inner(&window, bot_name).await.map_err(|e| {
-        let err = e.to_string();
-        ccprintln(&window, &err);
-        err
-    })
+#[tauri::command]
+pub async fn begin_python_bot(window: Window, bot_name: String) -> Result<BotConfigBundle, BeginBotError> {
+    let config_file = bootstrap_python_bot(&window, bot_name, ensure_bot_directory(&window)).await?;
+    Ok(BotConfigBundle::minimal_from_path(config_file).await?)
 }
 
 #[tauri::command]
-pub async fn begin_python_hivemind(window: Window, hive_name: String) -> Result<BotConfigBundle, String> {
-    async fn inner(window: &Window, hive_name: String) -> Result<BotConfigBundle, BeginBotError> {
-        let config_file = bootstrap_python_hivemind(window, hive_name, ensure_bot_directory(window)).await?;
-        Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file)).await?)
-    }
-
-    inner(&window, hive_name).await.map_err(|e| {
-        let err = e.to_string();
-        ccprintln(&window, &err);
-        err
-    })
+pub async fn begin_python_hivemind(window: Window, hive_name: String) -> Result<BotConfigBundle, BeginBotError> {
+    let config_file = bootstrap_python_hivemind(&window, hive_name, ensure_bot_directory(&window)).await?;
+    Ok(BotConfigBundle::minimal_from_path(config_file).await?)
 }
 
 #[tauri::command]
-pub async fn begin_rust_bot(window: Window, bot_name: String) -> Result<BotConfigBundle, String> {
-    async fn inner(window: &Window, bot_name: String) -> Result<BotConfigBundle, BeginBotError> {
-        let config_file = bootstrap_rust_bot(window, bot_name, ensure_bot_directory(window)).await?;
-        Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file)).await?)
-    }
-
-    inner(&window, bot_name).await.map_err(|e| {
-        let err = e.to_string();
-        ccprintln(&window, &err);
-        err
-    })
+pub async fn begin_rust_bot(window: Window, bot_name: String) -> Result<BotConfigBundle, BeginBotError> {
+    let config_file = bootstrap_rust_bot(&window, bot_name, ensure_bot_directory(&window)).await?;
+    Ok(BotConfigBundle::minimal_from_path(config_file).await?)
 }
 
 #[tauri::command]
-pub async fn begin_scratch_bot(window: Window, bot_name: String) -> Result<BotConfigBundle, String> {
-    async fn inner(window: &Window, bot_name: String) -> Result<BotConfigBundle, BeginBotError> {
-        let config_file = bootstrap_scratch_bot(window, bot_name, ensure_bot_directory(window)).await?;
-        Ok(BotConfigBundle::minimal_from_path(Path::new(&config_file)).await?)
-    }
-
-    inner(&window, bot_name).await.map_err(|e| {
-        let err = e.to_string();
-        ccprintln(&window, &err);
-        err
-    })
+pub async fn begin_scratch_bot(window: Window, bot_name: String) -> Result<BotConfigBundle, BeginBotError> {
+    let config_file = bootstrap_scratch_bot(&window, bot_name, ensure_bot_directory(&window)).await?;
+    Ok(BotConfigBundle::minimal_from_path(config_file).await?)
 }
 
 const PACKAGES: [&str; 9] = [
@@ -152,13 +121,13 @@ fn get_package_name(package_name: &str) -> &str {
 }
 
 #[tauri::command]
-pub async fn install_package(package_string: String) -> Result<PackageResult, String> {
+pub async fn install_package(package_string: String) -> PackageResult {
     let exit_code = spawn_capture_process_and_get_exit_code(
         &*PYTHON_PATH.read().await,
         ["-m", "pip", "install", "-U", "--no-warn-script-location", get_package_name(&package_string)],
     );
 
-    Ok(PackageResult::new(exit_code, vec![package_string]))
+    PackageResult::new(exit_code, vec![package_string])
 }
 
 #[derive(Debug, Error)]
@@ -167,31 +136,25 @@ pub enum InstallRequirementseError {
     LoadCfg(#[from] RLBotCfgParseError),
 }
 
+impl_serialize_from_display!(InstallRequirementseError);
+
 #[tauri::command]
-pub async fn install_requirements(window: Window, config_path: String) -> Result<PackageResult, String> {
-    async fn inner(window: &Window, config_path: String) -> Result<PackageResult, InstallRequirementseError> {
-        let bundle = BotConfigBundle::minimal_from_path(Path::new(&config_path)).await?;
+pub async fn install_requirements(window: Window, config_path: String) -> Result<PackageResult, InstallRequirementseError> {
+    let bundle = BotConfigBundle::minimal_from_path(Path::new(&config_path)).await?;
 
-        Ok(if let Some(file) = bundle.get_requirements_file() {
-            let python = PYTHON_PATH.read().await;
-            let packages = bundle.get_missing_packages(window, &*python);
-            let exit_code = spawn_capture_process_and_get_exit_code(&*python, ["-m", "pip", "install", "--no-warn-script-location", "-r", file]);
+    Ok(if let Some(file) = bundle.get_requirements_file() {
+        let python = PYTHON_PATH.read().await;
+        let packages = bundle.get_missing_packages(&window, &*python);
+        let exit_code = spawn_capture_process_and_get_exit_code(&*python, ["-m", "pip", "install", "--no-warn-script-location", "-r", file]);
 
-            PackageResult::new(exit_code, packages)
-        } else {
-            PackageResult::new(1, vec!["unknown file".to_owned()])
-        })
-    }
-
-    inner(&window, config_path).await.map_err(|e| {
-        let err = e.to_string();
-        ccprintln(&window, &err);
-        err
+        PackageResult::new(exit_code, packages)
+    } else {
+        PackageResult::new(1, vec!["unknown file".to_owned()])
     })
 }
 
 #[tauri::command]
-pub async fn install_basic_packages(window: Window) -> Result<PackageResult, String> {
+pub async fn install_basic_packages(window: Window) -> PackageResult {
     let packages = PACKAGES.iter().map(ToString::to_string).collect::<Vec<String>>();
 
     if matches!(online::tokio::check(None).await, Err(_)) {
@@ -200,7 +163,7 @@ pub async fn install_basic_packages(window: Window) -> Result<PackageResult, Str
             "Error connecting to the internet to install/update basic packages. Please check your internet connection and try again.",
         );
 
-        return Ok(PackageResult::new(3, packages));
+        return PackageResult::new(3, packages);
     }
 
     let python = PYTHON_PATH.read().await.to_owned();
@@ -217,21 +180,33 @@ pub async fn install_basic_packages(window: Window) -> Result<PackageResult, Str
         }
     }
 
-    Ok(PackageResult::new(exit_code, packages))
+    PackageResult::new(exit_code, packages)
 }
 
 #[tauri::command]
 pub fn get_console_texts() -> Result<Vec<String>, String> {
-    Ok(CONSOLE_TEXT.lock().map_err(|_| "CONSOLE_TEXT lock was poisoned")?.clone())
+    Ok(CONSOLE_TEXT.lock().map_err(|_| "Mutex CONSOLE_TEXT was poisoned")?.clone())
 }
 
 #[tauri::command]
 pub fn get_console_input_commands() -> Result<Vec<String>, String> {
-    Ok(CONSOLE_INPUT_COMMANDS.lock().map_err(|_| "CONSOLE_INPUT_COMMANDS lock was poisoned")?.clone())
+    Ok(CONSOLE_INPUT_COMMANDS.lock().map_err(|_| "Mutex CONSOLE_INPUT_COMMANDS was poisoned")?.clone())
 }
 
+#[derive(Debug, Error)]
+pub enum RunCommandError {
+    #[error("No command given")]
+    NoCommand,
+    #[error("Mutex {0} was poisoned")]
+    Poisoned(&'static str),
+    #[error(transparent)]
+    Command(#[from] CommandError),
+}
+
+impl_serialize_from_display!(RunCommandError);
+
 #[tauri::command]
-pub async fn run_command(window: Window, input: String) -> Result<(), String> {
+pub async fn run_command(window: Window, input: String) -> Result<(), RunCommandError> {
     #[cfg(windows)]
     const RLPY: &str = "%rlpy%";
     #[cfg(windows)]
@@ -242,10 +217,13 @@ pub async fn run_command(window: Window, input: String) -> Result<(), String> {
     #[cfg(not(windows))]
     const RLPY_ESC: &str = "\\$rlpy";
 
-    CONSOLE_INPUT_COMMANDS.lock().map_err(|err| err.to_string())?.push(input.clone());
+    CONSOLE_INPUT_COMMANDS
+        .lock()
+        .map_err(|_| RunCommandError::Poisoned("CONSOLE_INPUT_COMMANDS"))?
+        .push(input.clone());
 
     let python_path_lock = PYTHON_PATH.read().await;
-    let (program, original_program) = match input.split_whitespace().next().ok_or_else(|| "No command given".to_string())? {
+    let (program, original_program) = match input.split_whitespace().next().ok_or(RunCommandError::NoCommand)? {
         RLPY_ESC => (RLPY_ESC, RLPY_ESC),
         RLPY => (python_path_lock.as_ref(), RLPY),
         input => (input, input),
@@ -253,9 +231,8 @@ pub async fn run_command(window: Window, input: String) -> Result<(), String> {
 
     let args = input.strip_prefix(original_program).and_then(shlex::split).unwrap_or_default();
     spawn_capture_process(program, args).map_err(|err| {
-        let e = err.to_string();
-        ccprintln(&window, &e);
-        e
+        ccprintln(&window, err.to_string());
+        err
     })?;
 
     Ok(())
@@ -269,27 +246,31 @@ async fn get_missing_packages_generic<T: Runnable + Send + Sync>(window: &Window
             .enumerate()
             .filter_map(|(index, runnable)| {
                 if runnable.is_rlbot_controlled() && runnable.may_require_python_packages() {
-                    let mut warn = runnable.warn().clone();
-                    let mut missing_packages = runnable.missing_python_packages().clone();
-
-                    if let Some(missing_packages) = &missing_packages {
-                        if warn == Some("pythonpkg".to_owned()) && missing_packages.is_empty() {
+                    let mut warn = runnable.warn().as_deref();
+                    let missing_packages = Some(if let Some(missing_packages) = runnable.missing_python_packages() {
+                        if warn == Some("pythonpkg") && missing_packages.is_empty() {
                             warn = None;
                         }
+
+                        missing_packages.clone()
                     } else {
                         let bot_missing_packages = runnable.get_missing_packages(window, &python_path);
 
                         if bot_missing_packages.is_empty() {
                             warn = None;
                         } else {
-                            warn = Some("pythonpkg".to_owned());
+                            warn = Some("pythonpkg");
                         }
 
-                        missing_packages = Some(bot_missing_packages);
-                    }
+                        bot_missing_packages
+                    });
 
-                    if &warn != runnable.warn() || &missing_packages != runnable.missing_python_packages() {
-                        return Some(MissingPackagesUpdate { index, warn, missing_packages });
+                    if warn != runnable.warn().as_deref() || &missing_packages != runnable.missing_python_packages() {
+                        return Some(MissingPackagesUpdate {
+                            index,
+                            warn: warn.map(String::from),
+                            missing_packages,
+                        });
                     }
                 }
 
@@ -302,11 +283,7 @@ async fn get_missing_packages_generic<T: Runnable + Send + Sync>(window: &Window
             .enumerate()
             .filter_map(|(index, runnable)| {
                 if runnable.is_rlbot_controlled() && (runnable.warn().is_some() || runnable.missing_python_packages().is_some()) {
-                    Some(MissingPackagesUpdate {
-                        index,
-                        warn: None,
-                        missing_packages: None,
-                    })
+                    Some(MissingPackagesUpdate { index, ..Default::default() })
                 } else {
                     None
                 }
@@ -370,15 +347,14 @@ pub enum BootstrapCustomPythonError {
     ExtractZip(#[from] ExtractError),
 }
 
+impl_serialize_from_display!(BootstrapCustomPythonError);
+
 /// Downloads `RLBot`'s isloated Python 3.7.9 environment and unzips it.
 /// Updates the user with continuous progress updates.
 ///
 /// WORKS FOR WINDOWS ONLY
-///
-/// # Arguments
-///
-/// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
-pub async fn bootstrap_custom_python(window: &Window) -> Result<(), BootstrapCustomPythonError> {
+#[tauri::command]
+pub async fn install_python(window: Window) -> Result<(), BootstrapCustomPythonError> {
     if cfg!(not(windows)) {
         return Err(BootstrapCustomPythonError::NotWindows);
     }
@@ -417,21 +393,12 @@ pub async fn bootstrap_custom_python(window: &Window) -> Result<(), BootstrapCus
     window.emit(UPDATE_DOWNLOAD_PROGRESS_SIGNAL, ProgressBarUpdate::new(100., "Extracting zip...".to_owned()))?;
 
     // Extract the zip file
-    zip_extract_fixed::extract(window, File::open(&file_path)?, folder_destination.as_path(), false, false)?;
+    zip_extract_fixed::extract(&window, File::open(&file_path)?, folder_destination.as_path(), false, false)?;
 
     // Update the Python path
     *PYTHON_PATH.write().await = folder_destination.join("python.exe").to_string_lossy().to_string();
 
     Ok(())
-}
-
-#[tauri::command]
-pub async fn install_python(window: Window) -> Result<(), String> {
-    bootstrap_custom_python(&window).await.map_err(|e| {
-        let e = e.to_string();
-        ccprintln(&window, &e);
-        e
-    })
 }
 
 #[derive(Debug, Error)]
@@ -442,41 +409,45 @@ pub enum VenvCreationError {
     ImproperInstallation(String),
 }
 
+impl_serialize_from_display!(VenvCreationError);
+
 #[tauri::command]
-pub async fn create_python_venv(window: Window, path: String) -> Result<(), String> {
-    async fn inner(path: String) -> Result<(), VenvCreationError> {
-        let python_folder = get_content_folder().join("env");
-        let python_folder_str = python_folder.to_string_lossy().to_string();
-        if !get_command_status(path, ["-m", "venv", &python_folder_str]) {
-            return Err(VenvCreationError::Creation(python_folder_str));
-        }
-
-        let python_path = python_folder.join("bin/python").to_string_lossy().to_string();
-        if !get_command_status(&python_path, ["--version"]) {
-            return Err(VenvCreationError::ImproperInstallation(python_path));
-        }
-
-        *PYTHON_PATH.write().await = python_path;
-
-        Ok(())
+pub async fn create_python_venv(path: String) -> Result<(), VenvCreationError> {
+    let python_folder = get_content_folder().join("env");
+    let python_folder_str = python_folder.to_string_lossy().to_string();
+    if !get_command_status(path, ["-m", "venv", &python_folder_str]) {
+        return Err(VenvCreationError::Creation(python_folder_str));
     }
 
-    inner(path).await.map_err(|e| {
-        let e = e.to_string();
-        ccprintln(&window, &e);
-        e
-    })
+    let python_path = python_folder.join("bin/python").to_string_lossy().to_string();
+    if !get_command_status(&python_path, ["--version"]) {
+        return Err(VenvCreationError::ImproperInstallation(python_path));
+    }
+
+    *PYTHON_PATH.write().await = python_path;
+
+    Ok(())
 }
 
+#[derive(Debug, Error)]
+pub enum BotPackError {
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    #[error("Couldn't find revision number in map pack")]
+    NoRevision,
+}
+
+impl_serialize_from_display!(BotPackError);
+
 #[tauri::command]
-pub async fn download_bot_pack(window: Window) -> Result<String, String> {
+pub async fn download_bot_pack(window: Window) -> Result<String, BotPackError> {
     let botpack_location = get_content_folder().join(BOTPACK_FOLDER).to_string_lossy().to_string();
     let botpack_status = downloader::download_repo(&window, BOTPACK_REPO_OWNER, BOTPACK_REPO_NAME, &botpack_location, true).await;
 
     Ok(match botpack_status {
         downloader::BotpackStatus::Success(message) => {
             // Configure the folder settings
-            BOT_FOLDER_SETTINGS.write().await.add_folder(&window, botpack_location);
+            BOT_FOLDER_SETTINGS.write().await.add_folder(&window, botpack_location)?;
             message
         }
         downloader::BotpackStatus::Skipped(message) => message,
@@ -485,7 +456,7 @@ pub async fn download_bot_pack(window: Window) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub async fn update_bot_pack(window: Window) -> Result<String, String> {
+pub async fn update_bot_pack(window: Window) -> Result<String, BotPackError> {
     let botpack_location = get_content_folder().join(BOTPACK_FOLDER).to_string_lossy().to_string();
     let botpack_status = downloader::update_bot_pack(&window, BOTPACK_REPO_OWNER, BOTPACK_REPO_NAME, &botpack_location).await;
 
@@ -493,7 +464,7 @@ pub async fn update_bot_pack(window: Window) -> Result<String, String> {
         downloader::BotpackStatus::Skipped(message) => message,
         downloader::BotpackStatus::Success(message) => {
             // Configure the folder settings
-            BOT_FOLDER_SETTINGS.write().await.add_folder(&window, botpack_location);
+            BOT_FOLDER_SETTINGS.write().await.add_folder(&window, botpack_location)?;
             message
         }
         downloader::BotpackStatus::RequiresFullDownload => {
@@ -501,7 +472,7 @@ pub async fn update_bot_pack(window: Window) -> Result<String, String> {
             // the most likely cause is the botpack not existing in the first place
             match downloader::download_repo(&window, BOTPACK_REPO_OWNER, BOTPACK_REPO_NAME, &botpack_location, true).await {
                 downloader::BotpackStatus::Success(message) => {
-                    BOT_FOLDER_SETTINGS.write().await.add_folder(&window, botpack_location);
+                    BOT_FOLDER_SETTINGS.write().await.add_folder(&window, botpack_location)?;
                     message
                 }
                 downloader::BotpackStatus::Skipped(message) => message,
@@ -512,14 +483,14 @@ pub async fn update_bot_pack(window: Window) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub async fn update_map_pack(window: Window) -> Result<String, String> {
+pub async fn update_map_pack(window: Window) -> Result<String, BotPackError> {
     let mappack_location = get_content_folder().join(MAPPACK_FOLDER);
     let updater = downloader::MapPackUpdater::new(&mappack_location, MAPPACK_REPO.0.to_owned(), MAPPACK_REPO.1.to_owned());
     let location = mappack_location.to_string_lossy().to_string();
 
     Ok(match updater.needs_update(&window).await {
         downloader::BotpackStatus::Skipped(message) | downloader::BotpackStatus::Success(message) => {
-            BOT_FOLDER_SETTINGS.write().await.add_folder(&window, location);
+            BOT_FOLDER_SETTINGS.write().await.add_folder(&window, location)?;
             message
         }
         downloader::BotpackStatus::RequiresFullDownload => {
@@ -527,11 +498,11 @@ pub async fn update_map_pack(window: Window) -> Result<String, String> {
             // the most likely cause is the botpack not existing in the first place
             match downloader::download_repo(&window, MAPPACK_REPO.0, MAPPACK_REPO.1, &location, false).await {
                 downloader::BotpackStatus::Success(message) => {
-                    BOT_FOLDER_SETTINGS.write().await.add_folder(&window, location);
+                    BOT_FOLDER_SETTINGS.write().await.add_folder(&window, location)?;
 
                     if updater.get_map_index(&window).await.is_none() {
                         ccprintln(&window, "Error: Couldn't find revision number in map pack");
-                        return Err("Couldn't find revision number in map pack".to_owned());
+                        return Err(BotPackError::NoRevision);
                     }
 
                     let map_index_old = updater.get_map_index(&window).await;
@@ -562,6 +533,22 @@ pub async fn save_launcher_settings(window: Window, settings: LauncherConfig) {
     settings.write_to_file(&window).await;
 }
 
+#[derive(Debug, Error)]
+pub enum MatchHandlerError {
+    #[error("Couldn't start match handler: {0}")]
+    Command(#[from] CommandError),
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
+    #[error("Couldn't find STDIN in match handler")]
+    NoStdin,
+    #[error("Failed to write to match handler's STDIN")]
+    NoWrite,
+    #[error("Mutex {0} was poisoned")]
+    Poisoned(&'static str),
+}
+
+impl_serialize_from_display!(MatchHandlerError);
+
 /// Starts the match handler, which is written in Python so it can use the `RLBot` package (also written in Python)
 ///
 /// Returns None if it fails, otherwise returns pipe for the child process's stdin
@@ -569,18 +556,13 @@ pub async fn save_launcher_settings(window: Window, settings: LauncherConfig) {
 /// # Arguments
 ///
 /// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
-fn create_match_handler<S: AsRef<OsStr>>(window: &Window, use_pipe: bool, python_path: S) -> Option<(String, (Child, ChildStdin))> {
-    match get_maybe_capture_command(&python_path, ["-u", "-c", "from rlbot_smh.match_handler import listen; listen()"], use_pipe)
-        .ok()?
+fn create_match_handler<S: AsRef<OsStr>>(use_pipe: bool, python_path: S) -> Result<(String, (Child, ChildStdin)), MatchHandlerError> {
+    let mut child = get_maybe_capture_command(&python_path, ["-u", "-c", "from rlbot_smh.match_handler import listen; listen()"], use_pipe)?
         .stdin(Stdio::piped())
-        .spawn()
-    {
-        Ok(mut child) => child.stdin.take().map(|stdin| (python_path.as_ref().to_string_lossy().to_string(), (child, stdin))),
-        Err(err) => {
-            ccprintln!(window, "Error starting match handler: {err}");
-            None
-        }
-    }
+        .spawn()?;
+
+    let stdin = child.stdin.take().ok_or(MatchHandlerError::NoStdin)?;
+    Ok((python_path.as_ref().to_string_lossy().to_string(), (child, stdin)))
 }
 
 enum CreateHandler {
@@ -596,8 +578,13 @@ enum CreateHandler {
 /// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
 /// * `command` - The command to send to the match handler - can be in multiple parts, for passing arguments
 /// * `create_handler` - If the match handler should be started if it's down
-fn issue_match_handler_command<S: AsRef<OsStr>>(window: &Window, command_parts: &[String], mut create_handler: CreateHandler, python_path: S) -> Result<(), String> {
-    let mut command_lock = MATCH_HANDLER_STDIN.lock().map_err(|err| err.to_string())?;
+fn issue_match_handler_command<S: AsRef<OsStr>>(
+    window: &Window,
+    command_parts: &[String],
+    mut create_handler: CreateHandler,
+    python_path: S,
+) -> Result<(), MatchHandlerError> {
+    let mut command_lock = MATCH_HANDLER_STDIN.lock().map_err(|_| MatchHandlerError::Poisoned("MATCH_HANDLER_STDIN"))?;
     let (used_py_path, match_handler_stdin) = &mut *command_lock;
 
     if match_handler_stdin.is_none() {
@@ -607,9 +594,7 @@ fn issue_match_handler_command<S: AsRef<OsStr>>(window: &Window, command_parts: 
         };
 
         ccprintln(window, "Starting match handler!");
-        let Some((py_path, stdin)) = create_match_handler(window, use_pipe, &python_path) else {
-            return Err("Couldn't start match handler".to_owned());
-        };
+        let (py_path, stdin) = create_match_handler(use_pipe, &python_path)?;
 
         *match_handler_stdin = Some(stdin);
         *used_py_path = py_path;
@@ -617,7 +602,7 @@ fn issue_match_handler_command<S: AsRef<OsStr>>(window: &Window, command_parts: 
     }
 
     let command = format!("{} | \n", command_parts.join(" | "));
-    let (_, stdin) = match_handler_stdin.as_mut().ok_or("Tried creating match handler but failed")?;
+    let (_, stdin) = match_handler_stdin.as_mut().ok_or(MatchHandlerError::NoStdin)?;
 
     if stdin.write_all(command.as_bytes()).is_err() {
         drop(match_handler_stdin.take());
@@ -625,21 +610,35 @@ fn issue_match_handler_command<S: AsRef<OsStr>>(window: &Window, command_parts: 
             ccprintln(window, "Failed to write to match handler, trying to restart...");
             issue_match_handler_command(window, command_parts, create_handler, python_path)
         } else {
-            Err("Failed to write to match handler".to_owned())
+            Err(MatchHandlerError::NoWrite)
         }
     } else {
         Ok(())
     }
 }
 
+#[derive(Debug, Error)]
+pub enum MatchInteractionError {
+    #[error(transparent)]
+    MatchHandler(#[from] MatchHandlerError),
+    #[error(transparent)]
+    RLNoBot(#[from] setup_manager::RLNoBotError),
+    #[error(transparent)]
+    Serde(#[from] serde_json::Error),
+    #[error(transparent)]
+    MapSetup(#[from] MapSetupError),
+}
+
+impl_serialize_from_display!(MatchInteractionError);
+
 /// Perform pre-match startup checks
 ///
 /// # Arguments
 ///
 /// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
-async fn pre_start_match(window: &Window) -> Result<(), String> {
+async fn pre_start_match(window: &Window) -> Result<(), MatchInteractionError> {
     let port = gateway_util::find_existing_process(window);
-    let rl_is_running = setup_manager::is_rocket_league_running(port.unwrap_or(gateway_util::IDEAL_RLBOT_PORT))?;
+    let rl_is_running = setup_manager::is_rocket_league_running(port.unwrap_or(gateway_util::IDEAL_RLBOT_PORT)).map_err(MatchInteractionError::RLNoBot)?;
 
     ccprintln(
         window,
@@ -666,16 +665,16 @@ async fn pre_start_match(window: &Window) -> Result<(), String> {
 /// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
 /// * `bot_list` - A list of bots and their settings to use in the match
 /// * `match_settings` - The various match settings to use in the match, including scripts (only the path), mutators, game map, etc.
-async fn start_match_helper(window: &Window, bot_list: Vec<TeamBotBundle>, match_settings: MiniMatchConfig, use_pipe: bool) -> Result<(), String> {
+async fn start_match_helper(window: &Window, bot_list: Vec<TeamBotBundle>, match_settings: MiniMatchConfig, use_pipe: bool) -> Result<(), MatchInteractionError> {
     pre_start_match(window).await?;
 
     let launcher_settings = LauncherConfig::load(window).await;
-    let match_settings = match_settings.setup_for_start_match(window, &BOT_FOLDER_SETTINGS.read().await.folders)?;
+    let match_settings = match_settings.setup_for_start_match(&BOT_FOLDER_SETTINGS.read().await.folders)?;
 
     let args = [
         "start_match".to_owned(),
-        serde_json::to_string(&bot_list).map_err(|e| e.to_string())?.as_str().to_owned(),
-        serde_json::to_string(&match_settings).map_err(|e| e.to_string())?.as_str().to_owned(),
+        serde_json::to_string(&bot_list)?.as_str().to_owned(),
+        serde_json::to_string(&match_settings)?.as_str().to_owned(),
         launcher_settings.preferred_launcher,
         launcher_settings.use_login_tricks.to_string(),
         launcher_settings.rocket_league_exe_path.unwrap_or_default(),
@@ -689,35 +688,33 @@ async fn start_match_helper(window: &Window, bot_list: Vec<TeamBotBundle>, match
 }
 
 #[tauri::command]
-pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_settings: MiniMatchConfig) -> Result<(), String> {
-    let Err(error) = start_match_helper(&window, bot_list, match_settings, USE_PIPE.load(Ordering::Relaxed)).await else {
-        return Ok(());
-    };
+pub async fn start_match(window: Window, bot_list: Vec<TeamBotBundle>, match_settings: MiniMatchConfig) -> Result<(), MatchInteractionError> {
+    if let Err(error) = start_match_helper(&window, bot_list, match_settings, USE_PIPE.load(Ordering::Relaxed)).await {
+        if let Err(e) = window.emit("match-start-failed", ()) {
+            ccprintln!(&window, "Failed to emit match-start-failed: {e}");
+        }
 
-    if let Err(e) = window.emit("match-start-failed", ()) {
-        ccprintln!(&window, "Failed to emit match-start-failed: {e}");
+        ccprintln(&window, error.to_string());
+
+        Err(error)
+    } else {
+        Ok(())
     }
-
-    ccprintln(&window, &error);
-
-    Err(error)
 }
 
 #[tauri::command]
-pub async fn kill_bots(window: Window) -> Result<(), String> {
-    issue_match_handler_command(&window, &["kill_bots".to_owned()], CreateHandler::No, "")?;
-
-    Ok(())
+pub async fn kill_bots(window: Window) -> Result<(), MatchHandlerError> {
+    issue_match_handler_command(&window, &["kill_bots".to_owned()], CreateHandler::No, "")
 }
 
 #[tauri::command]
-pub async fn shut_down_match_handler() -> Result<(), String> {
-    let mut handler_lock = MATCH_HANDLER_STDIN.lock().map_err(|err| err.to_string())?;
+pub async fn shut_down_match_handler() -> Result<(), MatchHandlerError> {
+    let mut handler_lock = MATCH_HANDLER_STDIN.lock().map_err(|_| MatchHandlerError::Poisoned("MATCH_HANDLER_STDIN"))?;
 
     // Send the command to the match handler to shut down
     if let (_, Some((_, stdin))) = &mut *handler_lock {
         const KILL_BOTS_COMMAND: &[u8] = "shut_down | \n".as_bytes();
-        stdin.write_all(KILL_BOTS_COMMAND).map_err(|err| err.to_string())?;
+        stdin.write_all(KILL_BOTS_COMMAND)?;
     }
 
     // Drop stdin
@@ -736,36 +733,35 @@ pub async fn shut_down_match_handler() -> Result<(), String> {
             thread::sleep(pause_duration);
         }
 
-        child.kill().map_err(|err| err.to_string())?;
-        child.wait().map_err(|err| err.to_string())?;
+        child.kill()?;
+        child.wait()?;
     }
 
     Ok(())
 }
 
 #[tauri::command]
-pub async fn fetch_game_tick_packet_json(window: Window) -> Result<(), String> {
-    issue_match_handler_command(&window, &["fetch_gtp".to_owned()], CreateHandler::No, &*PYTHON_PATH.read().await)?;
-    Ok(())
+pub async fn fetch_game_tick_packet_json(window: Window) -> Result<(), MatchHandlerError> {
+    issue_match_handler_command(&window, &["fetch_gtp".to_owned()], CreateHandler::No, &*PYTHON_PATH.read().await)
 }
 
 #[tauri::command]
-pub async fn set_state(window: Window, state: HashMap<String, serde_json::Value>) -> Result<(), String> {
-    issue_match_handler_command(
+pub async fn set_state(window: Window, state: HashMap<String, serde_json::Value>) -> Result<(), MatchInteractionError> {
+    Ok(issue_match_handler_command(
         &window,
-        &["set_state".to_owned(), serde_json::to_string(&state).map_err(|e| e.to_string())?],
+        &["set_state".to_owned(), serde_json::to_string(&state)?],
         CreateHandler::No,
         &*PYTHON_PATH.read().await,
-    )
+    )?)
 }
 
 #[tauri::command]
-pub async fn spawn_car_for_viewing(window: Window, config: BotLooksConfig, team: u8, showcase_type: String, map: String) -> Result<(), String> {
+pub async fn spawn_car_for_viewing(window: Window, config: BotLooksConfig, team: u8, showcase_type: String, map: String) -> Result<(), MatchInteractionError> {
     let launcher_settings = LauncherConfig::load(&window).await;
 
     let args = [
         "spawn_car_for_viewing".to_owned(),
-        serde_json::to_string(&config).map_err(|e| e.to_string())?,
+        serde_json::to_string(&config)?,
         team.to_string(),
         showcase_type,
         map,
@@ -774,7 +770,7 @@ pub async fn spawn_car_for_viewing(window: Window, config: BotLooksConfig, team:
         launcher_settings.rocket_league_exe_path.unwrap_or_default(),
     ];
 
-    issue_match_handler_command(&window, &args, CreateHandler::Yes(true), &*PYTHON_PATH.read().await)
+    Ok(issue_match_handler_command(&window, &args, CreateHandler::Yes(true), &*PYTHON_PATH.read().await)?)
 }
 
 #[tauri::command]
@@ -971,6 +967,20 @@ async fn get_challenge_by_id(story_settings: &StoryConfig, challenge_id: &str) -
         .find_map(|city| find_challenge_in_city(challenge_id, city).map(|challenge| (city.clone(), challenge)))
 }
 
+#[derive(Debug, Error)]
+pub enum RunChallengeError {
+    #[error(transparent)]
+    MatchInteraction(#[from] MatchInteractionError),
+    #[error("Could not find challenge with id {0}")]
+    NoChallengeId(String),
+    #[error("Could not find RLBotPack-master folder")]
+    NoBotPackFolder,
+    #[error(transparent)]
+    Serde(#[from] serde_json::Error),
+}
+
+impl_serialize_from_display!(RunChallengeError);
+
 /// Launch a challenge for the user to play
 ///
 /// # Arguments
@@ -979,28 +989,26 @@ async fn get_challenge_by_id(story_settings: &StoryConfig, challenge_id: &str) -
 /// * `story_save` - The save state of the story, containing all the information about the story
 /// * `challenge_id` - The ID of the challenge to run
 /// * `picked_teammates` - The teammates that were picked by the human for teammates to use in the challenge
-async fn run_challenge(window: &Window, save_state: &StoryState, challenge_id: String, picked_teammates: &[String]) -> Result<(), Box<dyn Error>> {
+async fn run_challenge(window: &Window, save_state: &StoryState, challenge_id: String, picked_teammates: &[String]) -> Result<(), RunChallengeError> {
     pre_start_match(window).await?;
 
     let story_settings = save_state.get_story_settings();
 
     let Some((city, challenge)) = get_challenge_by_id(story_settings, &challenge_id).await else {
-        return Err(format!("Could not find challenge with id {challenge_id}").into());
+        return Err(RunChallengeError::NoChallengeId(challenge_id));
     };
 
     let all_bots = get_all_bot_configs(story_settings).await;
     let all_scripts = get_all_script_configs(story_settings).await;
 
-    let Some(botpack_root) = BOT_FOLDER_SETTINGS
+    let botpack_root = BOT_FOLDER_SETTINGS
         .read()
         .await
         .folders
         .keys()
         .map(|bf| Path::new(bf).join("RLBotPack-master"))
         .find(|bf| bf.exists())
-    else {
-        return Err("Could not find RLBotPack-master folder".into());
-    };
+        .ok_or(RunChallengeError::NoBotPackFolder)?;
 
     let player_configs = make_player_configs(&challenge, picked_teammates, &all_bots, botpack_root.as_path());
     let match_settings = make_match_config(&challenge, save_state.get_upgrades(), make_script_configs(&challenge, &all_scripts, botpack_root.as_path()));
@@ -1009,13 +1017,13 @@ async fn run_challenge(window: &Window, save_state: &StoryState, challenge_id: S
     let args = [
         "launch_challenge".to_owned(),
         challenge_id,
-        serde_json::to_string(&city.description.color).map_err(|e| e.to_string())?,
-        serde_json::to_string(&save_state.get_team_settings().color).map_err(|e| e.to_string())?,
-        serde_json::to_string(&save_state.get_upgrades()).map_err(|e| e.to_string())?,
-        serde_json::to_string(&player_configs).map_err(|e| e.to_string())?,
-        serde_json::to_string(&match_settings).map_err(|e| e.to_string())?,
-        serde_json::to_string(&challenge).map_err(|e| e.to_string())?,
-        serde_json::to_string(&save_state).map_err(|e| e.to_string())?,
+        serde_json::to_string(&city.description.color)?,
+        serde_json::to_string(&save_state.get_team_settings().color)?,
+        serde_json::to_string(&save_state.get_upgrades())?,
+        serde_json::to_string(&player_configs)?,
+        serde_json::to_string(&match_settings)?,
+        serde_json::to_string(&challenge)?,
+        serde_json::to_string(&save_state)?,
         launcher_prefs.preferred_launcher,
         launcher_prefs.use_login_tricks.to_string(),
         launcher_prefs.rocket_league_exe_path.unwrap_or_default(),
@@ -1023,7 +1031,7 @@ async fn run_challenge(window: &Window, save_state: &StoryState, challenge_id: S
 
     println!("Issuing command: {} | ", args.join(" | "));
 
-    issue_match_handler_command(window, &args, CreateHandler::Yes(true), &*PYTHON_PATH.read().await)?;
+    issue_match_handler_command(window, &args, CreateHandler::Yes(true), &*PYTHON_PATH.read().await).map_err(Into::<MatchInteractionError>::into)?;
 
     Ok(())
 }
@@ -1074,57 +1082,51 @@ pub enum LogUploadError {
     #[error("Failed to upload log file: {0}")]
     Upload(#[from] reqwest::Error),
     #[error("No key '{0}' in JSON repsonse")]
-    NoKey(String),
+    NoKey(&'static str),
     #[error("Key '{0}' in JSON response was not a string")]
-    InvalidKeyType(String),
+    InvalidKeyType(&'static str),
 }
 
+impl_serialize_from_display!(LogUploadError);
+
+/// there are a few references to hastebin in the GUI
+/// you should also change those references to avoid user confusion
+/// (if changing paste provider)
 #[tauri::command]
-pub async fn upload_log(window: Window) -> Result<String, String> {
+pub async fn upload_log(window: Window) -> Result<String, LogUploadError> {
     const KEY: &str = "key";
 
-    /// there are a few references to hastebin in the GUI
-    /// you should also change those references to avoid user confusion
-    /// (if changing paste provider)
-    async fn inner(window: &Window) -> Result<String, LogUploadError> {
-        ccprintln(window, "Reading log file...");
-        let file = AsyncFile::open(get_log_path()).await?;
+    ccprintln(&window, "Reading log file...");
+    let file = AsyncFile::open(get_log_path()).await?;
 
-        let mut reader = BufReader::new(file);
-        let mut contents = String::new();
-        reader.read_to_string(&mut contents).await?;
+    let mut reader = BufReader::new(file);
+    let mut contents = String::new();
+    reader.read_to_string(&mut contents).await?;
 
-        if contents.is_empty() {
-            return Err(LogUploadError::EmptyLog);
-        }
-
-        let (home_folder, replacement_key) = get_home_folder();
-        let contents = contents.replace(&home_folder.to_string_lossy().to_string(), replacement_key);
-
-        ccprintln(window, "Log file read succesfully! Now uploading to hastebin...");
-
-        // send contents to https://hastebin.com/documents via POST
-        let res = reqwest::Client::new().post("https://hastebin.com/documents").body(contents).send().await?;
-
-        // the returned JSON looks a little bit like `{"key":"royidegeni"}`
-        // Take this and return the key attached to the hastebin URL
-        let json: serde_json::Value = res.json().await?;
-
-        let url_postfix = json
-            .get(KEY)
-            .ok_or_else(|| LogUploadError::NoKey(KEY.to_owned()))?
-            .as_str()
-            .ok_or_else(|| LogUploadError::InvalidKeyType(KEY.to_owned()))?
-            .to_owned();
-
-        let url = format!("https://hastebin.com/{url_postfix}");
-        ccprintln!(window, "Log file uploaded to: {url}");
-        Ok(url)
+    if contents.is_empty() {
+        return Err(LogUploadError::EmptyLog);
     }
 
-    inner(&window).await.map_err(|e| {
-        let err = e.to_string();
-        ccprintln(&window, &err);
-        err
-    })
+    let (home_folder, replacement_key) = get_home_folder();
+    let contents = contents.replace(&home_folder.to_string_lossy().to_string(), replacement_key);
+
+    ccprintln(&window, "Log file read succesfully! Now uploading to hastebin...");
+
+    // send contents to https://hastebin.com/documents via POST
+    let res = reqwest::Client::new().post("https://hastebin.com/documents").body(contents).send().await?;
+
+    // the returned JSON looks a little bit like `{"key":"royidegeni"}`
+    // Take this and return the key attached to the hastebin URL
+    let json: serde_json::Value = res.json().await?;
+
+    let url_postfix = json
+        .get(KEY)
+        .ok_or_else(|| LogUploadError::NoKey(KEY))?
+        .as_str()
+        .ok_or_else(|| LogUploadError::InvalidKeyType(KEY))?
+        .to_owned();
+
+    let url = format!("https://hastebin.com/{url_postfix}");
+    ccprintln!(&window, "Log file uploaded to: {url}");
+    Ok(url)
 }

@@ -10,8 +10,14 @@ use configparser::ini::Ini;
 use core::fmt;
 use futures_util::future::join_all;
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, fmt::Debug, str::FromStr};
+use std::{
+    collections::HashMap,
+    fmt::{Debug, Display, Formatter},
+    io,
+    str::FromStr,
+};
 use tauri::Window;
+use thiserror::Error;
 use tokio::fs as async_fs;
 
 use serde_repr::{Deserialize_repr, Serialize_repr};
@@ -50,26 +56,24 @@ impl BotFolders {
         Self { files, folders }
     }
 
-    pub fn update_config(&mut self, window: &Window, bfs: Self) {
+    pub fn update_config(&mut self, window: &Window, bfs: Self) -> io::Result<()> {
         *self = bfs;
 
         let mut conf = load_gui_config_sync(window);
         conf.set("bot_folder_settings", "files", serde_json::to_string(&self.files).ok());
         conf.set("bot_folder_settings", "folders", serde_json::to_string(&self.folders).ok());
 
-        if let Err(e) = conf.write(get_config_path()) {
-            ccprintln!(window, "Error writing config file: {e}");
-        }
+        conf.write(get_config_path())
     }
 
-    pub fn add_folder(&mut self, window: &Window, path: String) {
+    pub fn add_folder(&mut self, window: &Window, path: String) -> io::Result<()> {
         self.folders.insert(path, BotFolder { visible: true });
-        self.update_config(window, self.clone());
+        self.update_config(window, self.clone())
     }
 
-    pub fn add_file(&mut self, window: &Window, path: String) {
+    pub fn add_file(&mut self, window: &Window, path: String) -> io::Result<()> {
         self.files.insert(path, BotFolder { visible: true });
-        self.update_config(window, self.clone());
+        self.update_config(window, self.clone())
     }
 }
 
@@ -215,16 +219,21 @@ impl Default for MiniMatchConfig {
     }
 }
 
+#[derive(Debug, Error)]
+pub struct MapSetupError(String);
+
+impl Display for MapSetupError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Failed to find custom map {}", self.0)
+    }
+}
+
 impl MiniMatchConfig {
-    pub fn setup_for_start_match(&self, window: &Window, bf: &HashMap<String, BotFolder>) -> Result<Self, String> {
+    pub fn setup_for_start_match(&self, bf: &HashMap<String, BotFolder>) -> Result<Self, MapSetupError> {
         let mut new = self.clone();
 
         if let MapType::Custom(path) = &mut new.map {
-            *path = convert_to_path(path, bf).ok_or_else(|| {
-                let err = format!("Failed to find custom map {path}");
-                ccprintln(window, &err);
-                err
-            })?;
+            *path = convert_to_path(path, bf).ok_or_else(|| MapSetupError(path.clone()))?;
         }
 
         Ok(new)
@@ -384,7 +393,7 @@ impl PackageResult {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct MissingPackagesUpdate {
     pub index: usize,
     pub warn: Option<String>,

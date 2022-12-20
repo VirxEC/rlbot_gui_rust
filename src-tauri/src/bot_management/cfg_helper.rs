@@ -3,6 +3,8 @@ use std::path::Path;
 use thiserror::Error;
 use tokio::fs as async_fs;
 
+use crate::impl_serialize_from_display;
+
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("Could not load cfg: {0}")]
@@ -10,6 +12,8 @@ pub enum Error {
     #[error("I/O error when managing cfg: {0}")]
     Io(#[from] std::io::Error),
 }
+
+impl_serialize_from_display!(Error);
 
 /// Load a CFG file synchronously, returns a description of any errors if unable to do so
 ///
