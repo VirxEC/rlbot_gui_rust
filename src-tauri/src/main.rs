@@ -493,6 +493,10 @@ fn try_emit_signal<S: Serialize + Clone>(window: &Window, signal: &str, payload:
 }
 
 fn emit_console_text_emit_queue(window: &Window, mut updates: Vec<ConsoleTextUpdate>) -> Result<(), InternalConsoleError> {
+    if updates.is_empty() {
+        return Ok(());
+    }
+
     // If an update is replace_last, then remove the previous update.
     let mut i = 1;
     while i < updates.len() {
@@ -589,6 +593,7 @@ fn gui_setup(app: &mut App) -> Result<(), Box<dyn StdError>> {
     thread::spawn(move || loop {
         thread::sleep(Duration::from_secs_f32(1. / 60.));
         let updates = emit_receiver.try_iter().collect();
+
         if let Err(e) = emit_console_text_emit_queue(&window3, updates) {
             ccprintln(&window3, e.to_string());
         }
