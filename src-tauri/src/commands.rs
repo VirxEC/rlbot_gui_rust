@@ -18,6 +18,7 @@ use crate::{
     stories::{Bot, BotType, Challenge, City, Script},
     *,
 };
+use flate2::{write::GzEncoder, Compression};
 use futures_util::StreamExt;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use std::{
@@ -112,7 +113,7 @@ const PACKAGES: [&str; 9] = [
     "numba<0.56",
     "selenium",
     "rlbot==1.*",
-    "rlbot_smh==1.*",
+    "rlbot_smh>=1.0.13",
 ];
 
 /// Apply version constraints to the given package name.
@@ -557,7 +558,7 @@ impl_serialize_from_display!(MatchHandlerError);
 ///
 /// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
 fn create_match_handler<S: AsRef<OsStr>>(use_pipe: bool, python_path: S) -> Result<(String, (Child, ChildStdin)), MatchHandlerError> {
-    let mut child = get_maybe_capture_command(&python_path, ["-u", "-c", "from rlbot_smh.match_handler import listen; listen()"], use_pipe)?
+    let mut child = get_maybe_capture_command(&python_path, ["-u", "-c", "from rlbot_smh.match_handler import listen; listen(is_raw_json=False)"], use_pipe)?
         .stdin(Stdio::piped())
         .spawn()?;
 
@@ -569,6 +570,13 @@ enum CreateHandler {
     /// The bool is whether is not a pipe should be attached to the process
     Yes(bool),
     No,
+}
+
+/// Use flate2 to encode a string with gzip then encode the binary with base64 back into a string
+fn gzip_encode(s: String) -> Result<String, MatchHandlerError> {
+    let mut e = GzEncoder::new(Vec::new(), Compression::best());
+    e.write_all(s.as_bytes())?;
+    Ok(base64::encode(e.finish()?))
 }
 
 /// Send a command to the match handler
@@ -601,7 +609,8 @@ fn issue_match_handler_command<S: AsRef<OsStr>>(
         create_handler = CreateHandler::No;
     }
 
-    let command = format!("{} | \n", command_parts.join(" | "));
+    let command = gzip_encode(format!("{} | \n", command_parts.join(" | ")))?;
+    print!("Issuing command: {command}");
     let (_, stdin) = match_handler_stdin.as_mut().ok_or(MatchHandlerError::NoStdin)?;
 
     if stdin.write_all(command.as_bytes()).is_err() {
@@ -658,6 +667,27 @@ async fn pre_start_match(window: &Window) -> Result<(), MatchInteractionError> {
     Ok(())
 }
 
+async fn get_start_match_args_arr(window: &Window, bot_list: Vec<TeamBotBundle>, match_settings: MiniMatchConfig) -> Result<[String; 6], MatchInteractionError> {
+    let launcher_settings = LauncherConfig::load(window).await;
+    let match_settings = match_settings.setup_for_start_match(&BOT_FOLDER_SETTINGS.read().await.folders)?;
+
+    Ok([
+        "start_match".to_owned(),
+        serde_json::to_string(&bot_list)?,
+        serde_json::to_string(&match_settings)?,
+        launcher_settings.preferred_launcher,
+        launcher_settings.use_login_tricks.to_string(),
+        launcher_settings.rocket_league_exe_path.unwrap_or_default(),
+    ])
+}
+
+#[tauri::command]
+pub async fn get_start_match_arguments(window: Window, bot_list: Vec<TeamBotBundle>, match_settings: MiniMatchConfig) -> Result<String, MatchInteractionError> {
+    let raw_string = format!("{} | ", get_start_match_args_arr(&window, bot_list, match_settings).await?.join(" | "));
+    println!("Raw JSON command: {raw_string}");
+    Ok(gzip_encode(raw_string)?)
+}
+
 /// Starts a match via the match handler with the given settings
 ///
 /// # Arguments
@@ -668,19 +698,7 @@ async fn pre_start_match(window: &Window) -> Result<(), MatchInteractionError> {
 async fn start_match_helper(window: &Window, bot_list: Vec<TeamBotBundle>, match_settings: MiniMatchConfig, use_pipe: bool) -> Result<(), MatchInteractionError> {
     pre_start_match(window).await?;
 
-    let launcher_settings = LauncherConfig::load(window).await;
-    let match_settings = match_settings.setup_for_start_match(&BOT_FOLDER_SETTINGS.read().await.folders)?;
-
-    let args = [
-        "start_match".to_owned(),
-        serde_json::to_string(&bot_list)?.as_str().to_owned(),
-        serde_json::to_string(&match_settings)?.as_str().to_owned(),
-        launcher_settings.preferred_launcher,
-        launcher_settings.use_login_tricks.to_string(),
-        launcher_settings.rocket_league_exe_path.unwrap_or_default(),
-    ];
-
-    println!("Issuing command: {} | ", args.join(" | "));
+    let args = get_start_match_args_arr(window, bot_list, match_settings).await?;
 
     issue_match_handler_command(window, &args, CreateHandler::Yes(use_pipe), &*PYTHON_PATH.read().await)?;
 

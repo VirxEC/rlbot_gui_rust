@@ -751,6 +751,7 @@ fn main() {
             get_selected_tab,
             set_selected_tab,
             shut_down_match_handler,
+            get_start_match_arguments,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
