@@ -92,6 +92,9 @@ export default {
         <b-dropdown-item @click="pickAndEditAppearanceFile()">
           Edit appearance config file
         </b-dropdown-item>
+        <b-dropdown-item @click="showLaunchArguments()">
+          Show match launch arguments
+        </b-dropdown-item>
         <b-dropdown-item @click="uploadLog()">
           Upload GUI log for help
         </b-dropdown-item>
@@ -453,6 +456,11 @@ export default {
       <p>Please copy the link and share it in the #rlbot-help channel in the RLBot Discord server:</p>
       <p><a href="https://discord.gg/zbaAKPt" target="_blank">https://discord.gg/zbaAKPt</a></p>
     </b-modal>
+
+    <b-modal title="Internal match launch arguments" id="launch-arguments" size="lg" centered ok-only>
+      <p><b>This is based on your current match configuration in the gui:</b></p>
+      <textarea type="text" :value="launchArguments" readonly style="width: 100%; height: 30vh">
+    </b-modal>
   </div>
 
   </b-container>
@@ -534,6 +542,7 @@ export default {
       allowMiniConsoleClose: false,
       errorStartingMatchContent: "",
       logUploadUrl: "",
+      launchArguments: "",
       updateDownloadProgressPercent: listen(
         "update-download-progress",
         (event) => {
@@ -561,6 +570,34 @@ export default {
   },
 
   methods: {
+    showLaunchArguments: function () {
+      const blueBots = this.blueTeam.map((bot) => {
+        return {
+          name: bot.name,
+          team: 0,
+          runnable_type: bot.runnable_type,
+          skill: bot.skill ? bot.skill : 1,
+          path: bot.path,
+        };
+      });
+      const orangeBots = this.orangeTeam.map((bot) => {
+        return {
+          name: bot.name,
+          team: 1,
+          runnable_type: bot.runnable_type,
+          skill: bot.skill ? bot.skill : 1,
+          path: bot.path,
+        };
+      });
+
+      invoke("get_start_match_arguments", {
+        botList: blueBots.concat(orangeBots),
+        matchSettings: this.matchSettings,
+      }).then((args) => {
+        this.launchArguments = args;
+        this.$bvModal.show("launch-arguments");
+      });
+    },
     shutDownMatchHandler: function () {
       invoke("shut_down_match_handler");
     },
