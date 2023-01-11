@@ -578,7 +578,7 @@ enum CreateHandler {
 }
 
 /// Use flate2 to encode a string with gzip then encode the binary with base64 back into a string
-fn gzip_encode(s: String) -> Result<String, MatchHandlerError> {
+fn gzip_encode(s: &str) -> Result<String, MatchHandlerError> {
     let mut e = GzEncoder::new(Vec::new(), Compression::best());
     e.write_all(s.as_bytes())?;
     Ok(BASE64_STANDARD.encode(e.finish()?))
@@ -614,7 +614,7 @@ fn issue_match_handler_command<S: AsRef<OsStr>>(
         create_handler = CreateHandler::No;
     }
 
-    let command = gzip_encode(format!("{} | \n", command_parts.join(" | ")))?;
+    let command = gzip_encode(&format!("{} | \n", command_parts.join(" | ")))?;
     print!("Issuing command: {command}");
     let (_, stdin) = match_handler_stdin.as_mut().ok_or(MatchHandlerError::NoStdin)?;
 
@@ -690,7 +690,7 @@ async fn get_start_match_args_arr(window: &Window, bot_list: Vec<TeamBotBundle>,
 pub async fn get_start_match_arguments(window: Window, bot_list: Vec<TeamBotBundle>, match_settings: MiniMatchConfig) -> Result<String, MatchInteractionError> {
     let raw_string = format!("{} | ", get_start_match_args_arr(&window, bot_list, match_settings).await?.join(" | "));
     println!("Raw JSON command: {raw_string}");
-    Ok(gzip_encode(raw_string)?)
+    Ok(gzip_encode(&raw_string)?)
 }
 
 /// Starts a match via the match handler with the given settings

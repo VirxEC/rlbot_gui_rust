@@ -1,3 +1,4 @@
+#![warn(clippy::pedantic)]
 #![allow(clippy::wildcard_imports)]
 
 mod bot_management;

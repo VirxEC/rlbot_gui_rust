@@ -277,9 +277,7 @@ impl BotConfigBundle {
         let config_path_str = config_path.display().to_string();
         let conf = load_cfg_sync(config_path)?;
 
-        let name = if let Some(the_name) = conf.get(BOT_CONFIG_MODULE_HEADER, NAME_KEY) {
-            the_name
-        } else {
+        let Some(name) = conf.get(BOT_CONFIG_MODULE_HEADER, NAME_KEY) else {
             return Err(RLBotCfgParseError::NoName(config_path_str));
         };
 
