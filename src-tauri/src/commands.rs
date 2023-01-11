@@ -18,6 +18,7 @@ use crate::{
     stories::{Bot, BotType, Challenge, City, Script},
     *,
 };
+use base64::{prelude::BASE64_STANDARD, Engine};
 use flate2::{write::GzEncoder, Compression};
 use futures_util::StreamExt;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
@@ -558,9 +559,13 @@ impl_serialize_from_display!(MatchHandlerError);
 ///
 /// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
 fn create_match_handler<S: AsRef<OsStr>>(use_pipe: bool, python_path: S) -> Result<(String, (Child, ChildStdin)), MatchHandlerError> {
-    let mut child = get_maybe_capture_command(&python_path, ["-u", "-c", "from rlbot_smh.match_handler import listen; listen(is_raw_json=False)"], use_pipe)?
-        .stdin(Stdio::piped())
-        .spawn()?;
+    let mut child = get_maybe_capture_command(
+        &python_path,
+        ["-u", "-c", "from rlbot_smh.match_handler import listen; listen(is_raw_json=False)"],
+        use_pipe,
+    )?
+    .stdin(Stdio::piped())
+    .spawn()?;
 
     let stdin = child.stdin.take().ok_or(MatchHandlerError::NoStdin)?;
     Ok((python_path.as_ref().to_string_lossy().to_string(), (child, stdin)))
@@ -576,7 +581,7 @@ enum CreateHandler {
 fn gzip_encode(s: String) -> Result<String, MatchHandlerError> {
     let mut e = GzEncoder::new(Vec::new(), Compression::best());
     e.write_all(s.as_bytes())?;
-    Ok(base64::encode(e.finish()?))
+    Ok(BASE64_STANDARD.encode(e.finish()?))
 }
 
 /// Send a command to the match handler

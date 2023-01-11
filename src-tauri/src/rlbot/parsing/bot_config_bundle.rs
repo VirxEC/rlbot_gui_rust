@@ -6,6 +6,7 @@ use crate::{
     ccprintln, get_command_status,
     rlbot::agents::{base_script::SCRIPT_FILE_KEY, runnable::Runnable},
 };
+use base64::{prelude::BASE64_STANDARD, Engine};
 use configparser::ini::Ini;
 use imghdr::Type;
 use serde::{Deserialize, Serialize};
@@ -123,7 +124,8 @@ pub fn to_base64(path: &str) -> Option<String> {
     let mut vec = Vec::new();
     file.read_to_end(&mut vec).ok()?;
 
-    get_file_extension(&vec).map(|extension| format!("data:image/{extension};base64,{}", base64::encode(vec).replace("\r\n", "")))
+    let encoded_string = BASE64_STANDARD.encode(&vec).replace("\r\n", "");
+    get_file_extension(&vec).map(|extension| format!("data:image/{extension};base64,{encoded_string}"))
 }
 
 #[derive(Debug, Error)]
