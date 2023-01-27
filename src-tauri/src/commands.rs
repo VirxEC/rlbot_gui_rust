@@ -609,16 +609,20 @@ fn issue_match_handler_command<S: AsRef<OsStr>>(
         ccprintln(window, "Starting match handler!");
         let (py_path, stdin) = create_match_handler(use_pipe, &python_path)?;
 
+        ccprintln!(window, "Waiting for match handler to start up...");
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        ccprintln!(window, "Done waiting for match handler to start up");
+
         *match_handler_stdin = Some(stdin);
         *used_py_path = py_path;
         create_handler = CreateHandler::No;
     }
 
-    let command = gzip_encode(&format!("{} | \n", command_parts.join(" | ")))?;
-    print!("Issuing command: {command}");
+    let command = gzip_encode(&format!("{} | ", command_parts.join(" | ")))?;
+    println!("Issuing command: {command}");
     let (_, stdin) = match_handler_stdin.as_mut().ok_or(MatchHandlerError::NoStdin)?;
 
-    if stdin.write_all(command.as_bytes()).is_err() {
+    if stdin.write_fmt(format_args!("{command}\n")).is_err() {
         drop(match_handler_stdin.take());
         if matches!(create_handler, CreateHandler::Yes(_)) {
             ccprintln(window, "Failed to write to match handler, trying to restart...");
@@ -627,6 +631,7 @@ fn issue_match_handler_command<S: AsRef<OsStr>>(
             Err(MatchHandlerError::NoWrite)
         }
     } else {
+        stdin.flush()?;
         Ok(())
     }
 }
