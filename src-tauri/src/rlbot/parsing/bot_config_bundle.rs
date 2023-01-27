@@ -6,6 +6,7 @@ use crate::{
     ccprintln, get_command_status,
     rlbot::agents::{base_script::SCRIPT_FILE_KEY, runnable::Runnable},
 };
+use base64::{prelude::BASE64_STANDARD, Engine};
 use configparser::ini::Ini;
 use imghdr::Type;
 use serde::{Deserialize, Serialize};
@@ -123,7 +124,8 @@ pub fn to_base64(path: &str) -> Option<String> {
     let mut vec = Vec::new();
     file.read_to_end(&mut vec).ok()?;
 
-    get_file_extension(&vec).map(|extension| format!("data:image/{extension};base64,{}", base64::encode(vec).replace("\r\n", "")))
+    let encoded_string = BASE64_STANDARD.encode(&vec).replace("\r\n", "");
+    get_file_extension(&vec).map(|extension| format!("data:image/{extension};base64,{encoded_string}"))
 }
 
 #[derive(Debug, Error)]
@@ -275,9 +277,7 @@ impl BotConfigBundle {
         let config_path_str = config_path.display().to_string();
         let conf = load_cfg_sync(config_path)?;
 
-        let name = if let Some(the_name) = conf.get(BOT_CONFIG_MODULE_HEADER, NAME_KEY) {
-            the_name
-        } else {
+        let Some(name) = conf.get(BOT_CONFIG_MODULE_HEADER, NAME_KEY) else {
             return Err(RLBotCfgParseError::NoName(config_path_str));
         };
 

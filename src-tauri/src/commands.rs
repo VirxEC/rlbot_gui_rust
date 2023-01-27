@@ -18,6 +18,7 @@ use crate::{
     stories::{Bot, BotType, Challenge, City, Script},
     *,
 };
+use base64::{prelude::BASE64_STANDARD, Engine};
 use flate2::{write::GzEncoder, Compression};
 use futures_util::StreamExt;
 use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
@@ -558,9 +559,13 @@ impl_serialize_from_display!(MatchHandlerError);
 ///
 /// * `window` - A reference to the GUI, obtained from a `#[tauri::command]` function
 fn create_match_handler<S: AsRef<OsStr>>(use_pipe: bool, python_path: S) -> Result<(String, (Child, ChildStdin)), MatchHandlerError> {
-    let mut child = get_maybe_capture_command(&python_path, ["-u", "-c", "from rlbot_smh.match_handler import listen; listen(is_raw_json=False)"], use_pipe)?
-        .stdin(Stdio::piped())
-        .spawn()?;
+    let mut child = get_maybe_capture_command(
+        &python_path,
+        ["-u", "-c", "from rlbot_smh.match_handler import listen; listen(is_raw_json=False)"],
+        use_pipe,
+    )?
+    .stdin(Stdio::piped())
+    .spawn()?;
 
     let stdin = child.stdin.take().ok_or(MatchHandlerError::NoStdin)?;
     Ok((python_path.as_ref().to_string_lossy().to_string(), (child, stdin)))
@@ -573,10 +578,10 @@ enum CreateHandler {
 }
 
 /// Use flate2 to encode a string with gzip then encode the binary with base64 back into a string
-fn gzip_encode(s: String) -> Result<String, MatchHandlerError> {
+fn gzip_encode(s: &str) -> Result<String, MatchHandlerError> {
     let mut e = GzEncoder::new(Vec::new(), Compression::best());
     e.write_all(s.as_bytes())?;
-    Ok(base64::encode(e.finish()?))
+    Ok(BASE64_STANDARD.encode(e.finish()?))
 }
 
 /// Send a command to the match handler
@@ -604,16 +609,20 @@ fn issue_match_handler_command<S: AsRef<OsStr>>(
         ccprintln(window, "Starting match handler!");
         let (py_path, stdin) = create_match_handler(use_pipe, &python_path)?;
 
+        ccprintln!(window, "Waiting for match handler to start up...");
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        ccprintln!(window, "Done waiting for match handler to start up");
+
         *match_handler_stdin = Some(stdin);
         *used_py_path = py_path;
         create_handler = CreateHandler::No;
     }
 
-    let command = gzip_encode(format!("{} | \n", command_parts.join(" | ")))?;
-    print!("Issuing command: {command}");
+    let command = gzip_encode(&format!("{} | ", command_parts.join(" | ")))?;
+    println!("Issuing command: {command}");
     let (_, stdin) = match_handler_stdin.as_mut().ok_or(MatchHandlerError::NoStdin)?;
 
-    if stdin.write_all(command.as_bytes()).is_err() {
+    if stdin.write_fmt(format_args!("{command}\n")).is_err() {
         drop(match_handler_stdin.take());
         if matches!(create_handler, CreateHandler::Yes(_)) {
             ccprintln(window, "Failed to write to match handler, trying to restart...");
@@ -622,6 +631,7 @@ fn issue_match_handler_command<S: AsRef<OsStr>>(
             Err(MatchHandlerError::NoWrite)
         }
     } else {
+        stdin.flush()?;
         Ok(())
     }
 }
@@ -685,7 +695,7 @@ async fn get_start_match_args_arr(window: &Window, bot_list: Vec<TeamBotBundle>,
 pub async fn get_start_match_arguments(window: Window, bot_list: Vec<TeamBotBundle>, match_settings: MiniMatchConfig) -> Result<String, MatchInteractionError> {
     let raw_string = format!("{} | ", get_start_match_args_arr(&window, bot_list, match_settings).await?.join(" | "));
     println!("Raw JSON command: {raw_string}");
-    Ok(gzip_encode(raw_string)?)
+    Ok(gzip_encode(&raw_string)?)
 }
 
 /// Starts a match via the match handler with the given settings
