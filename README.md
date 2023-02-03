@@ -11,7 +11,7 @@ Works on Windows and partially works on Linux.
 ## Useful program arguments for bot devs
 
 - `--debug`: Tricks JavaScript into think that the GUI was compiled in debug mode (won't check for updates on launch)
-- `--console`: (Windows only) will spawn a console window that will output all text, and will inherite console if available
+- `--console`: (Windows only) will spawn a console window that will output all text, and will inherit console if available
 - `--no-pipe`: Auto-enables `--console`, on Windows; Won't use the in-GUI console for RLBot-related things, but instead directly to a real console (work-around for some print flushing issues in Python & allowing for maximum print-spam)
 
 ### Screenshots
@@ -25,16 +25,16 @@ recruit teammates and purchase upgrades for your car!
 
 ![StoryMode](screenshots/story-mode.png)
 
-## Features & fixes unqiue to the Rust port
+## Features & fixes unique to the Rust port
 
 ### Back-portable
 
 - Add new bots into their proper place in the bot list instead of the end
-- Defered bundle logo loading and missing python package checking
+- Deferred bundle logo loading and missing python package checking
 - Better error messages when downloading or upgrading the botpack
 - Letting the user close Rocket League in between matches without restarting the GUI
 - Full self-updating of the GUI: Implemented for Windows and Ubuntu users & reserved spot on AUR
-- Prints get dumped asyncronously to log.txt in content folder
+- Prints get dumped asynchronously to log.txt in content folder
 - "Upload GUI log for help" button in Menu (top right) which uploads the log.txt file to HasteBin
 - DotNet runtime detection for C# bots to display warning message
 - The selected bot tab persists between launches
@@ -60,10 +60,10 @@ It will put "RLBotGUI" in your Windows start menu and desktop.
 ### Debian-based Linux distros
 
 1. Add the public GPG key of the ppa to your system: `wget -O- https://virxec.github.io/rlbot_gui_rust_apt/apt-repo/pgp-key.public | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/rl-bot-gui.gpg`
-  - NOTE: You might not see the prompmt, but you may need to enter in your sudo password.
-  - Deprecated method: `wget -O- https://virxec.github.io/rlbot_gui_rust_apt/apt-repo/pgp-key.public | sudo apt-key add -`
+   - NOTE: You might not see the prompt, but you may need to enter in your sudo password.
+   - Deprecated method: `wget -O- https://virxec.github.io/rlbot_gui_rust_apt/apt-repo/pgp-key.public | sudo apt-key add -`
 2. Add the repository to your system: `echo "deb [arch=amd64] https://virxec.github.io/rlbot_gui_rust_apt/apt-repo/ stable main" | sudo tee /etc/apt/sources.list.d/rl-bot-gui.list > /dev/null`
-  - Deprecated method: `sudo add-apt-repository 'deb [arch=amd64] https://virxec.github.io/rlbot_gui_rust_apt/apt-repo/ stable main'`
+   - Deprecated method: `sudo add-apt-repository 'deb [arch=amd64] https://virxec.github.io/rlbot_gui_rust_apt/apt-repo/ stable main'`
 3. Refresh app list: `sudo apt update`
 4. Install the GUI: `sudo apt install rl-bot-gui`
 
@@ -111,7 +111,7 @@ You're going to have to compile the GUI yourself:
 ### Prerequisites
 
 - 16gb of RAM *(minimum 8gb required, might not be able to have other apps open while compiling)*
-- 64gb+ free space *(asumming fresh Windows install with no build tools, Rocket League, git, IDE, etc)*
+- 64gb+ free space *(assuming fresh Windows install with no build tools, Rocket League, git, IDE, etc)*
 - For non-Windows: SSD *(debug binary is around 500mb on Linux)*
 
 **Windows**

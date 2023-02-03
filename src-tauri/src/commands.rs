@@ -741,8 +741,9 @@ pub async fn shut_down_match_handler() -> Result<(), MatchHandlerError> {
 
     // Send the command to the match handler to shut down
     if let (_, Some((_, stdin))) = &mut *handler_lock {
-        const KILL_BOTS_COMMAND: &[u8] = "shut_down | \n".as_bytes();
-        stdin.write_all(KILL_BOTS_COMMAND)?;
+        let kill_bots_command = gzip_encode("shut_down | ")?;
+        stdin.write_fmt(format_args!("{kill_bots_command}\n"))?;
+        stdin.flush()?;
     }
 
     // Drop stdin
