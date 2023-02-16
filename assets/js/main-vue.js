@@ -211,7 +211,8 @@ export default {
 
         <span style="flex-grow: 1"></span>
 
-        <b-button @click="startMatch()" variant="success" size="lg" :disabled="matchStarting" class="start-match-btn" style="margin-top: -10px;">
+        <b-button @click="showEvents()" variant="info" size="lg">Events</b-button>
+        <b-button @click="startMatch()" variant="success" size="lg" :disabled="matchStarting" class="start-match-btn ml-2" style="margin-top: -10px;">
           <span v-if="matchStarting">Starting match</span>
           <span v-else-if="gameAlreadyLaunched">Start another match</span>
           <span v-else>Launch Rocket League<br>and start match</span>
@@ -459,7 +460,19 @@ export default {
 
     <b-modal title="Internal match launch arguments" id="launch-arguments" size="lg" centered ok-only>
       <p><b>This is based on your current match configuration in the gui:</b></p>
-      <textarea type="text" :value="launchArguments" readonly style="width: 100%; height: 30vh">
+      <textarea type="text" :value="launchArguments" readonly style="width: 100%; height: 30vh"></textarea>
+    </b-modal>
+
+    <b-modal title="Community Events" id="community-events" size="lg" centered ok-only>
+      <div v-if="communityEvents.length == 0">
+        <p>There are no community events at this time.</p>
+      </div>
+      <div v-else v-for="event in communityEvents">
+        <h3>{{ event.name }}</h3>
+        <!-- localize date/time and how long it will be until it starts -->
+        <p>Will take on place on {{ event.time }}, which is in {{ event.timeUntil }}</p>
+        <p>Will be hosted at <a :href="event.location" target="_blank">{{ event.location }}</a></p>
+      </div>
     </b-modal>
   </div>
 
@@ -543,6 +556,7 @@ export default {
       errorStartingMatchContent: "",
       logUploadUrl: "",
       launchArguments: "",
+      communityEvents: [],
       updateDownloadProgressPercent: listen(
         "update-download-progress",
         (event) => {
@@ -570,6 +584,138 @@ export default {
   },
 
   methods: {
+    // def date_time_check(today, event):
+    //   names = event["summary"]
+    //   start = event["start"]["dateTime"]
+    //   new_date = datetime.datetime.strptime(start, FORMAT)
+    //   raw_date = new_date.timestamp()
+    //   try:
+    //       recurrence = event["recurrence"][0].split(";")
+    //       rec_type = recurrence[0].split("=")[1]
+    //       interval = recurrence[2].split("=")[1]
+    //       end_date_type = recurrence[2].split("=")[0]
+    //       end_date_raw = recurrence[2].split("=")[1]
+    //       if end_date_type == "COUNT":
+    //           if rec_type == "WEEKLY":
+    //               end_date = new_date + datetime.timedelta(days=7*int(interval)*int(end_date_raw))
+    //           elif rec_type == "MONTHLY":
+    //               end_date = new_date + datetime.timedelta(weeks=4*int(interval)*int(end_date_raw))
+    //       else:
+    //           end_date = datetime.datetime.strptime(end_date_raw, FORMAT3)
+    //       if rec_type == "WEEKLY":
+    //           while new_date <= end_date:
+    //               if new_date > today:
+    //                   break
+    //               new_date += datetime.timedelta(days=7)
+    //       elif rec_type == "MONTHLY":
+    //           while new_date <= end_date:
+    //               if new_date > today:
+    //                   break
+    //               new_date += datetime.timedelta(weeks=4)
+    //   except Exception as e:
+    //       print("Error checking recurrence:" + str(e))
+    //   time_untils = date.duration(new_date, now=today, precision=3)
+    //   return names, new_date, time_untils, raw_date
+    dateTimeCheck: function (today, event) {
+      const names = event.summary;
+      const start = event.start.dateTime;
+      let new_date = new Date(start);
+      const raw_date = new_date.getTime();
+      try {
+        const recurrence = event.recurrence[0].split(";");
+        const rec_type = recurrence[0].split("=")[1];
+        const interval = recurrence[2].split("=")[1];
+        const end_date_type = recurrence[2].split("=")[0];
+        const end_date_raw = recurrence[2].split("=")[1];
+        let end_date = new Date(new_date);
+        if (end_date_type == "COUNT") {
+          if (rec_type == "WEEKLY") {
+            end_date.setDate(new_date.getDate() + 7 * interval * end_date_raw);
+          } else if (rec_type == "MONTHLY") {
+            end_date.setDate(new_date.getDate() + 4 * interval * end_date_raw);
+          }
+        } else {
+          end_date.setDate(end_date_raw);
+        }
+        if (rec_type == "WEEKLY") {
+          while (new_date <= end_date) {
+            if (new_date > today) {
+              break;
+            }
+            new_date.setDate(new_date.getDate() + 7);
+          }
+        } else if (rec_type == "MONTHLY") {
+          while (new_date <= end_date) {
+            if (new_date > today) {
+              break;
+            }
+            new_date.setDate(new_date.getDate() + 4);
+          }
+        }
+      }
+      catch (e) {
+        console.log("Error checking recurrence:" + e);
+      }
+
+      const time_untils = new_date.getTime() - today.getTime();
+      return [names, new_date, time_untils, raw_date];
+    },
+    fetchEvents: function () {
+      const api_key = "AIzaSyBQ40UqlMPexzWxTNd7EYtTrkoFF_DqpqM";
+      const to_check = new Date().toISOString();
+      const url = `https://www.googleapis.com/calendar/v3/calendars/rlbotofficial@gmail.com/events?maxResults=10&timeMin=${to_check}&key=${api_key}`;
+
+      fetch(url).then((response) => {
+        response.json().then((data) => {
+          console.log(data.items);
+          this.communityEvents = [];
+
+          // compute dates and times
+          for (let event of data.items) {
+            let [names, new_date, time_untils, raw_date] = this.dateTimeCheck(new Date(), event);
+            console.log(names, new_date, time_untils, raw_date)
+            // time_untils is the time until the event in milliseconds
+            // convert this to something human readable, like "in 2 days"
+            let days = Math.floor(time_untils / (1000 * 60 * 60 * 24));
+            let hours = Math.floor(
+              (time_untils % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
+            );
+            let minutes = Math.floor(
+              (time_untils % (1000 * 60 * 60)) / (1000 * 60)
+            );
+            let format = "";
+            if (days > 0) {
+              format += days + "d ";
+            }
+            if (hours > 0) {
+              format += hours + "h ";
+            }
+            if (minutes > 0) {
+              format += minutes + "m";
+            }
+
+            this.communityEvents.push({
+              name: names,
+              location: event.location,
+              time: new_date.toLocaleString(),
+              timeUntil: format,
+              // timeUntil: timeUntil.toLocaleString(),
+            });
+          }
+
+          // sort community events by start time
+          this.communityEvents.sort((a, b) => {
+            return new Date(a.start) - new Date(b.start);
+          });
+
+          // only show the first 3
+          this.communityEvents = this.communityEvents.slice(0, 3);
+        });
+      });
+    },
+    showEvents: function () {
+      this.$bvModal.show("community-events");
+    },
     showLaunchArguments: function () {
       const blueBots = this.blueTeam.map((bot) => {
         return {
@@ -1309,6 +1455,8 @@ export default {
       invoke("get_python_path").then((path) => {
         this.python_path = path;
       });
+
+      this.fetchEvents();
 
       this.init = true;
     },
