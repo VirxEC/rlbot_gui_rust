@@ -3679,6 +3679,7 @@
 5755,SupersonicTrail,Product_TA ProductsDB.Products.ss_sharkfin,Shark Attack
 5756,Skin,Product_TA ProductsDB.Products.skin_grain_pittsburghknights_esports,Fennec: Pittsburgh Knights
 5757,Skin,Product_TA ProductsDB.Products.skin_grain_eunited_esports,Fennec: eUnited
+5759,GoalExplosion,Product_TA ProductsDB.Products.explosion_nfl,Super Bowl LVII
 5761,Boost,Product_TA ProductsDB.Products.boost_illgraph,Manganese
 5764,PremiumInventory,Product_TA ProductsDB.Products.CrateUnlocked_ChineseNewYear21,Golden Lantern '21
 5765,Blueprint,Product_TA ProductsDB.Products.BP_Series5,Season 2
@@ -5539,6 +5540,7 @@
 8391,GoalExplosion,Product_TA ProductsDB.Products.explosion_ekin2,Nike FC 2022
 8394,MusicStingers,Product_TA ProductsDB.Products.anthem_hh2022_03,Leatherface's Chainsaw
 8395,MusicStingers,Product_TA ProductsDB.Products.anthem_hh2022_04,Hello Zepp
+8396,Skin,Product_TA ProductsDB.Products.skin_octane_fbbnw,Octane: NFL Referee
 8397,Skin,Product_TA ProductsDB.Products.skin_Octane_hhdoll,Octane: Chucky Doll
 8398,MusicStingers,Product_TA ProductsDB.Products.anthem_hh2022_05,Halloween
 8399,MusicStingers,Product_TA ProductsDB.Products.anthem_fandf_03,Act A Fool
@@ -5737,8 +5739,13 @@
 8666,Skin,Product_TA ProductsDB.Products.skin_octane_williamsresolve_away,Octane: Resolve (Away)
 8667,Skin,Product_TA ProductsDB.Products.skin_octane_williamsresolve_home,Octane: Resolve (Home)
 8673,GoalExplosion,Product_TA ProductsDB.Products.Explosion_Esports_WilliamResolve_v2,Resolve
+8675,Skin,Product_TA ProductsDB.Products.skin_octane_gdbee,Octane: Sunniya
 8683,Wheels,Product_TA ProductsDB.Products.wheel_proto09_esports_tf,RL Esports 2022
+8686,PlayerAvatarBorder,Product_TA ProductsDB.Products.avatarborder_bh_tajfrancis,Parallel
+8687,PlayerBanner,Product_TA ProductsDB.Products.playerbanner_bh_tajfrancis,Parallel
 8689,PlayerBanner,Product_TA ProductsDB.Products.playerbanner_es_rles,RL Esports 2022
+8691,PlayerAvatarBorder,Product_TA ProductsDB.Products.avatarborder_bh_geneva,Sunniya
+8692,PlayerBanner,Product_TA ProductsDB.Products.playerbanner_bh_geneva,Sunniya
 8693,GoalExplosion,Product_TA ProductsDB.Products.Explosion_Esports_Tundra_v2,Tundra Esports
 8694,Wheels,Product_TA ProductsDB.Products.wheel_jetset,MR. PROFESSOR
 8695,PlayerAvatarBorder,Product_TA ProductsDB.Products.AvatarBorder_jetset,INSPECTION
@@ -5751,7 +5758,11 @@
 8704,PlayerBanner,Product_TA ProductsDB.Products.PlayerBanner_ES_Tundra,Tundra Esports
 8705,PlayerBanner,Product_TA ProductsDB.Products.PlayerBanner_jetset1,Cochise
 8706,PlayerBanner,Product_TA ProductsDB.Products.PlayerBanner_jetset2,POCKET ROCKET
+8707,Skin,Product_TA ProductsDB.Products.skin_octane_anthony,Octane: Yasuke
 8708,Skin,Product_TA ProductsDB.Products.skin_force_jetset,Breakout: Cochise
+8711,PlayerAvatarBorder,Product_TA ProductsDB.Products.avatarborder_bh_yasuke,Yasuke
+8712,PlayerBanner,Product_TA ProductsDB.Products.playerbanner_bh_yasuke,Yasuke
+8714,Skin,Product_TA ProductsDB.Products.skin_octane_taj,Octane: Parallel
 8715,Skin,Product_TA ProductsDB.Products.skin_grain_tundra_away,Fennec: Tundra Esports (Away)
 8716,Skin,Product_TA ProductsDB.Products.skin_grain_tundra_home,Fennec: Tundra Esports (Home)
 8717,Skin,Product_TA ProductsDB.Products.skin_musclecar_tundra_away,Dominus: Tundra Esports (Away)
@@ -5768,9 +5779,14 @@
 8738,ESportsTeam,Product_TA ProductsDB.Products.ESportsTeam_GenG,Gen.G
 8739,ESportsTeam,Product_TA ProductsDB.Products.ESportsTeam_Quadrant,Quadrant
 8740,ESportsTeam,Product_TA ProductsDB.Products.ESportsTeam_Tundra,Tundra Esports
+8743,Skin,Product_TA ProductsDB.Products.skin_grain_ballerbos,Fennec: Giant Killer
+8744,Skin,Product_TA ProductsDB.Products.skin_grain_ballercam,Fennec: Levelz Me
+8745,Skin,Product_TA ProductsDB.Products.skin_octane_ballermec,Octane: The Jet
+8758,MusicStingers,Product_TA ProductsDB.Products.anthem_champanthems_02,NFL Game Theme
 8759,MusicStingers,Product_TA ProductsDB.Products.album_anthem_neonnights_2023_ftcochise,Neon Nights 2023 ft. Cochise
 8760,MusicStingers,Product_TA ProductsDB.Products.anthem_cochise_longway,LONG WAY
 8761,MusicStingers,Product_TA ProductsDB.Products.anthem_cochise_pocketrocket,POCKET ROCKET
 8762,MusicStingers,Product_TA ProductsDB.Products.anthem_cochise_turnitup,TURN IT UP
+8763,MusicStingers,Product_TA ProductsDB.Products.anthem_fool_duality,Duality
 8801,ESportsTeam,Product_TA ProductsDB.Products.EsportsTeam_Resolve,Resolve
 8813,GoalExplosion,Product_TA ProductsDB.Products.Explosion_Esports_BDS_v2,Team BDS

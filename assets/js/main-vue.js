@@ -6,6 +6,7 @@ import MiniConsole from "./mini-console-vue.js";
 import MutatorField from "./mutator-field-vue.js";
 import ScriptCard from "./script-card-vue.js";
 import TeamCard from "./team-card-vue.js";
+import CommunityEvents from "./community-events-vue.js";
 
 const invoke = window.__TAURI__.invoke;
 const listen = window.__TAURI__.event.listen;
@@ -51,9 +52,18 @@ export default {
 
     <b-navbar-nav class="ml-auto">
       <b-spinner v-if="showProgressSpinner" variant="success" label="Spinning" class="mr-2"></b-spinner>
+
       <b-button @click="$router.push('/console')" variant="dark" class="ml-2">
         Console
       </b-button>
+      
+      <b-button @click="$bvModal.show('community-events')" variant="dark" class="ml-2">
+        Events
+        <b-badge v-if="$refs.communityEvents?.events.length > 0" variant="danger">
+          {{ $refs.communityEvents.events.length }}
+        </b-badge>
+      </b-button>
+
       <span id="sandbox-button-wrapper">
         <b-button
           @click="$router.replace('/sandbox')" variant="dark" class="ml-2"
@@ -459,8 +469,10 @@ export default {
 
     <b-modal title="Internal match launch arguments" id="launch-arguments" size="lg" centered ok-only>
       <p><b>This is based on your current match configuration in the gui:</b></p>
-      <textarea type="text" :value="launchArguments" readonly style="width: 100%; height: 30vh">
+      <textarea type="text" :value="launchArguments" readonly style="width: 100%; height: 30vh"></textarea>
     </b-modal>
+    
+    <community-events ref="communityEvents"/>
   </div>
 
   </b-container>
@@ -475,6 +487,7 @@ export default {
     "team-card": TeamCard,
     "launcher-preference-modal": LauncherPreferenceModal,
     "mini-console": MiniConsole,
+    "community-events": CommunityEvents,
   },
   data() {
     return {
@@ -543,6 +556,7 @@ export default {
       errorStartingMatchContent: "",
       logUploadUrl: "",
       launchArguments: "",
+      communityEvents: [],
       updateDownloadProgressPercent: listen(
         "update-download-progress",
         (event) => {
