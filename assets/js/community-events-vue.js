@@ -8,7 +8,7 @@ export default {
 			<div v-else v-for="event in events">
 				<h3>{{ event.name }}</h3>
           <p v-if="event.timeUntilMs > 0" class="mb-1">
-              <b-icon icon="alarm"/> Starts in <b>{{ event.timeUntil }}</b> ({{ event.time }})
+              <b-icon icon="calendar-plus"/> Starts in <b>{{ event.timeUntil }}</b> ({{ event.time }})
           </p>
           <p v-else class="mb-1">
               <b-icon icon="alarm"/> Started <b>{{ event.timeUntil }}</b> ago, but you can still join!
