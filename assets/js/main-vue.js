@@ -60,7 +60,14 @@ export default {
       <b-button @click="$bvModal.show('community-events')" variant="dark" class="ml-2">
         Events
         <b-badge v-if="$refs.communityEvents?.events.length > 0" variant="danger">
-          {{ $refs.communityEvents.events.length }}
+          <span v-if="$refs.communityEvents?.eventsNow">
+            <b-icon icon="alarm"/>
+            {{ $refs.communityEvents.eventsNow }}
+            </span>
+          <span v-if="$refs.communityEvents?.eventsFuture">
+            <b-icon icon="calendar-plus"/>
+            {{ $refs.communityEvents.eventsFuture }}
+          </span>
         </b-badge>
       </b-button>
 
@@ -1272,6 +1279,8 @@ export default {
           return;
         }
 
+        invoke("get_match_settings").then(this.matchSettingsReceived);
+
         if (!this.init) {
           invoke("is_debug_build").then((isDebugBuild) => {
             if (!isDebugBuild && !this.$route.query.check_for_updates) {
@@ -1318,7 +1327,6 @@ export default {
         });
       });
 
-      invoke("get_match_settings").then(this.matchSettingsReceived);
       invoke("get_recommendations").then(this.recommendationsReceived);
       invoke("get_python_path").then((path) => {
         this.python_path = path;
