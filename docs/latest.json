@@ -1,9 +1,9 @@
 { 
-  "name": "v1.0.41",
+  "name": "v1.0.42",
   "platforms": {
     "windows-x86_64": {
-      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSRUhsNHpKd29ueXZVclpHMEt0L25idFo5bTUrZWowWHp1TlZRcmNyRytTTlowNDNkL1lWM1BvZ0l1MXd6NkVpbStMYi93UzJISTFQVzBKZTBOUUR2cHVRWkQwWGQ1YWdvPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNjc3NjM5NjgzCWZpbGU6UkxCb3RHVUlfMS4wLjQxX3g2NF9lbi1VUy5tc2kuemlwClJUNi9kS0xkUTNiU0VvVTI0WFFMVk4vU2J6Wk5Xb2tGbmo1QzhmR0dJQ3VCMDRhODM3YVVvbmZ1NFFuNEUyeWVHSjlzS2FXa0c4OGc3eDRGVnhSNUN3PT0K",
-      "url":"https://github.com/VirxEC/rlbot_gui_rust/releases/download/v1.0.41/RLBotGUI_1.0.41_x64_en-US.msi.zip"
+      "signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVSRUhsNHpKd29ueW90Z2I1YlBHTFVkSWcxRzJmMDljMDl4Uk5paUlycUlqQkt3bWRnMk1OU3BwNmJUdGJZNjh2N2N6UDlpUmZCMHdRRy9LTjBwaGNPc2kxMlFwYWY5WXdZPQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNjc3NzA2NjE1CWZpbGU6UkxCb3RHVUlfMS4wLjQyX3g2NF9lbi1VUy5tc2kuemlwCnZxdzlwbHJTRGlpTk5zU2xaS201MjdEbkJMUlJqaXBlK1N5eCtudVV2K3dCVTVsRTZ1em5VV3FSQzc2SENsUXkyK2t3ZnFCUXgwZEJpdmdqN3kzT0JnPT0K",
+      "url":"https://github.com/VirxEC/rlbot_gui_rust/releases/download/v1.0.42/RLBotGUI_1.0.42_x64_en-US.msi.zip"
     }
   }
 }
