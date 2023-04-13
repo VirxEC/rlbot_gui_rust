@@ -5888,7 +5888,15 @@
 8865,Antenna,Product_TA ProductsDB.Products.flag_mc_warnercase,Warner Case
 8866,Antenna,Product_TA ProductsDB.Products.flag_mc_bhaskar,Bhaskar
 8869,Hat,Product_TA ProductsDB.Products.hat_palms,Oasis
+8871,Skin,Product_TA ProductsDB.Products.skin_margarine_multichrome,Flutterby: Multichrome
+8872,Wheels,Product_TA ProductsDB.Products.wheel_xmat_multichrome,Hanasha JRL: Multichrome
+8873,Skin,Product_TA ProductsDB.Products.skin_force_huntbo,Breakout: Turbo Huntress
+8874,Skin,Product_TA ProductsDB.Products.skin_ramen_huntoolz,Dingo: Figurator Huntress
 8875,SupersonicTrail,Product_TA ProductsDB.Products.ss_fireflies,Glister
+8877,Skin,Product_TA ProductsDB.Products.skin_grain_huntlines,Fennec: Nitty-Gritty Huntress
+8878,Skin,Product_TA ProductsDB.Products.skin_musclecar_campesino_cool,Dominus: Megafrost
+8879,Skin,Product_TA ProductsDB.Products.skin_octane_campesino_warm,Octane: Ultraheat
+8880,Skin,Product_TA ProductsDB.Products.skin_octane_hunt88,Octane: MG-88 Huntress
 8885,Skin,Product_TA ProductsDB.Products.skin_dub_flames_tierall,Volkswagen Golf GTI: Flames
 8886,Skin,Product_TA ProductsDB.Products.skin_dub_lightning_tierall,Volkswagen Golf GTI: Lightning
 8887,Skin,Product_TA ProductsDB.Products.skin_dub_stripes_tierall,Volkswagen Golf GTI: Stripes
@@ -5896,11 +5904,25 @@
 8889,Skin,Product_TA ProductsDB.Products.skin_dub_kingsnake_tierall,Volkswagen Golf GTI: Team Kingsnake
 8890,Skin,Product_TA ProductsDB.Products.skin_dub_ten_tierall,Volkswagen Golf GTI: Track Ready
 8891,Wheels,Product_TA ProductsDB.Products.wheel_dub_t2,Volkswagen Golf GTI RLE
+8912,Skin,Product_TA ProductsDB.Products.skin_force_campesino_cool,Breakout: Megafrost
+8913,Skin,Product_TA ProductsDB.Products.skin_grain_mono_A,Fennec: Shinjuku
+8914,Skin,Product_TA ProductsDB.Products.skin_musclecar_mono_A,Dominus: Shinjuku
+8915,Skin,Product_TA ProductsDB.Products.skin_ramen_campesino_warm,Dingo: Ultraheat
+8917,Wheels,Product_TA ProductsDB.Products.wheel_star_infinity,OEM: Infinite
+8919,Skin,Product_TA ProductsDB.Products.skin_grain_ntlivery,Fennec: Neo-LL37
 8920,EngineAudio,Product_TA ProductsDB.Products.engineaudio_singingbowl,Serenity
 8922,Antenna,Product_TA ProductsDB.Products.antenna_dub,Whip
+8923,Skin,Product_TA ProductsDB.Products.skin_ramen_bunnyg,Dingo: Buffy-Sugo
 8926,PlayerBanner,Product_TA ProductsDB.Products.playerbanner_dub,Volkswagen Golf GTI
 8935,EngineAudio,Product_TA ProductsDB.Products.engineaudio_dub,Volkswagen Golf GTI
 8936,EngineAudio,Product_TA ProductsDB.Products.engineaudio_dub_t2,Volkswagen Golf GTI RLE
+8937,Wheels,Product_TA ProductsDB.Products.wheel_ultrabarro_radiant,Ultralex: Radiant
+8938,Skin,Product_TA ProductsDB.Products.skin_grain_bob,Fennec: Bob's Ramen
+8939,Skin,Product_TA ProductsDB.Products.skin_neocar_dance,Masamune: Danpa
+8940,Skin,Product_TA ProductsDB.Products.skin_sourdough_viral,Jäger 619: Neo-Viral
+8943,Skin,Product_TA ProductsDB.Products.skin_musclecar_tech,Dominus: Neo-Star
+8944,Skin,Product_TA ProductsDB.Products.skin_ramen_splatter,Dingo: Neo-Ghost
+8945,Skin,Product_TA ProductsDB.Products.skin_octane_badbeats,Octane: Hakkaa
 8947,MusicStingers,Product_TA ProductsDB.Products.anthem_zensei_oasis,Oasis
 8964,MusicStingers,Product_TA ProductsDB.Products.album_anthem_AL3JANDRO_DoTheseStoriesMakeMeHuman,Do These Stories Make Me Human?
 8965,MusicStingers,Product_TA ProductsDB.Products.Anthem_AL3JANDRO_OnTheCanvas,On The Canvas
