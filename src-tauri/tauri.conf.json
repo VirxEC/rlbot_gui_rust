@@ -28,7 +28,7 @@
       "longDescription": "The Rust implementation of RLBot's custom GUI"
     },
     "security": {
-      "csp": "default-src *"
+      "csp": null
     },
     "updater": {
       "active": false

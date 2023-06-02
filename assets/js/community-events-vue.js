@@ -1,13 +1,13 @@
 export default {
   name: "community-events",
   template: /*html*/ `
-    <b-modal title="Community Events" id="community-events" size="lg" centered ok-only>
+    <b-modal title="Community Events" id="community-events" size="xl" centered ok-only>
       <div v-if="events.length == 0">
         <p>There are no community events at this time.</p>
       </div>
       <div v-else v-for="event in events">
         <div class="d-flex align-items-center">
-          <img v-if="event.logo" :src="event.logo" class="mr-3" style="max-width: 100%; max-height: 100px;"/>
+          <img v-if="event.logo" :src="event.logo" class="mr-3" style="max-width: 100%; max-height: 150px;"/>
           <div>
             <h3>{{ event.name }}</h3>
             <p v-if="event.timeUntilMs > 0" class="mb-1">
@@ -18,6 +18,9 @@ export default {
             </p>
             <p>
               <b-icon icon="geo"/> <a :href="event.location" target="_blank">{{ event.location }}</a>
+            </p>
+            <p v-if="event.moreInfo">
+              <b-icon icon="info-circle"/> <a :href="event.moreInfo" target="_blank">More info</a>
             </p>
           </div>
         </div>
@@ -142,10 +145,17 @@ export default {
                 ? event.description
                     .split("logo:")[1]
                     .replace("\n", "")
-                    .replace("</a>", "")
-                    .split(">")[1]
-                    .trim()
+                    .split('href="')[1]
+                    .split('"')[0]
                 : null;
+
+            let description = event.description
+              ? event.description
+                  .split("logo:")[0]
+                  .replace("\n", "")
+                  .split('href="')[1]
+                  .split('"')[0]
+              : null;
 
             this.events.push({
               name: names,
@@ -153,6 +163,7 @@ export default {
               time: new_date.toLocaleString(),
               timeUntil: format,
               timeUntilMs: time_until_ms,
+              moreInfo: description,
               logo: logo,
             });
           }
@@ -162,8 +173,8 @@ export default {
             return new Date(a.timeUntilMs) - new Date(b.timeUntilMs);
           });
 
-          // only show the first 3
-          this.events = this.events.slice(0, 3);
+          // only show the first 4
+          this.events = this.events.slice(0, 4);
         });
       });
     },
