@@ -95,6 +95,16 @@ crate::storymode_json! {
             "type": "rlbot",
             "path": ["$RLBOTPACKROOT", "RLBotPack", "PhoenixCS", "phoenix.cfg"]
         },
+        "broccoli": {
+            "name": "BroccoliBot",
+            "type": "rlbot",
+            "path": ["$RLBOTPACKROOT", "RLBotPack", "BroccoliBot", "BroccoliBot.cfg"]
+        },
+        "bribble": {
+            "name": "Bribblebot",
+            "type": "rlbot",
+            "path": ["$RLBOTPACKROOT", "RLBotPack", "Bribblebot", "bot.cfg"]
+        },
         "atlas": {
             "name": "Atlas",
             "type": "rlbot",
@@ -119,6 +129,16 @@ crate::storymode_json! {
             "name": "Beast from the East",
             "type": "rlbot",
             "path": ["$RLBOTPACKROOT", "RLBotPack", "beastbot", "beastbot.cfg"]
+        },
+        "noobbot": {
+            "name": "Noob Bot",
+            "type": "rlbot",
+            "path": ["$RLBOTPACKROOT", "RLBotPack", "Noob_Bot", "src", "bot.cfg"]
+        },
+        "monkey": {
+            "name": "Monkey",
+            "type": "rlbot",
+            "path": ["$RLBOTPACKROOT", "RLBotPack", "Monkey", "bot.cfg"]
         },
         "cryo": {
             "name": "Codename Cryo",

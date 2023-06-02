@@ -1,4 +1,5 @@
 #![allow(clippy::wildcard_imports)]
+#![recursion_limit = "256"]
 
 mod bot_management;
 mod commands;

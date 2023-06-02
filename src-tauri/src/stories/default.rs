@@ -15,6 +15,14 @@ crate::storymode_json! {
                     "map": "BeckwithPark",
                     "disabledBoost": true,
                     "display": "Win something so we know you can drive"
+                },
+                {
+                    "id": "INTRO-2",
+                    "humanTeamSize": 1,
+                    "opponentBots": ["noobbot"],
+                    "optional": true,
+                    "map": "Farmstead",
+                    "display": "A training partner challenges you"
                 }
             ]
         },
@@ -42,6 +50,14 @@ crate::storymode_json! {
                     },
                     "map": "UrbanCentral_Dawn",
                     "display": "Upgrade your reputation by beating your opponents by 3 or more goals"
+                },
+                {
+                    "id": "TRYHARD-3",
+                    "humanTeamSize": 1,
+                    "opponentBots": ["monkey"],
+                    "optional": true,
+                    "map": "UrbanCentral_Dawn",
+                    "display": "A stranger is experimenting with their new ML tech."
                 }
             ]
         },
@@ -65,6 +81,18 @@ crate::storymode_json! {
                     "opponentBots": ["rashbot", "stick", "leaf"],
                     "map": "Mannfield_Stormy",
                     "display": "2v3! Get through this storm of Marvin bots!"
+                },
+                {
+                    "id": "PBOOST-3",
+                    "humanTeamSize": 2,
+                    "opponentBots": ["broccoli", "molten", "phoenix"],
+                    "completionConditions": {
+                        "win": true,
+                        "scoreDifference": 3
+                    },
+                    "optional": true,
+                    "map": "DFHStadium_Stormy",
+                    "display": "Broccoli and bots on fire - this place is wild"
                 }
             ]
         },
@@ -96,6 +124,14 @@ crate::storymode_json! {
                     },
                     "map": "Wasteland",
                     "display": "Win and get at least two demos"
+                },
+                {
+                    "id": "WASTELAND-3",
+                    "humanTeamSize": 3,
+                    "opponentBots": ["bribble", "bribble", "wildfire"],
+                    "map": "Wasteland_Night",
+                    "optional": true,
+                    "display": "These bot wants to show you what strategic demos are"
                 }
             ]
         },
@@ -134,19 +170,27 @@ crate::storymode_json! {
                 "display": "There's something unnatural about these bots..."
             },
             {
-                "id": "CS-5",
+                "id": "CS-4",
                 "humanTeamSize": 1,
-                "opponentBots": ["snek", "peter"],
+                "opponentBots": ["snek", "broccoli"],
                 "max_score": "3 Goals",
                 "map": "NeoTokyo",
                 "display": "How does that car turn so fast?"
             },
             {
-                "id": "CS-4",
+                "id": "CS-5",
                 "humanTeamSize": 2,
                 "opponentBots": ["invisibot"],
                 "map": "NeoTokyo",
                 "display": "Wait where did that car go?"
+            },
+            {
+                "id": "CS-6",
+                "humanTeamSize": 1,
+                "opponentBots": ["snek", "snek", "snek"],
+                "map": "NeoTokyo",
+                "optional": true,
+                "display": "You find yourself in a game of Tron"
             }
             ]
         },
@@ -198,6 +242,22 @@ crate::storymode_json! {
                     "opponentBots": ["nexto"],
                     "map": "ChampionsField_Day",
                     "display": "You made it to the top. Time to face the champion."
+                },
+                {
+                    "id": "CHAMP-7",
+                    "humanTeamSize": 1,
+                    "opponentBots": ["invisibot", "invisibot"],
+                    "map": "Mannfield_Night",
+                    "optional": true,
+                    "display": "A master does not have to see their opponents. Right?"
+                },
+                {
+                    "id": "CHAMP-8",
+                    "humanTeamSize": 1,
+                    "opponentBots": ["nexto", "nexto"],
+                    "map": "ChampionsField_Day",
+                    "optional": true,
+                    "display": "The ultimate champion challenge"
                 }
             ]
         }
