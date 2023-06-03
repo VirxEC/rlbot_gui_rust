@@ -1095,6 +1095,7 @@
 1707,PaintFinish,Product_TA ProductsDB.Products.paintfinish_knitted,Knitted Yarn
 1708,PaintFinish,Product_TA ProductsDB.Products.paintfinish_particleboard,Chipboard
 1710,PaintFinish,Product_TA ProductsDB.Products.paintfinish_roughweave,Burlap
+1711,PaintFinish,Product_TA ProductsDB.Products.paintfinish_twill,Wicker
 1712,PaintFinish,Product_TA ProductsDB.Products.paintfinish_zebra,Zebra
 1713,Wheels,Product_TA ProductsDB.Products.wheel_esports01,Apex
 1714,Wheels,Product_TA ProductsDB.Products.wheel_esports02,Ninja
@@ -1724,7 +1725,6 @@
 2783,Antenna,Product_TA ProductsDB.Products.antenna_watermelon_hot,Warm Watermelon
 2784,Wheels,Product_TA ProductsDB.Products.wheel_precision,Jayvyn
 2786,Hat,Product_TA ProductsDB.Products.hat_raft,Swim Ring
-2787,Hat,Product_TA ProductsDB.Products.hat_coconuttree,Palm Tree
 2789,Boost,Product_TA ProductsDB.Products.boost_cherryblossom,Cherry Blossom
 2791,GoalExplosion,Product_TA ProductsDB.Products.Explosion_MiniRLBalls,Ballistic
 2794,PlayerBanner,Product_TA ProductsDB.Products.PlayerBanner_DCComics_Number2,DC Comics
@@ -3611,6 +3611,7 @@
 5644,Skin,Product_TA ProductsDB.Products.skin_unicorn_gust_all,R3MX: Sally
 5645,Boost,Product_TA ProductsDB.Products.boost_Clockwork,Timeline
 5646,Skin,Product_TA ProductsDB.Products.skin_octane_lar_h,Octane: Los Angeles Rams
+5648,Antenna,Product_TA ProductsDB.Products.flag_mc_beauz,Beauz
 5649,Antenna,Product_TA ProductsDB.Products.flag_mc_Au5,Au5
 5650,Antenna,Product_TA ProductsDB.Products.flag_mc_Chime,Chime
 5651,Antenna,Product_TA ProductsDB.Products.flag_mc_JackNewsome,Jack Newsome
@@ -4153,6 +4154,7 @@
 6431,Skin,Product_TA ProductsDB.Products.skin_levain_xmat,Werewolf: Kana
 6435,Skin,Product_TA ProductsDB.Products.skin_Marauder_omens,Marauder: Martian Wind
 6437,Skin,Product_TA ProductsDB.Products.skin_Marauder_Tsunami,Marauder: Anthrophobe
+6445,Skin,Product_TA ProductsDB.Products.skin_mitty_tsunami,Komodo: Anthrophobe
 6467,Skin,Product_TA ProductsDB.Products.skin_sixty_UIR,BMW M240i: United In Rivalry
 6470,GoalExplosion,Product_TA ProductsDB.Products.explosion_teepeed,TP
 6485,Skin,Product_TA ProductsDB.Products.skin_sixty_a,BMW M240i: Thundernight Metallic
@@ -5031,6 +5033,7 @@
 7644,Skin,Product_TA ProductsDB.Products.skin_cured_02,Formula 1 2022: AlphaTauri 2022
 7645,Skin,Product_TA ProductsDB.Products.skin_cured_03,Formula 1 2022: Alpine 2022
 7646,Skin,Product_TA ProductsDB.Products.skin_cured_09,Formula 1 2022: Red Bull 2022
+7651,Body,Product_TA ProductsDB.Products.body_jinn,Redline
 7652,Skin,Product_TA ProductsDB.Products.Skin_Octane_jerm,Octane: Blinkpad
 7653,Skin,Product_TA ProductsDB.Products.skin_lux_frosted,Maestro: Ombre
 7655,Skin,Product_TA ProductsDB.Products.skin_lux_flames,Maestro: Flames
@@ -5368,7 +5371,7 @@
 8129,Skin,Product_TA ProductsDB.Products.skin_octane_nwc_nigeria,Octane: Nigeria (Nike)
 8130,Skin,Product_TA ProductsDB.Products.skin_octane_nwc_poland,Octane: Poland (Nike)
 8131,Skin,Product_TA ProductsDB.Products.skin_octane_nwc_portugal,Octane: Portugal (Nike)
-8132,Skin,Product_TA ProductsDB.Products.skin_octane_nwc_qatar,Octane: Qatar
+8132,Skin,Product_TA ProductsDB.Products.skin_octane_nwc_qatar,Octane: Qatar (Nike)
 8135,Skin,Product_TA ProductsDB.Products.skin_grain_v1_away,Fennec: Version1 (Away)
 8136,Skin,Product_TA ProductsDB.Products.skin_grain_v1_home,Fennec: Version1 (Home)
 8137,Skin,Product_TA ProductsDB.Products.skin_musclecar_v1_away,Dominus: Version1 (Away)
@@ -5702,8 +5705,10 @@
 8552,GoalExplosion,Product_TA ProductsDB.Products.Explosion_Esports_EG_v2,Evil Geniuses
 8554,Wheels,Product_TA ProductsDB.Products.wheel_ten,Bugatti Centodieci
 8555,Skin,Product_TA ProductsDB.Products.skin_ten,Bugatti Centodieci: Noire
+8556,Hat,Product_TA ProductsDB.Products.hat_burner,Solar Shields
 8558,EngineAudio,Product_TA ProductsDB.Products.engineaudio_ten,Bugatti Centodieci
 8559,Hat,Product_TA ProductsDB.Products.hat_chillcat,Lofi Girl Cat
+8560,MusicStingers,Product_TA ProductsDB.Products.anthem_radioclassics_vol1_07,Never Gonna Give You Up
 8561,Wheels,Product_TA ProductsDB.Products.wheel_onetrue,Torque TX
 8562,Wheels,Product_TA ProductsDB.Products.wheel_risoli,Dunetune
 8565,Body,Product_TA ProductsDB.Products.body_beak_tier2_ice,Emperor II: Frozen
@@ -5840,6 +5845,7 @@
 8776,Wheels,Product_TA ProductsDB.Products.wheel_flowerdog_infinity,Floret: Infinite
 8786,Skin,Product_TA ProductsDB.Products.skin_import_oasis,Takumi: Bloomzoom
 8791,Wheels,Product_TA ProductsDB.Products.wheel_onetrue_negative,Torque TX: Inverted
+8794,Antenna,Product_TA ProductsDB.Products.antenna_plier,Quick Jump
 8801,ESportsTeam,Product_TA ProductsDB.Products.EsportsTeam_Resolve,Resolve
 8805,Wheels,Product_TA ProductsDB.Products.wheel_terracotta,Green Machine
 8806,Body,Product_TA ProductsDB.Products.body_dub_t1,Volkswagen Golf GTI
@@ -5872,8 +5878,10 @@
 8843,PlayerBanner,Product_TA ProductsDB.Products.playerbanner_hedge,Hedge Wretch
 8844,Boost,Product_TA ProductsDB.Products.Boost_wispysmoke_psplus,PG Candyfloss
 8845,Skin,Product_TA ProductsDB.Products.skin_dub_huntress_tierall,Volkswagen Golf GTI: Huntress
+8846,MusicStingers,Product_TA ProductsDB.Products.anthem_oddkidout_codes_featmacntaj,CODES (feat. Macntaj)
 8847,Wheels,Product_TA ProductsDB.Products.wheel_nirvana,Starcade
 8849,Skin,Product_TA ProductsDB.Products.skin_octane_fcacm,Octane: AC Milan (PUMA x KOCHÉ)
+8851,PlayerBanner,Product_TA ProductsDB.Products.playerbanner_geometricrobot,STAR WARS R2-D2 (Twin Suns)
 8852,PlayerBanner,Product_TA ProductsDB.Products.playerbanner_chainsaw,Chainsaw
 8853,Skin,Product_TA ProductsDB.Products.skin_musclecar_fcacm,Dominus: AC Milan (PUMA x KOCHÉ)
 8856,Wheels,Product_TA ProductsDB.Products.wheel_dub_t1,Volkswagen Golf GTI
@@ -5888,6 +5896,7 @@
 8865,Antenna,Product_TA ProductsDB.Products.flag_mc_warnercase,Warner Case
 8866,Antenna,Product_TA ProductsDB.Products.flag_mc_bhaskar,Bhaskar
 8869,Hat,Product_TA ProductsDB.Products.hat_palms,Oasis
+8870,Skin,Product_TA ProductsDB.Products.skin_mitty_twankle,Komodo: Hyperspace
 8871,Skin,Product_TA ProductsDB.Products.skin_margarine_multichrome,Flutterby: Multichrome
 8872,Wheels,Product_TA ProductsDB.Products.wheel_xmat_multichrome,Hanasha JRL: Multichrome
 8873,Skin,Product_TA ProductsDB.Products.skin_force_huntbo,Breakout: Turbo Huntress
@@ -5897,6 +5906,8 @@
 8878,Skin,Product_TA ProductsDB.Products.skin_musclecar_campesino_cool,Dominus: Megafrost
 8879,Skin,Product_TA ProductsDB.Products.skin_octane_campesino_warm,Octane: Ultraheat
 8880,Skin,Product_TA ProductsDB.Products.skin_octane_hunt88,Octane: MG-88 Huntress
+8881,Skin,Product_TA ProductsDB.Products.skin_mitty_dimensional,Komodo: Deceptor
+8882,Wheels,Product_TA ProductsDB.Products.wheel_soccerball_anodized,Cristiano: Anodized
 8885,Skin,Product_TA ProductsDB.Products.skin_dub_flames_tierall,Volkswagen Golf GTI: Flames
 8886,Skin,Product_TA ProductsDB.Products.skin_dub_lightning_tierall,Volkswagen Golf GTI: Lightning
 8887,Skin,Product_TA ProductsDB.Products.skin_dub_stripes_tierall,Volkswagen Golf GTI: Stripes
@@ -5904,6 +5915,8 @@
 8889,Skin,Product_TA ProductsDB.Products.skin_dub_kingsnake_tierall,Volkswagen Golf GTI: Team Kingsnake
 8890,Skin,Product_TA ProductsDB.Products.skin_dub_ten_tierall,Volkswagen Golf GTI: Track Ready
 8891,Wheels,Product_TA ProductsDB.Products.wheel_dub_t2,Volkswagen Golf GTI RLE
+8909,Wheels,Product_TA ProductsDB.Products.wheel_sayonara,Buffstuff
+8910,Wheels,Product_TA ProductsDB.Products.wheel_rl37,Spacerocker
 8912,Skin,Product_TA ProductsDB.Products.skin_force_campesino_cool,Breakout: Megafrost
 8913,Skin,Product_TA ProductsDB.Products.skin_grain_mono_A,Fennec: Shinjuku
 8914,Skin,Product_TA ProductsDB.Products.skin_musclecar_mono_A,Dominus: Shinjuku
@@ -5913,6 +5926,7 @@
 8920,EngineAudio,Product_TA ProductsDB.Products.engineaudio_singingbowl,Serenity
 8922,Antenna,Product_TA ProductsDB.Products.antenna_dub,Whip
 8923,Skin,Product_TA ProductsDB.Products.skin_ramen_bunnyg,Dingo: Buffy-Sugo
+8925,Skin,Product_TA ProductsDB.Products.skin_import_newtonball,Takumi: BB-8
 8926,PlayerBanner,Product_TA ProductsDB.Products.playerbanner_dub,Volkswagen Golf GTI
 8935,EngineAudio,Product_TA ProductsDB.Products.engineaudio_dub,Volkswagen Golf GTI
 8936,EngineAudio,Product_TA ProductsDB.Products.engineaudio_dub_t2,Volkswagen Golf GTI RLE
@@ -5924,5 +5938,43 @@
 8944,Skin,Product_TA ProductsDB.Products.skin_ramen_splatter,Dingo: Neo-Ghost
 8945,Skin,Product_TA ProductsDB.Products.skin_octane_badbeats,Octane: Hakkaa
 8947,MusicStingers,Product_TA ProductsDB.Products.anthem_zensei_oasis,Oasis
+8948,Wheels,Product_TA ProductsDB.Products.wheel_oii_opccc,C-3PO
+8954,Skin,Product_TA ProductsDB.Products.skin_jinn_flames_tierall,Redline: Flames
+8955,Skin,Product_TA ProductsDB.Products.skin_jinn_huntress_tierall,Redline: Huntress
+8956,Skin,Product_TA ProductsDB.Products.skin_jinn_lightning_tierall,Redline: Lightning
+8957,Skin,Product_TA ProductsDB.Products.skin_jinn_stripes_tierall,Redline: Stripes
+8958,Skin,Product_TA ProductsDB.Products.skin_jinn_wings_tierall,Redline: Wings
+8959,Wheels,Product_TA ProductsDB.Products.wheel_kaytoo,K-2SO
+8962,Hat,Product_TA ProductsDB.Products.hat_newtonball,BB-8
+8963,Skin,Product_TA ProductsDB.Products.skin_octane_beep,Octane: R2-D2
 8964,MusicStingers,Product_TA ProductsDB.Products.album_anthem_AL3JANDRO_DoTheseStoriesMakeMeHuman,Do These Stories Make Me Human?
 8965,MusicStingers,Product_TA ProductsDB.Products.Anthem_AL3JANDRO_OnTheCanvas,On The Canvas
+8966,Skin,Product_TA ProductsDB.Products.skin_grain_oii_trips,Fennec: C-3PO
+8967,Skin,Product_TA ProductsDB.Products.skin_musclecar_kaytoo,Dominus: K-2SO
+8971,Wheels,Product_TA ProductsDB.Products.wheel_oii_beep,R2-D2
+8972,Antenna,Product_TA ProductsDB.Products.flag_mc_laneboy,Lane Boy
+8973,Hat,Product_TA ProductsDB.Products.hat_beep,R2-D2
+8988,Antenna,Product_TA ProductsDB.Products.flag_oracle,ORACLE
+8989,Antenna,Product_TA ProductsDB.Products.flag_mc_milesaway,Miles Away
+8991,PremiumInventory,Product_TA ProductsDB.Products.crateunlocked_spring23,Golden Toolkit
+8992,Antenna,Product_TA ProductsDB.Products.flag_lissa,LissA
+8995,EngineAudio,Product_TA ProductsDB.Products.engineaudio_jinn,Redline
+8996,Wheels,Product_TA ProductsDB.Products.wheel_newtonball,BB-8
+9003,Skin,Product_TA ProductsDB.Products.skin_jinn_tech_tierall,Redline: Tech
+9030,PlayerAvatarBorder,Product_TA ProductsDB.Products.AvatarBorder_racing,Tight Corner
+9031,PlayerBanner,Product_TA ProductsDB.Products.PlayerBanner_Racing,Redline Rush
+9032,Wheels,Product_TA ProductsDB.Products.wheel_claw,Fast & Furious Dodge Charger SRT Hellcat
+9045,EngineAudio,Product_TA ProductsDB.Products.engineaudio_carshow,Showoff
+9053,Body,Product_TA ProductsDB.Products.body_claw,Fast & Furious Dodge Charger SRT Hellcat
+9057,Skin,Product_TA ProductsDB.Products.skin_claw_alameda,Fast & Furious Dodge Charger SRT Hellcat: Alameda Twin
+9058,Skin,Product_TA ProductsDB.Products.skin_claw_flames,Fast & Furious Dodge Charger SRT Hellcat: Flames
+9060,Skin,Product_TA ProductsDB.Products.skin_claw_irl,Fast & Furious Dodge Charger SRT Hellcat: Reel Life
+9062,Skin,Product_TA ProductsDB.Products.skin_claw_sinclair,Fast & Furious Dodge Charger SRT Hellcat: Sinclair
+9063,Skin,Product_TA ProductsDB.Products.skin_claw_wheelman,Fast & Furious Dodge Charger SRT Hellcat: Wheelman
+9073,EngineAudio,Product_TA ProductsDB.Products.engineaudio_claw,Fast & Furious Dodge Charger SRT Hellcat
+9082,Skin,Product_TA ProductsDB.Products.skin_claw_srt,Fast & Furious Dodge Charger SRT Hellcat: Hellcat
+9099,Skin,Product_TA ProductsDB.Products.skin_claw_stripes,Fast & Furious Dodge Charger SRT Hellcat: Stripes
+9101,MusicStingers,Product_TA ProductsDB.Products.album_anthem_spaceship,Star Wars
+9102,MusicStingers,Product_TA ProductsDB.Products.anthem_beep_01,R2-D2
+9105,Wheels,Product_TA ProductsDB.Products.wheel_rl37_radiant,Spacerocker: Radiant
+9116,MusicStingers,Product_TA ProductsDB.Products.anthem_fandf_04,Gasolina (Safari Riot Remix) ft. Myke Towers
