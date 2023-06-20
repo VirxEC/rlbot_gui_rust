@@ -1,4 +1,5 @@
 #![allow(clippy::wildcard_imports)]
+#![recursion_limit = "256"]
 
 mod bot_management;
 mod commands;
@@ -68,7 +69,8 @@ static MATCH_HANDLER_STDIN: Mutex<(String, Option<(Child, ChildStdin)>)> = Mutex
 static CAPTURE_PIPE_WRITER: Mutex<Option<PipeWriter>> = Mutex::new(None);
 
 static PYTHON_PATH: AsyncRwLock<String> = AsyncRwLock::const_new(String::new());
-static CUSTOM_STORIES_CACHE: AsyncRwLock<Lazy<HashMap<StoryConfig, StoryModeConfig>>> = AsyncRwLock::const_new(Lazy::new(HashMap::new));
+static CUSTOM_STORIES_CACHE: AsyncRwLock<Lazy<HashMap<StoryConfig, StoryModeConfig>>> =
+    AsyncRwLock::const_new(Lazy::new(HashMap::new));
 static BOT_FOLDER_SETTINGS: AsyncRwLock<Lazy<BotFolders>> = AsyncRwLock::const_new(Lazy::new(BotFolders::default));
 
 #[macro_export]
@@ -263,7 +265,10 @@ fn has_chrome() -> bool {
 
 #[cfg(target_os = "macos")]
 fn has_chrome() -> bool {
-    get_command_status("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", vec!["--version"])
+    get_command_status(
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        vec!["--version"],
+    )
 }
 
 #[cfg(target_os = "linux")]
@@ -318,10 +323,15 @@ pub enum CommandError {
 ///
 /// * `program` - The executable to run
 /// * `args` - The arguments to pass to the executable
-pub fn get_capture_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(program: S, args: I) -> Result<Command, CommandError> {
+pub fn get_capture_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(
+    program: S,
+    args: I,
+) -> Result<Command, CommandError> {
     let mut command = get_command(program, args);
 
-    let pipe = CAPTURE_PIPE_WRITER.lock().map_err(|_| CommandError::Poisoned("CAPTURE_PIPE_WRITER"))?;
+    let pipe = CAPTURE_PIPE_WRITER
+        .lock()
+        .map_err(|_| CommandError::Poisoned("CAPTURE_PIPE_WRITER"))?;
     let out_pipe = pipe.as_ref().ok_or(CommandError::ClosedPipe)?.try_clone()?;
     let err_pipe = pipe.as_ref().ok_or(CommandError::ClosedPipe)?.try_clone()?;
 
@@ -363,7 +373,11 @@ pub fn get_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(
 ///
 /// * `program` - The executable to run
 /// * `args` - The arguments to pass to the executable
-pub fn get_maybe_capture_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(program: S, args: I, use_pipe: bool) -> Result<Command, CommandError> {
+pub fn get_maybe_capture_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(
+    program: S,
+    args: I,
+    use_pipe: bool,
+) -> Result<Command, CommandError> {
     if use_pipe {
         get_capture_command(program, args)
     } else {
@@ -386,7 +400,10 @@ pub fn get_maybe_capture_command<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterat
 ///
 /// * `program` - The executable to run
 /// * `args` - The arguments to pass to the executable
-pub fn spawn_capture_process<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(program: S, args: I) -> Result<Child, CommandError> {
+pub fn spawn_capture_process<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(
+    program: S,
+    args: I,
+) -> Result<Child, CommandError> {
     Ok(get_capture_command(program, args)?.spawn()?)
 }
 
@@ -399,7 +416,10 @@ pub fn spawn_capture_process<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<I
 ///
 /// * `program` - The executable to run
 /// * `args` - The arguments to pass to the executable
-pub fn spawn_capture_process_and_get_exit_code<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(program: S, args: I) -> i32 {
+pub fn spawn_capture_process_and_get_exit_code<S: AsRef<OsStr>, A: AsRef<OsStr>, I: IntoIterator<Item = A>>(
+    program: S,
+    args: I,
+) -> i32 {
     let Ok(mut child) = spawn_capture_process(program, args) else {
         return 2;
     };
@@ -475,7 +495,9 @@ fn write_console_text_out_queue_to_file(window: &Window, to_write_out: Vec<Strin
 }
 
 fn update_internal_console(update: &ConsoleTextUpdate) -> Result<(), InternalConsoleError> {
-    let mut console_text = CONSOLE_TEXT.lock().map_err(|_| InternalConsoleError::Poisoned("CONSOLE_TEXT"))?;
+    let mut console_text = CONSOLE_TEXT
+        .lock()
+        .map_err(|_| InternalConsoleError::Poisoned("CONSOLE_TEXT"))?;
     if update.replace_last {
         console_text.pop();
     }
@@ -573,13 +595,17 @@ fn emit_text<T: AsRef<str>>(window: &Window, text: T, replace_last: bool) {
 fn gui_setup_load_config(window: &Window) {
     tauri_block_on(async {
         let gui_config = load_gui_config(window).await;
-        *PYTHON_PATH.write().await = gui_config.get("python_config", "path").unwrap_or_else(|| auto_detect_python().unwrap_or_default().0);
+        *PYTHON_PATH.write().await = gui_config
+            .get("python_config", "path")
+            .unwrap_or_else(|| auto_detect_python().unwrap_or_default().0);
         **BOT_FOLDER_SETTINGS.write().await = BotFolders::load_from_conf(&load_gui_config(window).await);
     });
 }
 
 fn gui_setup(app: &mut App) -> Result<(), Box<dyn StdError>> {
-    let window = app.get_window(MAIN_WINDOW_NAME).ok_or(format!("Cannot find window '{MAIN_WINDOW_NAME}'"))?;
+    let window = app
+        .get_window(MAIN_WINDOW_NAME)
+        .ok_or(format!("Cannot find window '{MAIN_WINDOW_NAME}'"))?;
     let window2 = window.clone();
     let window3 = window.clone();
     let window4 = window.clone();

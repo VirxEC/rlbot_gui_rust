@@ -136,7 +136,10 @@ async fn download_and_extract_repo_zip<T: IntoUrl, J: AsRef<Path>>(
 
         if last_update.elapsed().as_secs_f32() >= 0.1 {
             let progress = bytes.len() as f64 / real_size_estimate * 100.0;
-            if let Err(e) = window.emit(UPDATE_DOWNLOAD_PROGRESS_SIGNAL, ProgressBarUpdate::new(progress, "Downloading zip...".to_owned())) {
+            if let Err(e) = window.emit(
+                UPDATE_DOWNLOAD_PROGRESS_SIGNAL,
+                ProgressBarUpdate::new(progress, "Downloading zip...".to_owned()),
+            ) {
                 ccprintln!(window, "Error when updating progress bar: {e}");
             }
             last_update = Instant::now();
@@ -149,7 +152,10 @@ async fn download_and_extract_repo_zip<T: IntoUrl, J: AsRef<Path>>(
         }
     }
 
-    if let Err(e) = window.emit(UPDATE_DOWNLOAD_PROGRESS_SIGNAL, ProgressBarUpdate::new(100., "Extracting zip...".to_owned())) {
+    if let Err(e) = window.emit(
+        UPDATE_DOWNLOAD_PROGRESS_SIGNAL,
+        ProgressBarUpdate::new(100., "Extracting zip...".to_owned()),
+    ) {
         ccprintln!(window, "Error when updating progress bar: {e}");
     }
 
@@ -169,7 +175,13 @@ async fn download_and_extract_repo_zip<T: IntoUrl, J: AsRef<Path>>(
 /// * `repo_name`: The name of the repo, e.x. `"RLBotPack"`
 /// * `checkout_folder`: The folder to checkout the repo to
 /// * `update_tag_settings`: Whether to update the incr tag in the GUI config
-pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, checkout_folder: &str, update_tag_settings: bool) -> BotpackStatus {
+pub async fn download_repo(
+    window: &Window,
+    repo_owner: &str,
+    repo_name: &str,
+    checkout_folder: &str,
+    update_tag_settings: bool,
+) -> BotpackStatus {
     let client = Client::new();
     let repo_full_name = format!("{repo_owner}/{repo_name}");
 
@@ -188,11 +200,18 @@ pub async fn download_repo(window: &Window, repo_owner: &str, repo_name: &str, c
     };
 
     if update_tag_settings {
-        let latest_release_tag_name = match get_json_from_url(&client, &format!("https://api.github.com/repos/{repo_full_name}/releases/latest")).await {
+        let latest_release_tag_name = match get_json_from_url(
+            &client,
+            &format!("https://api.github.com/repos/{repo_full_name}/releases/latest"),
+        )
+        .await
+        {
             Ok(release) => release["tag_name"].as_str().unwrap_or_default().to_owned(),
             Err(e) => {
                 ccprintln(window, e.to_string());
-                return BotpackStatus::Success("Downloaded the bot pack, but failed to get the latest release tag.".to_owned());
+                return BotpackStatus::Success(
+                    "Downloaded the bot pack, but failed to get the latest release tag.".to_owned(),
+                );
             }
         };
 
@@ -233,16 +252,23 @@ fn get_url_from_tag(repo_full_name: &str, tag: u32) -> String {
 
 /// Finds what the tag is on the latest release in a repo
 async fn get_latest_release_tag(repo_full_name: &str) -> Result<u32, String> {
-    get_json_from_url(&Client::new(), &format!("https://api.github.com/repos/{repo_full_name}/releases/latest"))
-        .await
-        .map_err(|e| e.to_string())
-        .and_then(|release| {
-            release
-                .get("tag_name")
-                .ok_or_else(|| "No key 'tag_name' found in json".to_string())
-                .and_then(|json_tag| json_tag.as_str().ok_or_else(|| "Couldn't convert tag_name to string".to_string()))
-                .and_then(|tag_name| tag_name.replace("incr-", "").parse::<u32>().map_err(|e| e.to_string()))
-        })
+    get_json_from_url(
+        &Client::new(),
+        &format!("https://api.github.com/repos/{repo_full_name}/releases/latest"),
+    )
+    .await
+    .map_err(|e| e.to_string())
+    .and_then(|release| {
+        release
+            .get("tag_name")
+            .ok_or_else(|| "No key 'tag_name' found in json".to_string())
+            .and_then(|json_tag| {
+                json_tag
+                    .as_str()
+                    .ok_or_else(|| "Couldn't convert tag_name to string".to_string())
+            })
+            .and_then(|tag_name| tag_name.replace("incr-", "").parse::<u32>().map_err(|e| e.to_string()))
+    })
 }
 
 /// Check if the botpack is up to date
@@ -324,7 +350,10 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
         ccprintln(window, &patch_status);
 
         let progress = f64::from(tag - current_tag_name) / total_patches * 100.;
-        if let Err(e) = window.emit(UPDATE_DOWNLOAD_PROGRESS_SIGNAL, ProgressBarUpdate::new(progress, patch_status)) {
+        if let Err(e) = window.emit(
+            UPDATE_DOWNLOAD_PROGRESS_SIGNAL,
+            ProgressBarUpdate::new(progress, patch_status),
+        ) {
             ccprintln!(window, "Error when updating progress bar: {e}");
         }
 
@@ -337,7 +366,10 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
         };
 
         let progress = progress + 1. / (total_patches * 2.) * 100.;
-        if let Err(e) = window.emit(UPDATE_DOWNLOAD_PROGRESS_SIGNAL, ProgressBarUpdate::new(progress, format!("Applying patch incr-{tag}..."))) {
+        if let Err(e) = window.emit(
+            UPDATE_DOWNLOAD_PROGRESS_SIGNAL,
+            ProgressBarUpdate::new(progress, format!("Applying patch incr-{tag}...")),
+        ) {
             ccprintln!(window, "Error when updating progress bar: {}", e);
         }
 
@@ -379,7 +411,12 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
 /// * `window`: A reference to the GUI, obtained from a `#[tauri::command]` function
 /// * `local_folder_path`: The path to the local folder containing the botpack
 /// * `tag_deleted_files_path`: The path to the file containing the deleted files for the patch
-async fn apply_patch(resp: Result<reqwest::Response, reqwest::Error>, window: &Window, local_folder_path: &Path, tag_deleted_files_path: &Path) -> ControlFlow<()> {
+async fn apply_patch(
+    resp: Result<reqwest::Response, reqwest::Error>,
+    window: &Window,
+    local_folder_path: &Path,
+    tag_deleted_files_path: &Path,
+) -> ControlFlow<()> {
     let download = match resp {
         Ok(download) => download,
         Err(e) => {
@@ -480,7 +517,10 @@ impl MapPackUpdater {
             return BotpackStatus::RequiresFullDownload;
         };
         let revision = index["revision"].as_u64().unwrap();
-        let url = format!("https://api.github.com/repos/{}/{}/releases/latest", self.repo_owner, self.repo_name);
+        let url = format!(
+            "https://api.github.com/repos/{}/{}/releases/latest",
+            self.repo_owner, self.repo_name
+        );
 
         let latest_release = match get_json_from_url(&self.client, &url).await {
             Ok(latest_release) => latest_release,
@@ -519,7 +559,9 @@ impl MapPackUpdater {
         };
 
         let new_maps = Self::extract_maps_from_index(&index);
-        let old_maps = old_index.map(|index| Self::extract_maps_from_index(&index)).unwrap_or_default();
+        let old_maps = old_index
+            .map(|index| Self::extract_maps_from_index(&index))
+            .unwrap_or_default();
 
         let to_fetch = new_maps
             .into_iter()
@@ -536,7 +578,10 @@ impl MapPackUpdater {
             .map(|path| (Path::new(&path).file_name().unwrap().to_string_lossy().to_string(), path))
             .collect::<HashMap<String, String>>();
 
-        let url = format!("https://api.github.com/repos/{}/{}/releases/latest", self.repo_owner, self.repo_name);
+        let url = format!(
+            "https://api.github.com/repos/{}/{}/releases/latest",
+            self.repo_owner, self.repo_name
+        );
 
         let latest_release = match get_json_from_url(&self.client, &url).await {
             Ok(latest_release) => latest_release,
@@ -548,7 +593,10 @@ impl MapPackUpdater {
 
         for asset in latest_release["assets"].as_array().unwrap() {
             let asset_name = asset["name"].as_str().unwrap();
-            if let Err(e) = self.download_asset(window, asset, asset_name, &filename_to_path, &self.full_path).await {
+            if let Err(e) = self
+                .download_asset(window, asset, asset_name, &filename_to_path, &self.full_path)
+                .await
+            {
                 ccprintln!(window, "Error downloading asset {asset_name}: {e}");
             }
         }

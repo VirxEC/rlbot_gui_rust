@@ -91,6 +91,25 @@ pub enum MapType {
     Hourglass,
     Barricade,
     Colossus,
+    #[serde(rename = "BeckwithPark_Snowy")]
+    BeckwithParkSnowy,
+    #[serde(rename = "NeoTokyo_Comic")]
+    NeoTokyoComic,
+    #[serde(rename = "UtopiaColiseum_Gilded")]
+    UtopiaColiseumGilded,
+    SovereignHeights,
+    #[serde(rename = "Hoops_TheBlock")]
+    HoopsTheBlock,
+    #[serde(rename = "Farmstead_Spooky")]
+    FarmsteadSpooky,
+    #[serde(rename = "ChampionsField_NikeFC")]
+    ChampionsFieldNikeFC,
+    #[serde(rename = "ForbiddenTemple_FireAndIce")]
+    ForbiddenTempleFireAndIce,
+    #[serde(rename = "DeadeyeCanyon_Oasis")]
+    DeadeyeCanyonOasis,
+    #[serde(rename = "EstadioVida_Dusk")]
+    EstadioVidaDusk,
     #[serde(other)]
     Custom(String),
 }

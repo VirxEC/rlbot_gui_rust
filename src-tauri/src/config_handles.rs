@@ -114,7 +114,11 @@ impl_serialize_from_display!(SaveFolderSettingsError);
 
 #[tauri::command]
 pub async fn save_folder_settings(window: Window, bot_folder_settings: BotFolders) -> Result<(), SaveFolderSettingsError> {
-    BOT_FOLDER_SETTINGS.write().await.update_config(&window, bot_folder_settings).map_err(Into::into)
+    BOT_FOLDER_SETTINGS
+        .write()
+        .await
+        .update_config(&window, bot_folder_settings)
+        .map_err(Into::into)
 }
 
 #[tauri::command]
@@ -127,7 +131,10 @@ where
     I: IntoIterator,
     I::Item: Runnable + Clone,
 {
-    bundles.into_iter().filter(|b| !b.get_config_file_name().starts_with('_')).collect()
+    bundles
+        .into_iter()
+        .filter(|b| !b.get_config_file_name().starts_with('_'))
+        .collect()
 }
 
 async fn get_bots_from_directory(window: &Window, path: &str) -> Vec<BotConfigBundle> {
@@ -181,7 +188,9 @@ pub fn pick_bot_folder(window: Window) {
             return;
         };
 
-        if let Err(error) = tauri_block_on(BOT_FOLDER_SETTINGS.write()).add_folder(&window, path.to_string_lossy().to_string()) {
+        if let Err(error) =
+            tauri_block_on(BOT_FOLDER_SETTINGS.write()).add_folder(&window, path.to_string_lossy().to_string())
+        {
             ccprintln!(&window, "Error adding folder: {error}");
         }
     });
@@ -189,28 +198,34 @@ pub fn pick_bot_folder(window: Window) {
 
 #[tauri::command]
 pub fn pick_bot_config(window: Window) {
-    FileDialogBuilder::new().add_filter("Bot Cfg File", &["cfg"]).pick_file(move |path| {
-        let Some(path) = path else {
+    FileDialogBuilder::new()
+        .add_filter("Bot Cfg File", &["cfg"])
+        .pick_file(move |path| {
+            let Some(path) = path else {
             return;
         };
 
-        if let Err(error) = tauri_block_on(BOT_FOLDER_SETTINGS.write()).add_file(&window, path.to_string_lossy().to_string()) {
-            ccprintln!(&window, "Error adding file: {error}");
-        }
-    });
+            if let Err(error) =
+                tauri_block_on(BOT_FOLDER_SETTINGS.write()).add_file(&window, path.to_string_lossy().to_string())
+            {
+                ccprintln!(&window, "Error adding file: {error}");
+            }
+        });
 }
 
 #[tauri::command]
 pub fn pick_json_file(window: Window) {
-    FileDialogBuilder::new().add_filter("JSON File", &["json"]).pick_file(move |path| {
-        let Some(path) = path else {
+    FileDialogBuilder::new()
+        .add_filter("JSON File", &["json"])
+        .pick_file(move |path| {
+            let Some(path) = path else {
             return;
         };
 
-        if let Err(e) = window.emit("json_file_selected", path.to_string_lossy().to_string()) {
-            ccprintln!(&window, "Error emiting json_file_selected event: {e}");
-        }
-    });
+            if let Err(e) = window.emit("json_file_selected", path.to_string_lossy().to_string()) {
+                ccprintln!(&window, "Error emiting json_file_selected event: {e}");
+            }
+        });
 }
 
 #[derive(Debug, Error)]
@@ -253,7 +268,8 @@ pub async fn save_looks(window: Window, path: String, config: BotLooksConfig) {
 #[tauri::command]
 pub async fn get_match_options() -> Result<MatchOptions, String> {
     let mut mo = MatchOptions::default();
-    mo.map_types.extend(custom_maps::find_all(&BOT_FOLDER_SETTINGS.read().await.folders));
+    mo.map_types
+        .extend(custom_maps::find_all(&BOT_FOLDER_SETTINGS.read().await.folders));
     Ok(mo)
 }
 
@@ -308,7 +324,8 @@ pub async fn get_team_settings(window: Window) -> HashMap<String, Vec<BotConfigB
 
     let orange_team = trimmed_to_bot_bundles(
         &window,
-        serde_json::from_str(&config.get("team_settings", "orange_team").unwrap_or_else(|| "[]".to_owned())).unwrap_or_default(),
+        serde_json::from_str(&config.get("team_settings", "orange_team").unwrap_or_else(|| "[]".to_owned()))
+            .unwrap_or_default(),
     )
     .await;
 
@@ -322,15 +339,29 @@ pub async fn get_team_settings(window: Window) -> HashMap<String, Vec<BotConfigB
 fn trim_bot_bundles(bundles: Vec<BotConfigBundle>) -> Vec<(Option<f32>, String)> {
     bundles
         .into_iter()
-        .map(|b| if b.path.is_empty() { (b.skill, b.runnable_type) } else { (b.skill, b.path) })
+        .map(|b| {
+            if b.path.is_empty() {
+                (b.skill, b.runnable_type)
+            } else {
+                (b.skill, b.path)
+            }
+        })
         .collect()
 }
 
 #[tauri::command]
 pub async fn save_team_settings(window: Window, blue_team: Vec<BotConfigBundle>, orange_team: Vec<BotConfigBundle>) {
     let mut config = load_gui_config(&window).await;
-    config.set("team_settings", "blue_team", Some(serde_json::to_string(&trim_bot_bundles(blue_team)).unwrap()));
-    config.set("team_settings", "orange_team", Some(serde_json::to_string(&trim_bot_bundles(orange_team)).unwrap()));
+    config.set(
+        "team_settings",
+        "blue_team",
+        Some(serde_json::to_string(&trim_bot_bundles(blue_team)).unwrap()),
+    );
+    config.set(
+        "team_settings",
+        "orange_team",
+        Some(serde_json::to_string(&trim_bot_bundles(orange_team)).unwrap()),
+    );
 
     if let Err(e) = save_cfg(&config, get_config_path()).await {
         ccprintln!(&window, "Error saving team settings: {e}");
@@ -344,7 +375,10 @@ pub async fn get_language_support() -> HashMap<String, bool> {
     lang_support.insert("java".to_owned(), get_command_status("java", ["-version"]));
     lang_support.insert("node".to_owned(), get_command_status("node", ["--version"]));
     lang_support.insert("chrome".to_owned(), has_chrome());
-    lang_support.insert("fullpython".to_owned(), get_command_status(&*PYTHON_PATH.read().await, ["-c", "import tkinter"]));
+    lang_support.insert(
+        "fullpython".to_owned(),
+        get_command_status(&*PYTHON_PATH.read().await, ["-c", "import tkinter"]),
+    );
     lang_support.insert("dotnet".to_owned(), get_command_status("dotnet", ["--list"]));
 
     dbg!(lang_support)
@@ -373,13 +407,15 @@ pub async fn set_python_path(window: Window, path: String) {
 
 #[tauri::command]
 pub fn pick_appearance_file(window: Window) {
-    FileDialogBuilder::new().add_filter("Appearance Cfg File", &["cfg"]).pick_file(move |path| {
-        if let Some(path) = path {
-            if let Err(e) = window.emit("set_appearance_file", path.to_string_lossy().to_string()) {
-                ccprintln!(&window, "Error setting appearance file: {e}");
+    FileDialogBuilder::new()
+        .add_filter("Appearance Cfg File", &["cfg"])
+        .pick_file(move |path| {
+            if let Some(path) = path {
+                if let Err(e) = window.emit("set_appearance_file", path.to_string_lossy().to_string()) {
+                    ccprintln!(&window, "Error setting appearance file: {e}");
+                }
             }
-        }
-    });
+        });
 }
 
 #[derive(Debug, Error)]
@@ -428,7 +464,12 @@ pub async fn get_recommendations(window: Window) -> Option<AllRecommendations<Bo
             .iter()
             .filter(|(_, props)| props.visible)
             .filter_map(|(path, _)| match glob(&format!("{path}/**/*.cfg")) {
-                Ok(paths) => Some(paths.flatten().filter_map(|path| BotConfigBundle::name_from_path(path.as_path()).ok()).collect::<Vec<_>>()),
+                Ok(paths) => Some(
+                    paths
+                        .flatten()
+                        .filter_map(|path| BotConfigBundle::name_from_path(path.as_path()).ok())
+                        .collect::<Vec<_>>(),
+                ),
                 Err(e) => {
                     ccprintln(&window, e.to_string());
                     None
@@ -515,8 +556,16 @@ async fn get_custom_story_json(story_settings: &StoryConfig) -> Option<StoryMode
         return Some(json.clone());
     }
 
-    let story_config: StoryModeConfig = serde_json::from_str(&async_fs::read_to_string(&story_settings.custom_config.story_path).await.ok()?).ok()?;
-    CUSTOM_STORIES_CACHE.write().await.insert(story_settings.clone(), story_config.clone());
+    let story_config: StoryModeConfig = serde_json::from_str(
+        &async_fs::read_to_string(&story_settings.custom_config.story_path)
+            .await
+            .ok()?,
+    )
+    .ok()?;
+    CUSTOM_STORIES_CACHE
+        .write()
+        .await
+        .insert(story_settings.clone(), story_config.clone());
     Some(story_config)
 }
 
@@ -601,8 +650,16 @@ impl GuiTabCategory {
     }
 
     pub fn save_to_config(&self, conf: &mut Ini) {
-        conf.set("gui_state", "selected_tab", Some(serde_json::to_string(&self.primary).unwrap()));
-        conf.set("gui_state", "selected_tab_secondary", Some(serde_json::to_string(&self.secondary).unwrap()));
+        conf.set(
+            "gui_state",
+            "selected_tab",
+            Some(serde_json::to_string(&self.primary).unwrap()),
+        );
+        conf.set(
+            "gui_state",
+            "selected_tab_secondary",
+            Some(serde_json::to_string(&self.secondary).unwrap()),
+        );
     }
 
     pub async fn save(&self, window: &Window) {

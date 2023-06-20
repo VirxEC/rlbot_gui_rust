@@ -27,6 +27,7 @@ crate::storymode_json! {
             "challenges": [
                 {
                     "id": "TRYHARD-1",
+                    "optional": true,
                     "humanTeamSize": 2,
                     "opponentBots": ["nombot", "beast"],
                     "map": "UrbanCentral",
@@ -34,6 +35,7 @@ crate::storymode_json! {
                 },
                 {
                     "id": "TRYHARD-2",
+                    "optional": true,
                     "humanTeamSize": 2,
                     "opponentBots": ["penguin", "beast"],
                     "completionConditions": {
@@ -175,7 +177,7 @@ crate::storymode_json! {
                     "display": "This ML prodigy would like to have a word with you."
                 },
                 {
-                    "id": "CHAMP-4",
+                    "id": "CHAMP-5",
                     "humanTeamSize": 3,
                     "opponentBots": ["bumblebee", "bumblebee", "bumblebee"],
                     "map": "ChampionsField",

@@ -38,7 +38,13 @@ pub enum ExtractError {
 /// * `target_dir`: The target directory to extract the zip file to
 /// * `toplevel`: If the top level directory to strip from the zip file (does nothing if there are multiple top level directories)
 /// * `replace`: Whether or not files should be overwritten if they already exist in the target directory
-pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, strip_toplevel: bool, replace: bool) -> Result<(), ExtractError> {
+pub fn extract<S: Read + Seek>(
+    window: &Window,
+    source: S,
+    target_dir: &Path,
+    strip_toplevel: bool,
+    replace: bool,
+) -> Result<(), ExtractError> {
     if !target_dir.exists() {
         fs::create_dir_all(target_dir)?;
     }
@@ -84,7 +90,12 @@ pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, st
         let outpath = target_dir.join(&relative_path);
 
         if item.is_dir() {
-            ccprintlnr!(window, "Creating directory {} from {}", outpath.to_string_lossy(), relative_path.display());
+            ccprintlnr!(
+                window,
+                "Creating directory {} from {}",
+                outpath.to_string_lossy(),
+                relative_path.display()
+            );
             if !outpath.exists() {
                 if let Err(e) = fs::create_dir_all(&outpath) {
                     ccprintln!(window, "Error creating directory {}: {e}", outpath.display());
@@ -107,7 +118,12 @@ pub fn extract<S: Read + Seek>(window: &Window, source: S, target_dir: &Path, st
             }
         }
 
-        ccprintlnr!(window, "({i}/{num_files}) Creating {} from {}", outpath.to_string_lossy(), relative_path.display());
+        ccprintlnr!(
+            window,
+            "({i}/{num_files}) Creating {} from {}",
+            outpath.to_string_lossy(),
+            relative_path.display()
+        );
         let mut outfile = fs::File::create(&outpath)?;
         copy(&mut item, &mut outfile)?;
     }
@@ -138,7 +154,11 @@ fn has_toplevel<S: Read + Seek>(window: &Window, archive: &mut ZipArchive<S>) ->
         } else {
             // First iteration
             let comp: PathBuf = file.components().take(1).collect();
-            ccprintln!(window, "Checking if path component {} is the only toplevel directory", comp.display());
+            ccprintln!(
+                window,
+                "Checking if path component {} is the only toplevel directory",
+                comp.display()
+            );
             toplevel_dir = Some(comp);
         }
     }

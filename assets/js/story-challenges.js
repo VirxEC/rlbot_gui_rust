@@ -10,12 +10,14 @@ const DEBUG = false;
 const CITY_STATE = {
   LOCKED: 0,
   OPEN: 1,
-  DONE: 2,
+  OPTIONALS_LEFT: 2,
+  DONE: 3,
 };
 
 const CITY_ICON_MAP = [
   "imgs/story/lock-100px.png", // LOCKED
-  "",
+  "", // OPEN
+  "imgs/story/checkmark-outline-100px.png", // OPTIONALS_LEFT
   "imgs/story/checkmark-100px.png", // DONE
 ];
 
@@ -198,7 +200,7 @@ export default {
                 <b-button block
                   @click="$refs.pickTeamPopup.show(challenge)"
                   v-bind:variant="challengeCompleted(challenge.id)? 'outline-dark' : 'outline-primary' ">
-                  {{challenge.display}}
+                  {{!!challenge.optional ? "Optional: " + challenge.display : challenge.display}}
                 </b-button>
               </b-list-group-item>
             </b-list-group>
@@ -283,14 +285,20 @@ export default {
       return result;
     },
     recruit_list: function () {
-      const recruits = {};
+      let recruits = {};
 
-      for (const city of Object.keys(this.challenges)) {
-        if (this.getCityState(city) !== CITY_STATE.DONE) {
+      // You can recruit bots from mandatory challenges of
+      // a city once all the mandatory challenges of that city is complete.
+      for (let city of Object.keys(this.challenges)) {
+        const state = this.getCityState(city);
+        if (state === CITY_STATE.LOCKED || state === CITY_STATE.OPEN) {
           continue;
         }
-        for (const challenge of this.challenges[city]) {
-          // This challenge was completed so opponents are available
+        for (let challenge of this.challenges[city]) {
+          if (challenge.optional) {
+            continue;
+          }
+          // This challenge was mandatory and now completed so opponents are available
           const botIds = challenge.opponentBots;
           for (const botId of botIds) {
             const bot = Object.assign({}, this.bots_config[botId]);
@@ -317,13 +325,18 @@ export default {
         // current city is stll open, that's fine
       } else {
         const openCities = Object.keys(this.cityDisplayInfo).filter(
-          (city) => this.getCityState(city) === CITY_STATE.OPEN
+          (city) => this.getCityState(city) == CITY_STATE.OPEN
         );
-
-        const random =
-          openCities[Math.floor(Math.random() * openCities.length)];
-        console.log(random);
-        this.selectedCityId = random;
+        // Fall back to cities with optional challenges left
+        if (openCities.length === 0)
+          openCities = Object.keys(this.cityDisplayInfo).filter(
+            (city) => this.getCityState(city) == CITY_STATE.OPTIONALS_LEFT
+          );
+        // Fall back to cur
+        if (openCities.length === 0) this.selectedCityId = cur;
+        else
+          this.selectedCityId =
+            openCities[Math.floor(Math.random() * openCities.length)];
       }
     },
     challengeCompleted: function (id) {
@@ -352,12 +365,28 @@ export default {
       let state = CITY_STATE.LOCKED;
 
       const prereqs = this.cityDisplayInfo[city].prereqs;
-      if (prereqs.every((c) => this.getCityState(c) === CITY_STATE.DONE)) {
-        state = CITY_STATE.OPEN;
+      if (
+        prereqs.every((c) =>
+          [CITY_STATE.DONE, CITY_STATE.OPTIONALS_LEFT].includes(
+            this.getCityState(c)
+          )
+        )
+      ) {
+        let anyOptionalsLeft = false;
+        let anyRequiredLeft = false;
 
-        // only need to check completion of challenges if we are open
-        const cityChallenges = this.challenges[city];
-        if (cityChallenges.every((c) => this.challengeCompleted(c.id))) {
+        let cityChallenges = this.challenges[city];
+        for (const c of cityChallenges) {
+          if (!this.challengeCompleted(c.id)) {
+            if (!!c.optional) anyOptionalsLeft = true;
+            else anyRequiredLeft = true;
+          }
+        }
+        if (anyRequiredLeft) {
+          state = CITY_STATE.OPEN;
+        } else if (anyOptionalsLeft) {
+          state = CITY_STATE.OPTIONALS_LEFT;
+        } else {
           state = CITY_STATE.DONE;
         }
       }
