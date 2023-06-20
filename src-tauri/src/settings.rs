@@ -49,9 +49,15 @@ pub struct BotFolders {
 
 impl BotFolders {
     pub fn load_from_conf(conf: &Ini) -> Self {
-        let files = serde_json::from_str(&conf.get("bot_folder_settings", "files").unwrap_or_else(|| String::from("[]"))).unwrap_or_default();
+        let files = serde_json::from_str(&conf.get("bot_folder_settings", "files").unwrap_or_else(|| String::from("[]")))
+            .unwrap_or_default();
 
-        let folders = serde_json::from_str(&conf.get("bot_folder_settings", "folders").unwrap_or_else(|| String::from("[]"))).unwrap_or_default();
+        let folders = serde_json::from_str(
+            &conf
+                .get("bot_folder_settings", "folders")
+                .unwrap_or_else(|| String::from("[]")),
+        )
+        .unwrap_or_default();
 
         Self { files, folders }
     }
@@ -105,34 +111,70 @@ impl MutatorConfig {
     pub async fn load(window: &Window) -> Self {
         let conf = load_gui_config(window).await;
 
-        let match_length = conf.get("mutator_settings", "match_length").and_then(|x| serde_json::from_str(&x).ok()).unwrap_or_default();
-        let max_score = conf.get("mutator_settings", "max_score").and_then(|x| serde_json::from_str(&x).ok()).unwrap_or_default();
-        let overtime = conf.get("mutator_settings", "overtime").and_then(|x| serde_json::from_str(&x).ok()).unwrap_or_default();
+        let match_length = conf
+            .get("mutator_settings", "match_length")
+            .and_then(|x| serde_json::from_str(&x).ok())
+            .unwrap_or_default();
+        let max_score = conf
+            .get("mutator_settings", "max_score")
+            .and_then(|x| serde_json::from_str(&x).ok())
+            .unwrap_or_default();
+        let overtime = conf
+            .get("mutator_settings", "overtime")
+            .and_then(|x| serde_json::from_str(&x).ok())
+            .unwrap_or_default();
         let series_length = conf
             .get("mutator_settings", "series_length")
             .and_then(|x| serde_json::from_str(&x).ok())
             .unwrap_or_default();
-        let game_speed = conf.get("mutator_settings", "game_speed").and_then(|x| serde_json::from_str(&x).ok()).unwrap_or_default();
+        let game_speed = conf
+            .get("mutator_settings", "game_speed")
+            .and_then(|x| serde_json::from_str(&x).ok())
+            .unwrap_or_default();
         let ball_max_speed = conf
             .get("mutator_settings", "ball_max_speed")
             .and_then(|x| serde_json::from_str(&x).ok())
             .unwrap_or_default();
-        let ball_type = conf.get("mutator_settings", "ball_type").and_then(|x| serde_json::from_str(&x).ok()).unwrap_or_default();
-        let ball_weight = conf.get("mutator_settings", "ball_weight").and_then(|x| serde_json::from_str(&x).ok()).unwrap_or_default();
-        let ball_size = conf.get("mutator_settings", "ball_size").and_then(|x| serde_json::from_str(&x).ok()).unwrap_or_default();
+        let ball_type = conf
+            .get("mutator_settings", "ball_type")
+            .and_then(|x| serde_json::from_str(&x).ok())
+            .unwrap_or_default();
+        let ball_weight = conf
+            .get("mutator_settings", "ball_weight")
+            .and_then(|x| serde_json::from_str(&x).ok())
+            .unwrap_or_default();
+        let ball_size = conf
+            .get("mutator_settings", "ball_size")
+            .and_then(|x| serde_json::from_str(&x).ok())
+            .unwrap_or_default();
         let ball_bounciness = conf
             .get("mutator_settings", "ball_bounciness")
             .and_then(|x| serde_json::from_str(&x).ok())
             .unwrap_or_default();
-        let boost_amount = conf.get("mutator_settings", "boost_amount").and_then(|x| serde_json::from_str(&x).ok()).unwrap_or_default();
-        let rumble = conf.get("mutator_settings", "rumble").and_then(|x| serde_json::from_str(&x).ok()).unwrap_or_default();
+        let boost_amount = conf
+            .get("mutator_settings", "boost_amount")
+            .and_then(|x| serde_json::from_str(&x).ok())
+            .unwrap_or_default();
+        let rumble = conf
+            .get("mutator_settings", "rumble")
+            .and_then(|x| serde_json::from_str(&x).ok())
+            .unwrap_or_default();
         let boost_strength = conf
             .get("mutator_settings", "boost_strength")
             .and_then(|x| serde_json::from_str(&x).ok())
             .unwrap_or_default();
-        let gravity = conf.get("mutator_settings", "gravity").and_then(|x| serde_json::from_str(&x).ok()).unwrap_or_default();
-        let demolish = conf.get("mutator_settings", "demolish").and_then(|x| serde_json::from_str(&x).ok()).unwrap_or_default();
-        let respawn_time = conf.get("mutator_settings", "respawn_time").and_then(|x| serde_json::from_str(&x).ok()).unwrap_or_default();
+        let gravity = conf
+            .get("mutator_settings", "gravity")
+            .and_then(|x| serde_json::from_str(&x).ok())
+            .unwrap_or_default();
+        let demolish = conf
+            .get("mutator_settings", "demolish")
+            .and_then(|x| serde_json::from_str(&x).ok())
+            .unwrap_or_default();
+        let respawn_time = conf
+            .get("mutator_settings", "respawn_time")
+            .and_then(|x| serde_json::from_str(&x).ok())
+            .unwrap_or_default();
 
         Self {
             match_length,
@@ -294,19 +336,57 @@ impl MatchConfig {
     pub async fn load(window: &Window) -> Self {
         let conf = load_gui_config(window).await;
 
-        let map = conf.get("match_settings", "map").and_then(|x| serde_json::from_str(&x).ok()).unwrap_or_default();
-        let game_mode = conf.get("match_settings", "game_mode").and_then(|x| serde_json::from_str(&x).ok()).unwrap_or_default();
-        let match_behavior = conf.get("match_settings", "match_behavior").and_then(|x| serde_json::from_str(&x).ok()).unwrap_or_default();
-        let skip_replays = conf.getbool("match_settings", "skip_replays").ok().flatten().unwrap_or_default();
-        let instant_start = conf.getbool("match_settings", "instant_start").ok().flatten().unwrap_or_default();
-        let enable_lockstep = conf.getbool("match_settings", "enable_lockstep").ok().flatten().unwrap_or_default();
-        let randomize_map = conf.getbool("match_settings", "randomize_map").ok().flatten().unwrap_or_default();
-        let enable_rendering = conf.getbool("match_settings", "enable_rendering").ok().flatten().unwrap_or_default();
-        let enable_state_setting = conf.getbool("match_settings", "enable_state_setting").ok().flatten().unwrap_or(true);
-        let auto_save_replay = conf.getbool("match_settings", "auto_save_replay").ok().flatten().unwrap_or_default();
+        let map = conf
+            .get("match_settings", "map")
+            .and_then(|x| serde_json::from_str(&x).ok())
+            .unwrap_or_default();
+        let game_mode = conf
+            .get("match_settings", "game_mode")
+            .and_then(|x| serde_json::from_str(&x).ok())
+            .unwrap_or_default();
+        let match_behavior = conf
+            .get("match_settings", "match_behavior")
+            .and_then(|x| serde_json::from_str(&x).ok())
+            .unwrap_or_default();
+        let skip_replays = conf
+            .getbool("match_settings", "skip_replays")
+            .ok()
+            .flatten()
+            .unwrap_or_default();
+        let instant_start = conf
+            .getbool("match_settings", "instant_start")
+            .ok()
+            .flatten()
+            .unwrap_or_default();
+        let enable_lockstep = conf
+            .getbool("match_settings", "enable_lockstep")
+            .ok()
+            .flatten()
+            .unwrap_or_default();
+        let randomize_map = conf
+            .getbool("match_settings", "randomize_map")
+            .ok()
+            .flatten()
+            .unwrap_or_default();
+        let enable_rendering = conf
+            .getbool("match_settings", "enable_rendering")
+            .ok()
+            .flatten()
+            .unwrap_or_default();
+        let enable_state_setting = conf
+            .getbool("match_settings", "enable_state_setting")
+            .ok()
+            .flatten()
+            .unwrap_or(true);
+        let auto_save_replay = conf
+            .getbool("match_settings", "auto_save_replay")
+            .ok()
+            .flatten()
+            .unwrap_or_default();
         let scripts = Self::trimmed_to_bundles(
             window,
-            serde_json::from_str(&conf.get("match_settings", "scripts").unwrap_or_else(|| "[]".to_owned())).unwrap_or_default(),
+            serde_json::from_str(&conf.get("match_settings", "scripts").unwrap_or_else(|| "[]".to_owned()))
+                .unwrap_or_default(),
         )
         .await;
 
@@ -414,7 +494,10 @@ pub struct ConsoleTextUpdate {
 
 impl ConsoleTextUpdate {
     const fn new(text: String, replace_last: bool) -> Self {
-        ConsoleTextUpdate { content: text, replace_last }
+        ConsoleTextUpdate {
+            content: text,
+            replace_last,
+        }
     }
 
     pub fn from(mut text: String, replace_last: bool) -> Self {
@@ -451,8 +534,13 @@ impl LauncherConfig {
         let config = load_gui_config(window).await;
 
         Self {
-            preferred_launcher: config.get("launcher_settings", "preferred_launcher").unwrap_or_else(|| "epic".to_owned()),
-            use_login_tricks: config.getbool("launcher_settings", "use_login_tricks").unwrap_or_default().unwrap_or(true),
+            preferred_launcher: config
+                .get("launcher_settings", "preferred_launcher")
+                .unwrap_or_else(|| "epic".to_owned()),
+            use_login_tricks: config
+                .getbool("launcher_settings", "use_login_tricks")
+                .unwrap_or_default()
+                .unwrap_or(true),
             rocket_league_exe_path: config.get("launcher_settings", "rocket_league_exe_path"),
         }
     }
@@ -461,7 +549,11 @@ impl LauncherConfig {
         let mut config = load_gui_config(window).await;
 
         config.set("launcher_settings", "preferred_launcher", Some(self.preferred_launcher));
-        config.set("launcher_settings", "use_login_tricks", Some(self.use_login_tricks.to_string()));
+        config.set(
+            "launcher_settings",
+            "use_login_tricks",
+            Some(self.use_login_tricks.to_string()),
+        );
         config.set("launcher_settings", "rocket_league_exe_path", self.rocket_league_exe_path);
 
         if let Err(e) = async_fs::write(get_config_path(), config.writes()).await {
@@ -630,7 +722,10 @@ impl StoryState {
     }
 
     pub fn add_purchase(&mut self, id: String, cost: usize) -> Result<(), String> {
-        let current_currency = *self.upgrades.get(Self::CURRENCY_KEY).ok_or("The key 'currency' was not found")?;
+        let current_currency = *self
+            .upgrades
+            .get(Self::CURRENCY_KEY)
+            .ok_or("The key 'currency' was not found")?;
         if current_currency < cost {
             return Err(format!("Not enough currency to purchase {id}"));
         }
@@ -646,7 +741,10 @@ impl StoryState {
     }
 
     pub fn add_recruit(&mut self, id: String) -> Result<(), String> {
-        let current_currency = *self.upgrades.get(Self::CURRENCY_KEY).ok_or("The key 'currency' was not found")?;
+        let current_currency = *self
+            .upgrades
+            .get(Self::CURRENCY_KEY)
+            .ok_or("The key 'currency' was not found")?;
         if current_currency < 1 {
             return Err(format!("Not enough currency to recruit {id}"));
         }

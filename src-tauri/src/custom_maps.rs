@@ -10,14 +10,17 @@ pub fn find_all(bf: &HashMap<String, BotFolder>) -> Vec<MapType> {
     get_search_folders(bf)
         .iter()
         .flat_map(|folder| {
-            glob(&format!("{folder}/**/*.u[pd]k")).unwrap().flatten().filter_map(|match_| {
-                let basename = match_.file_name()?.to_string_lossy();
-                if basename.starts_with('_') {
-                    None
-                } else {
-                    Some(MapType::Custom(basename.to_string()))
-                }
-            })
+            glob(&format!("{folder}/**/*.u[pd]k"))
+                .unwrap()
+                .flatten()
+                .filter_map(|match_| {
+                    let basename = match_.file_name()?.to_string_lossy();
+                    if basename.starts_with('_') {
+                        None
+                    } else {
+                        Some(MapType::Custom(basename.to_string()))
+                    }
+                })
         })
         .collect()
 }

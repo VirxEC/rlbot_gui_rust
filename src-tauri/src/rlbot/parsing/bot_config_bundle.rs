@@ -227,19 +227,29 @@ impl BotConfigBundle {
             .get(BOT_CONFIG_MODULE_HEADER, LOOKS_CONFIG_KEY)
             .map(|path| format!("{config_directory}/{path}"))
             .ok_or_else(|| RLBotCfgParseError::NoLooksConfig(config_path_str.clone()))?;
-        let supports_standalone = conf.getboolcoerce(BOT_CONFIG_MODULE_HEADER, SUPPORTS_STANDALONE).unwrap_or_default().unwrap_or_default();
+        let supports_standalone = conf
+            .getboolcoerce(BOT_CONFIG_MODULE_HEADER, SUPPORTS_STANDALONE)
+            .unwrap_or_default()
+            .unwrap_or_default();
         let use_virtual_environment = conf
             .getboolcoerce(BOT_CONFIG_MODULE_HEADER, USE_VIRTUAL_ENVIRONMENT_KEY)
             .unwrap_or_default()
             .unwrap_or_default();
-        let requirements_file = conf.get(BOT_CONFIG_MODULE_HEADER, REQUIREMENTS_FILE_KEY).map(|path| format!("{config_directory}/{path}"));
-        let requires_tkinter = conf.getboolcoerce(BOT_CONFIG_MODULE_HEADER, REQUIRES_TKINTER).unwrap_or_default().unwrap_or_default();
+        let requirements_file = conf
+            .get(BOT_CONFIG_MODULE_HEADER, REQUIREMENTS_FILE_KEY)
+            .map(|path| format!("{config_directory}/{path}"));
+        let requires_tkinter = conf
+            .getboolcoerce(BOT_CONFIG_MODULE_HEADER, REQUIRES_TKINTER)
+            .unwrap_or_default()
+            .unwrap_or_default();
 
         if !Path::new(&looks_path).exists() {
             return Err(RLBotCfgParseError::NoLooksConfig(config_path_str));
         }
 
-        let relative_logo_path = conf.get(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY).unwrap_or_else(|| String::from("logo.png"));
+        let relative_logo_path = conf
+            .get(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY)
+            .unwrap_or_else(|| String::from("logo.png"));
         let logo_path = format!("{config_directory}/{relative_logo_path}");
 
         let logo = None;
@@ -386,7 +396,10 @@ impl Runnable for BotConfigBundle {
     }
 
     fn may_require_python_packages(&self) -> bool {
-        self.info.as_ref().map(|info| info.language.to_lowercase().contains("python")).unwrap_or_default()
+        self.info
+            .as_ref()
+            .map(|info| info.language.to_lowercase().contains("python"))
+            .unwrap_or_default()
     }
 }
 
@@ -440,10 +453,17 @@ impl ScriptConfigBundle {
             .getboolcoerce(BOT_CONFIG_MODULE_HEADER, USE_VIRTUAL_ENVIRONMENT_KEY)
             .unwrap_or(None)
             .unwrap_or_default();
-        let requirements_file = conf.get(BOT_CONFIG_MODULE_HEADER, REQUIREMENTS_FILE_KEY).map(|path| format!("{config_directory}/{path}"));
-        let requires_tkinter = conf.getboolcoerce(BOT_CONFIG_MODULE_HEADER, REQUIRES_TKINTER).unwrap_or(None).unwrap_or_default();
+        let requirements_file = conf
+            .get(BOT_CONFIG_MODULE_HEADER, REQUIREMENTS_FILE_KEY)
+            .map(|path| format!("{config_directory}/{path}"));
+        let requires_tkinter = conf
+            .getboolcoerce(BOT_CONFIG_MODULE_HEADER, REQUIRES_TKINTER)
+            .unwrap_or(None)
+            .unwrap_or_default();
 
-        let relative_logo_path = conf.get(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY).unwrap_or_else(|| String::from("logo.png"));
+        let relative_logo_path = conf
+            .get(BOT_CONFIG_MODULE_HEADER, LOGO_FILE_KEY)
+            .unwrap_or_else(|| String::from("logo.png"));
         let absolute_logo_path = format!("{config_directory}/{relative_logo_path}");
         let logo = None;
 

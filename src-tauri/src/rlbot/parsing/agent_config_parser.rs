@@ -108,8 +108,16 @@ impl BotTeamLooksConfig {
         config.set(loadout_header, "engine_audio_id", Some(self.engine_audio_id.clone()));
         config.set(loadout_header, "trails_id", Some(self.trails_id.clone()));
         config.set(loadout_header, "goal_explosion_id", Some(self.goal_explosion_id.clone()));
-        config.set(loadout_header, "primary_color_lookup", Some(self.primary_color_lookup.clone()));
-        config.set(loadout_header, "secondary_color_lookup", Some(self.secondary_color_lookup.clone()));
+        config.set(
+            loadout_header,
+            "primary_color_lookup",
+            Some(self.primary_color_lookup.clone()),
+        );
+        config.set(
+            loadout_header,
+            "secondary_color_lookup",
+            Some(self.secondary_color_lookup.clone()),
+        );
         config.set(paint_header, "car_paint_id", Some(self.car_paint_id.clone()));
         config.set(paint_header, "decal_paint_id", Some(self.decal_paint_id.clone()));
         config.set(paint_header, "wheels_paint_id", Some(self.wheels_paint_id.clone()));
@@ -117,7 +125,11 @@ impl BotTeamLooksConfig {
         config.set(paint_header, "antenna_paint_id", Some(self.antenna_paint_id.clone()));
         config.set(paint_header, "hat_paint_id", Some(self.hat_paint_id.clone()));
         config.set(paint_header, "trails_paint_id", Some(self.trails_paint_id.clone()));
-        config.set(paint_header, "goal_explosion_paint_id", Some(self.goal_explosion_paint_id.clone()));
+        config.set(
+            paint_header,
+            "goal_explosion_paint_id",
+            Some(self.goal_explosion_paint_id.clone()),
+        );
     }
 }
 
@@ -130,16 +142,26 @@ pub struct BotLooksConfig {
 impl BotLooksConfig {
     pub async fn from_path(path: &str) -> Result<Self, Error> {
         Ok(Self {
-            blue: BotTeamLooksConfig::from_path(BOT_CONFIG_LOADOUT_HEADER, BOT_CONFIG_LOADOUT_PAINT_BLUE_HEADER, path).await?,
-            orange: BotTeamLooksConfig::from_path(BOT_CONFIG_LOADOUT_ORANGE_HEADER, BOT_CONFIG_LOADOUT_PAINT_ORANGE_HEADER, path).await?,
+            blue: BotTeamLooksConfig::from_path(BOT_CONFIG_LOADOUT_HEADER, BOT_CONFIG_LOADOUT_PAINT_BLUE_HEADER, path)
+                .await?,
+            orange: BotTeamLooksConfig::from_path(
+                BOT_CONFIG_LOADOUT_ORANGE_HEADER,
+                BOT_CONFIG_LOADOUT_PAINT_ORANGE_HEADER,
+                path,
+            )
+            .await?,
         })
     }
 
     pub async fn save_to_path(&self, window: &Window, path: &str) {
         let mut config = Ini::new();
-        self.blue.save_to_config(&mut config, BOT_CONFIG_LOADOUT_HEADER, BOT_CONFIG_LOADOUT_PAINT_BLUE_HEADER);
-        self.orange
-            .save_to_config(&mut config, BOT_CONFIG_LOADOUT_ORANGE_HEADER, BOT_CONFIG_LOADOUT_PAINT_ORANGE_HEADER);
+        self.blue
+            .save_to_config(&mut config, BOT_CONFIG_LOADOUT_HEADER, BOT_CONFIG_LOADOUT_PAINT_BLUE_HEADER);
+        self.orange.save_to_config(
+            &mut config,
+            BOT_CONFIG_LOADOUT_ORANGE_HEADER,
+            BOT_CONFIG_LOADOUT_PAINT_ORANGE_HEADER,
+        );
 
         if let Err(e) = save_cfg(&config, path).await {
             ccprintln!(window, "Error saving bot config to {path}: {e}");

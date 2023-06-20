@@ -42,7 +42,11 @@ pub enum DownloadExtractError {
 /// * `window`: A reference to the GUI, obtained from a `#[tauri::command]` function
 /// * `url`: The URL of the ZIP that should be downloaded
 /// * `top_dir`: The path to the folder where the ZIP will get extracted
-async fn download_extract_bot_template<T: IntoUrl>(window: &Window, url: T, top_dir: &Path) -> Result<(), DownloadExtractError> {
+async fn download_extract_bot_template<T: IntoUrl>(
+    window: &Window,
+    url: T,
+    top_dir: &Path,
+) -> Result<(), DownloadExtractError> {
     let res = reqwest::get(url).await?;
     let bytes = res.bytes().await?;
 
@@ -80,7 +84,12 @@ pub async fn bootstrap_python_bot(window: &Window, bot_name: String, directory: 
         return Err(BoostrapError::NameExists(sanitized_name));
     }
 
-    download_extract_bot_template(window, "https://github.com/RLBot/RLBotPythonExample/archive/master.zip", top_dir.as_path()).await?;
+    download_extract_bot_template(
+        window,
+        "https://github.com/RLBot/RLBotPythonExample/archive/master.zip",
+        top_dir.as_path(),
+    )
+    .await?;
 
     let bundles = scan_directory_for_bot_configs(window, &top_dir.to_string_lossy()).await;
     let config_file = &bundles[0].path;
@@ -125,7 +134,11 @@ fn replace_all_regex_in_file<R: Replacer>(file_path: &Path, regex: &Regex, repla
 /// * `window`: A reference to the GUI, obtained from a `#[tauri::command]` function
 /// * `hive_name`: The name of the bots
 /// * `directory`: The base directory to put the bot it, which must exist already
-pub async fn bootstrap_python_hivemind(window: &Window, hive_name: String, directory: PathBuf) -> Result<String, BoostrapError> {
+pub async fn bootstrap_python_hivemind(
+    window: &Window,
+    hive_name: String,
+    directory: PathBuf,
+) -> Result<String, BoostrapError> {
     let sanitized_name = sanitize(&hive_name);
     let top_dir = directory.join(&sanitized_name);
 
@@ -133,7 +146,12 @@ pub async fn bootstrap_python_hivemind(window: &Window, hive_name: String, direc
         return Err(BoostrapError::NameExists(sanitized_name));
     }
 
-    download_extract_bot_template(window, "https://github.com/RLBot/RLBotPythonHivemindExample/archive/master.zip", top_dir.as_path()).await?;
+    download_extract_bot_template(
+        window,
+        "https://github.com/RLBot/RLBotPythonHivemindExample/archive/master.zip",
+        top_dir.as_path(),
+    )
+    .await?;
 
     let config_file = top_dir.join("config.cfg");
     let drone_file = top_dir.join("src").join("drone.py");
@@ -141,7 +159,11 @@ pub async fn bootstrap_python_hivemind(window: &Window, hive_name: String, direc
 
     change_key_in_cfg(&config_file, BOT_CONFIG_MODULE_HEADER, NAME_KEY, hive_name.clone()).await?;
 
-    replace_all_regex_in_file(&drone_file, &Regex::new(r"hive_name = .*$").unwrap(), format!("hive_name = \"{hive_name} Hivemind\""))?;
+    replace_all_regex_in_file(
+        &drone_file,
+        &Regex::new(r"hive_name = .*$").unwrap(),
+        format!("hive_name = \"{hive_name} Hivemind\""),
+    )?;
 
     let mut hasher = DefaultHasher::new();
     hive_name.hash(&mut hasher);
@@ -149,7 +171,11 @@ pub async fn bootstrap_python_hivemind(window: &Window, hive_name: String, direc
     // add random number between 100000 and 999999 to hive_id
     hive_key += rand::random::<u64>() % 1_000_000;
 
-    replace_all_regex_in_file(&drone_file, &Regex::new(r"hive_key = .*$").unwrap(), format!("hive_key = \"{hive_key}\""))?;
+    replace_all_regex_in_file(
+        &drone_file,
+        &Regex::new(r"hive_key = .*$").unwrap(),
+        format!("hive_key = \"{hive_key}\""),
+    )?;
 
     replace_all_regex_in_file(
         &hive_file,
@@ -187,14 +213,23 @@ pub async fn bootstrap_rust_bot(window: &Window, bot_name: String, directory: Pa
         return Err(BoostrapError::NameExists(sanitized_name));
     }
 
-    download_extract_bot_template(window, "https://github.com/NicEastvillage/RLBotRustTemplateBot/archive/master.zip", top_dir.as_path()).await?;
+    download_extract_bot_template(
+        window,
+        "https://github.com/NicEastvillage/RLBotRustTemplateBot/archive/master.zip",
+        top_dir.as_path(),
+    )
+    .await?;
 
     let config_file = top_dir.join("rustbot_dev").join("rustbot.cfg");
 
     let mut conf = load_cfg(&config_file).await?;
 
     conf.set(BOT_CONFIG_MODULE_HEADER, NAME_KEY, Some(bot_name.clone()));
-    conf.set(BOT_CONFIG_PARAMS_HEADER, EXECUTABLE_PATH_KEY, Some(format!("../target/debug/{bot_name}.exe")));
+    conf.set(
+        BOT_CONFIG_PARAMS_HEADER,
+        EXECUTABLE_PATH_KEY,
+        Some(format!("../target/debug/{bot_name}.exe")),
+    );
 
     save_cfg(&conf, &config_file).await?;
 
@@ -233,7 +268,12 @@ pub async fn bootstrap_scratch_bot(window: &Window, bot_name: String, directory:
         return Err(BoostrapError::NameExists(sanitized_name));
     }
 
-    download_extract_bot_template(window, "https://github.com/RLBot/RLBotScratchInterface/archive/gui-friendly.zip", top_dir.as_path()).await?;
+    download_extract_bot_template(
+        window,
+        "https://github.com/RLBot/RLBotScratchInterface/archive/gui-friendly.zip",
+        top_dir.as_path(),
+    )
+    .await?;
 
     // Choose appropriate file names based on the bot name
     let code_dir = top_dir.join(&sanitized_name);
@@ -245,9 +285,15 @@ pub async fn bootstrap_scratch_bot(window: &Window, bot_name: String, directory:
     replace_all_regex_in_file(
         &top_dir.join("rlbot.cfg"),
         &Regex::new(r"(?P<a>participant_config_\d = ).*$").unwrap(),
-        Regex::new(&format!(r"$a{}", Path::new(&sanitized_name).join(config_filename).to_string_lossy().replace('\\', "\\\\")))
-            .unwrap()
-            .to_string(),
+        Regex::new(&format!(
+            r"$a{}",
+            Path::new(&sanitized_name)
+                .join(config_filename)
+                .to_string_lossy()
+                .replace('\\', "\\\\")
+        ))
+        .unwrap()
+        .to_string(),
     )?;
 
     // We're assuming that the file structure / names in RLBotScratchInterface will not change.
