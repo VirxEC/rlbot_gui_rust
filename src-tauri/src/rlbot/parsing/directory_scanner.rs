@@ -24,9 +24,9 @@ pub async fn scan_directory_for_script_configs(window: &Window, root_dir: &str) 
 /// func will be ran on all items found in the directory at the same time (via `join_all`).
 async fn scan_directory_for_item<T, R, F>(window: &Window, root_dir: &str, func: F) -> Vec<T>
 where
-    T: Sized,
-    R: Future<Output = Result<T, RLBotCfgParseError>>,
-    F: FnMut(PathBuf) -> R,
+    T: Sized + Send,
+    R: Future<Output = Result<T, RLBotCfgParseError>> + Send,
+    F: FnMut(PathBuf) -> R + Send,
 {
     join_all(glob(&format!("{root_dir}/**/*.cfg")).unwrap().flatten().map(func))
         .await

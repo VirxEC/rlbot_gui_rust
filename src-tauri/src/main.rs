@@ -1,3 +1,4 @@
+#![warn(clippy::all)]
 #![allow(clippy::wildcard_imports)]
 #![recursion_limit = "256"]
 
@@ -45,8 +46,6 @@ use tauri::{async_runtime::block_on as tauri_block_on, App, Error as TauriError,
 use thiserror::Error;
 use tokio::sync::RwLock as AsyncRwLock;
 
-pub use serde;
-
 const MAIN_WINDOW_NAME: &str = "main";
 
 static NO_CONSOLE_WINDOWS: AtomicBool = AtomicBool::new(true);
@@ -77,10 +76,10 @@ static BOT_FOLDER_SETTINGS: AsyncRwLock<Lazy<BotFolders>> = AsyncRwLock::const_n
 macro_rules! impl_serialize_from_display {
     ($($t:ty),*) => {
         $(
-            impl $crate::serde::Serialize for $t {
+            impl ::serde::Serialize for $t {
                 fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
                 where
-                    S: $crate::serde::Serializer,
+                    S: ::serde::Serializer,
                 {
                     serializer.serialize_str(&self.to_string())
                 }
@@ -538,7 +537,7 @@ fn emit_console_text_emit_queue(window: &Window, mut updates: Vec<ConsoleTextUpd
 fn issue_console_update(text: String, replace_last: bool) -> Result<(), InternalConsoleError> {
     println!("{text}");
 
-    let converted_and_escaped = ansi_to_html::convert_escaped(&text)?;
+    let converted_and_escaped = ansi_to_html::convert(&text)?;
     let update = ConsoleTextUpdate::from(converted_and_escaped, replace_last);
     update_internal_console(&update)?;
 
@@ -707,7 +706,7 @@ fn main() {
     println!("Config path: {}", get_config_path().display());
 
     tauri::Builder::default()
-        .setup(|app| gui_setup(app))
+        .setup(gui_setup)
         .plugin(tauri_plugin::init())
         .invoke_handler(tauri::generate_handler![
             get_folder_settings,

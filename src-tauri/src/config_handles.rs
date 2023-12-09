@@ -202,8 +202,8 @@ pub fn pick_bot_config(window: Window) {
         .add_filter("Bot Cfg File", &["cfg"])
         .pick_file(move |path| {
             let Some(path) = path else {
-            return;
-        };
+                return;
+            };
 
             if let Err(error) =
                 tauri_block_on(BOT_FOLDER_SETTINGS.write()).add_file(&window, path.to_string_lossy().to_string())
@@ -219,8 +219,8 @@ pub fn pick_json_file(window: Window) {
         .add_filter("JSON File", &["json"])
         .pick_file(move |path| {
             let Some(path) = path else {
-            return;
-        };
+                return;
+            };
 
             if let Err(e) = window.emit("json_file_selected", path.to_string_lossy().to_string()) {
                 ccprintln!(&window, "Error emiting json_file_selected event: {e}");
@@ -630,7 +630,7 @@ pub struct GuiTabCategory {
 }
 
 impl GuiTabCategory {
-    pub fn new(primary: PrimaryCategories, secondary: usize) -> Self {
+    pub const fn new(primary: PrimaryCategories, secondary: usize) -> Self {
         Self { primary, secondary }
     }
 

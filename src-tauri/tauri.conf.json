@@ -30,9 +30,6 @@
     "security": {
       "csp": null
     },
-    "updater": {
-      "active": false
-    },
     "windows": [
       {
         "label": "main",

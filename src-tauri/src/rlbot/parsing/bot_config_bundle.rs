@@ -194,7 +194,7 @@ impl BotConfigBundle {
         }
     }
 
-    pub async fn minimal_from_path<T: AsRef<Path>>(config_path: T) -> Result<Self, RLBotCfgParseError> {
+    pub async fn minimal_from_path<T: AsRef<Path> + Send>(config_path: T) -> Result<Self, RLBotCfgParseError> {
         let config_path = config_path.as_ref();
         Self::minimal_from_conf(config_path, &load_cfg(config_path).await?)
     }
@@ -424,7 +424,7 @@ pub struct ScriptConfigBundle {
 }
 
 impl ScriptConfigBundle {
-    pub async fn minimal_from_path<T: AsRef<Path>>(config_path: T) -> Result<Self, RLBotCfgParseError> {
+    pub async fn minimal_from_path<T: AsRef<Path> + Send>(config_path: T) -> Result<Self, RLBotCfgParseError> {
         let config_path = config_path.as_ref();
         let conf = load_cfg(config_path).await?;
 

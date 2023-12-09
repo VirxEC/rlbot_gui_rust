@@ -20,7 +20,7 @@ pub fn log_text(text: String) -> Result<(), InternalConsoleError> {
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     PluginBuilder::new("eventhandler")
         .on_event(|_, event| {
-            if let RunEvent::Exit = event {
+            if matches!(event, RunEvent::Exit) {
                 if let Err(e) = tauri_block_on(async { shut_down_match_handler().await }) {
                     if let Err(e) = log_text(e.to_string()) {
                         println!("{e}");

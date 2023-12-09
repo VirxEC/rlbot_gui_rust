@@ -111,7 +111,7 @@ impl ProgressBarUpdate {
 /// * `local_folder_path`: The path to the folder to extract the zip to
 /// * `clobber`: Deletes `local_folder_path` if it already exists
 /// * `repo_full_name`: The owner/name of the repo, e.x. "RLBot/RLBotPack"
-async fn download_and_extract_repo_zip<T: IntoUrl, J: AsRef<Path>>(
+async fn download_and_extract_repo_zip<T: IntoUrl + Send, J: AsRef<Path> + Send>(
     window: &Window,
     client: &Client,
     download_url: T,
@@ -373,7 +373,7 @@ pub async fn update_bot_pack(window: &Window, repo_owner: &str, repo_name: &str,
             ccprintln!(window, "Error when updating progress bar: {}", e);
         }
 
-        if let ControlFlow::Break(_) = apply_patch(resp, window, &local_folder_path, &tag_deleted_files_path).await {
+        if apply_patch(resp, window, &local_folder_path, &tag_deleted_files_path).await == ControlFlow::Break(()) {
             break;
         }
 
@@ -602,7 +602,7 @@ impl MapPackUpdater {
         }
     }
 
-    async fn download_asset<T: AsRef<Path>>(
+    async fn download_asset<T: AsRef<Path> + Send>(
         &self,
         window: &Window,
         asset: &serde_json::Value,

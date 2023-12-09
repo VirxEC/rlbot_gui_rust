@@ -34,7 +34,7 @@ pub fn load_cfg_sync<T: AsRef<Path>>(path: T) -> Result<Ini, Error> {
 /// # Arguments
 ///
 /// * `path`: The path to the CFG file that needs to be loaded
-pub async fn load_cfg<T: AsRef<Path>>(path: T) -> Result<Ini, Error> {
+pub async fn load_cfg<T: AsRef<Path> + Send>(path: T) -> Result<Ini, Error> {
     let mut conf = Ini::new();
     conf.set_multiline(true);
     conf.set_comment_symbols(&[';']);
@@ -49,7 +49,7 @@ pub async fn load_cfg<T: AsRef<Path>>(path: T) -> Result<Ini, Error> {
 ///
 /// * `conf`: The CFG file that needs to be saved
 /// * `path`: Where to save the CFG file to
-pub async fn save_cfg<T: AsRef<Path>>(conf: &Ini, path: T) -> Result<(), Error> {
+pub async fn save_cfg<T: AsRef<Path> + Send>(conf: &Ini, path: T) -> Result<(), Error> {
     async_fs::write(path, conf.writes()).await?;
     Ok(())
 }
@@ -62,8 +62,13 @@ pub async fn save_cfg<T: AsRef<Path>>(conf: &Ini, path: T) -> Result<(), Error> 
 /// * `section`: The section of the CFG file to change
 /// * `key`: The key in `section` to change
 /// * `value`: What to set the value to
-pub async fn change_key_in_cfg<T: AsRef<Path>>(path: T, section: &str, key: &str, value: String) -> Result<(), Error> {
-    let mut conf = load_cfg(&path).await?;
+pub async fn change_key_in_cfg<T: AsRef<Path> + Send>(
+    path: T,
+    section: &str,
+    key: &str,
+    value: String,
+) -> Result<(), Error> {
+    let mut conf = load_cfg(path.as_ref()).await?;
     conf.set(section, key, Some(value));
     save_cfg(&conf, path).await
 }

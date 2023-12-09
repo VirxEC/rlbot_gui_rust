@@ -42,7 +42,7 @@ pub enum DownloadExtractError {
 /// * `window`: A reference to the GUI, obtained from a `#[tauri::command]` function
 /// * `url`: The URL of the ZIP that should be downloaded
 /// * `top_dir`: The path to the folder where the ZIP will get extracted
-async fn download_extract_bot_template<T: IntoUrl>(
+async fn download_extract_bot_template<T: IntoUrl + Send>(
     window: &Window,
     url: T,
     top_dir: &Path,

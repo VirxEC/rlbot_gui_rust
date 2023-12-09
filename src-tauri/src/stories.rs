@@ -2,10 +2,10 @@ use crate::rlbot::parsing::match_settings_config_parser::{MapType, MaxScore};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-pub(crate) mod bots_base;
-pub(crate) mod cmaps;
-pub(crate) mod default;
-pub(crate) mod easy;
+pub mod bots_base;
+pub mod cmaps;
+pub mod default;
+pub mod easy;
 
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]

@@ -28,7 +28,8 @@ use rayon::iter::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIter
 use std::{
     collections::HashMap,
     fs::{create_dir_all, File},
-    io::{copy, Cursor, Write},
+    io::{copy, Cursor, Result as IoResult, Write},
+    iter,
     path::Path,
     time::Instant,
 };
@@ -37,6 +38,7 @@ use thiserror::Error;
 use tokio::{
     fs::File as AsyncFile,
     io::{AsyncReadExt, BufReader},
+    net::TcpStream,
 };
 
 const DEBUG_MODE_SHORT_GAMES: bool = false;
@@ -177,11 +179,30 @@ pub async fn install_requirements(window: Window, config_path: String) -> Result
     })
 }
 
+/// Captive portals: <https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/captivePortal>
+pub const ADDRS: [&str; 2] = [
+    // - http://clients3.google.com/generate_204
+    "clients3.google.com:80",
+    // - http://detectportal.firefox.com/success.txt
+    "detectportal.firefox.com:80",
+];
+
+pub async fn check_online() -> IoResult<()> {
+    // No timeout.
+    if TcpStream::connect(ADDRS[0]).await.is_ok() {
+        Ok(())
+    } else if let Err(e) = TcpStream::connect(ADDRS[1]).await {
+        Err(e)
+    } else {
+        Ok(())
+    }
+}
+
 #[tauri::command]
 pub async fn install_basic_packages(window: Window) -> PackageResult {
     let packages = PACKAGES.iter().map(ToString::to_string).collect::<Vec<String>>();
 
-    if matches!(online::tokio::check(None).await, Err(_)) {
+    if check_online().await.is_err() {
         ccprintln(
             &window,
             "Error connecting to the internet to install/update basic packages. Please check your internet connection and try again.",
@@ -370,7 +391,7 @@ pub fn get_missing_script_logos(scripts: Vec<ScriptConfigBundle>) -> Vec<LogoUpd
 }
 
 #[tauri::command]
-pub fn is_windows() -> bool {
+pub const fn is_windows() -> bool {
     cfg!(windows)
 }
 
@@ -661,7 +682,10 @@ fn issue_match_handler_command<S: AsRef<OsStr>>(
 
     if match_handler_stdin.is_none() {
         let CreateHandler::Yes(use_pipe) = create_handler else {
-            ccprintln(window, "Not issuing command to handler as it's down and I was told to not start it");
+            ccprintln(
+                window,
+                "Not issuing command to handler as it's down and I was told to not start it",
+            );
             return Ok(());
         };
 
@@ -1022,11 +1046,7 @@ fn make_player_configs(
         .filter_map(|name| all_bots.get(name))
         .map(|bot| bot_to_team_bot_bundle(bot, Team::Orange, botpack_root));
 
-    [make_human_config(Team::Blue)]
-        .into_iter()
-        .chain(blue)
-        .chain(orange)
-        .collect()
+    iter::once(make_human_config(Team::Blue)).chain(blue).chain(orange).collect()
 }
 
 /// Load a script from a Script config

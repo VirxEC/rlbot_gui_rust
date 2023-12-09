@@ -494,7 +494,7 @@ pub struct ConsoleTextUpdate {
 
 impl ConsoleTextUpdate {
     const fn new(text: String, replace_last: bool) -> Self {
-        ConsoleTextUpdate {
+        Self {
             content: text,
             replace_last,
         }
@@ -518,7 +518,7 @@ impl ConsoleTextUpdate {
             text = format!("<span style='color: {color}'>{text}</span>");
         }
 
-        ConsoleTextUpdate::new(text, replace_last)
+        Self::new(text, replace_last)
     }
 }
 
