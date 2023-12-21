@@ -1,5 +1,5 @@
 use std::fmt::{Display, Formatter};
-use sysinfo::{ProcessExt, ProcessRefreshKind, RefreshKind, System, SystemExt};
+use sysinfo::{ProcessRefreshKind, RefreshKind, System, UpdateKind};
 use thiserror::Error;
 
 const ROCKET_LEAGUE_PROGRAM_NAME: &str = if cfg!(windows) { "RocketLeague.exe" } else { "RocketLeague" };
@@ -15,7 +15,9 @@ impl Display for RLNoBotError {
 }
 
 pub fn is_rocket_league_running(port: u16) -> Result<bool, RLNoBotError> {
-    let system = System::new_with_specifics(RefreshKind::new().with_processes(ProcessRefreshKind::new().with_user()));
+    let system = System::new_with_specifics(
+        RefreshKind::new().with_processes(ProcessRefreshKind::new().with_user(UpdateKind::OnlyIfNotSet)),
+    );
     let mut rl_procs = system.processes_by_name(ROCKET_LEAGUE_PROGRAM_NAME);
     let port_arg = format!("{}:{port}", REQUIRED_ARGS[1]);
 

@@ -1,5 +1,5 @@
 use crate::ccprintln;
-use sysinfo::{ProcessExt, ProcessRefreshKind, RefreshKind, System, SystemExt};
+use sysinfo::{ProcessRefreshKind, RefreshKind, System};
 use tauri::Window;
 
 pub const IDEAL_RLBOT_PORT: u16 = 23233;
